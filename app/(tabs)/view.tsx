@@ -182,6 +182,13 @@ export default function ViewScreen() {
                 </View>
               </TouchableOpacity>
             )}
+            {isPlaying && (
+              <View style={styles.playingOverlay}>
+                <View style={styles.playingIndicator}>
+                  <Text style={styles.playingText}>Playing...</Text>
+                </View>
+              </View>
+            )}
           </View>
 
           <View style={styles.videoControls}>
@@ -308,6 +315,27 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#374151',
     marginLeft: 4,
+  },
+  playingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playingIndicator: {
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  playingText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
   },
   videoControls: {
     flexDirection: 'row',
