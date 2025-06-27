@@ -28,14 +28,17 @@ export default function ViewScreen() {
 
   useEffect(() => {
     if (hasVideos()) {
-      const video = getNextVideo();
-      if (video) {
-        setTimeLeft(video.duration);
-        setCoinsToEarn(video.coinReward);
-        if (autoPlay) {
-          setIsPlaying(true);
+      // Defer state updates to prevent render-time state changes
+      setTimeout(() => {
+        const video = getNextVideo();
+        if (video) {
+          setTimeLeft(video.duration);
+          setCoinsToEarn(video.coinReward);
+          if (autoPlay) {
+            setIsPlaying(true);
+          }
         }
-      }
+      }, 0);
     }
   }, []);
 
@@ -76,14 +79,17 @@ export default function ViewScreen() {
 
   const loadNextVideo = () => {
     if (hasVideos()) {
-      const video = getNextVideo();
-      if (video) {
-        setTimeLeft(video.duration);
-        setCoinsToEarn(video.coinReward);
-        if (autoPlay) {
-          setIsPlaying(true);
+      // Defer state updates to prevent render-time state changes
+      setTimeout(() => {
+        const video = getNextVideo();
+        if (video) {
+          setTimeLeft(video.duration);
+          setCoinsToEarn(video.coinReward);
+          if (autoPlay) {
+            setIsPlaying(true);
+          }
         }
-      }
+      }, 0);
     }
   };
 
