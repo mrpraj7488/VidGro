@@ -172,11 +172,11 @@ export default function PromoteScreen() {
                   <View style={styles.costRow}>
                     <DollarSign size={20} color="#FFFFFF" />
                     <Text style={styles.costText}>
-                      Total Cost: {calculateCost(parseInt(videoDuration), parseInt(viewsGoal))} coins
+                      Total Cost: {String(calculateCost(parseInt(videoDuration), parseInt(viewsGoal)))} coins
                     </Text>
                   </View>
                   <Text style={styles.earningText}>
-                    Viewers earn: {calculateEarning(parseInt(videoDuration))} coins per view
+                    Viewers earn: {String(calculateEarning(parseInt(videoDuration)))} coins per view
                   </Text>
                 </LinearGradient>
               </View>

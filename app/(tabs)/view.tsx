@@ -98,6 +98,11 @@ function ViewScreenContent() {
 
   const startWatchingVideo = async (video: Video) => {
     try {
+      // Ensure video object is valid before proceeding
+      if (!video || !video.id) {
+        throw new Error('Invalid video object');
+      }
+
       const response = await videoService.startWatching(video.id);
       
       if (response.success) {
@@ -158,14 +163,24 @@ function ViewScreenContent() {
   };
 
   const loadNextVideo = () => {
-    const currentIndex = availableVideos.findIndex(v => v.id === currentVideo?.id);
+    if (!currentVideo || availableVideos.length === 0) {
+      loadVideos();
+      return;
+    }
+
+    const currentIndex = availableVideos.findIndex(v => v.id === currentVideo.id);
     const nextIndex = (currentIndex + 1) % availableVideos.length;
     
     if (nextIndex === 0) {
       // Reload videos if we've reached the end
       loadVideos();
     } else {
-      startWatchingVideo(availableVideos[nextIndex]);
+      const nextVideo = availableVideos[nextIndex];
+      if (nextVideo && nextVideo.id) {
+        startWatchingVideo(nextVideo);
+      } else {
+        loadVideos();
+      }
     }
   };
 
@@ -311,7 +326,7 @@ function ViewScreenContent() {
             </View>
             <View style={styles.statCard}>
               <DollarSign size={24} color="#00FF00" />
-              <Text style={styles.statNumber} style={{ color: '#00FF00' }}>{coinsToEarn}</Text>
+              <Text style={[styles.statNumber, { color: '#00FF00' }]}>{coinsToEarn}</Text>
               <Text style={styles.statLabel}>Coins Reward</Text>
             </View>
           </View>

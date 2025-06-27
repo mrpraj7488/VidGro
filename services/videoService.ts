@@ -41,14 +41,14 @@ class VideoService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Simplified query without joins to avoid relationship issues
+      // Use id for ordering instead of created_at since created_at column doesn't exist
       const { data: videos, error } = await supabase
         .from('promoted_videos')
         .select('*')
         .eq('status', 'active')
         .lt('views_completed', 'views_requested')
         .neq('promoter_id', user.id)
-        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .range(offset, offset + limit - 1);
 
       if (error) {
@@ -60,7 +60,7 @@ class VideoService {
             .select('*')
             .lt('views_completed', 'views_requested')
             .neq('promoter_id', user.id)
-            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
             .range(offset, offset + limit - 1);
 
           if (fallbackError) throw fallbackError;
@@ -105,7 +105,7 @@ class VideoService {
   private getMockVideos(): Video[] {
     return [
       {
-        id: 1,
+        id: 'mock-1',
         promoter_id: 'mock-user-1',
         youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
         youtube_video_id: 'dQw4w9WgXcQ',
@@ -124,7 +124,7 @@ class VideoService {
         watch_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
       },
       {
-        id: 2,
+        id: 'mock-2',
         promoter_id: 'mock-user-2',
         youtube_url: 'https://www.youtube.com/watch?v=9bZkp7q19f0',
         youtube_video_id: '9bZkp7q19f0',
@@ -145,7 +145,7 @@ class VideoService {
     ];
   }
 
-  async getVideoDetails(videoId: number): Promise<Video | null> {
+  async getVideoDetails(videoId: string | number): Promise<Video | null> {
     try {
       const { data: video, error } = await supabase
         .from('promoted_videos')
@@ -188,7 +188,7 @@ class VideoService {
     }
   }
 
-  async startWatching(videoId: number): Promise<StartWatchResponse> {
+  async startWatching(videoId: string | number): Promise<StartWatchResponse> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');

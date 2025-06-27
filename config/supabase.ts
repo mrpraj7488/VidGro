@@ -11,7 +11,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Database types
+// Database types - Updated to handle both UUID and integer IDs
 export interface User {
   id: string;
   email: string;
@@ -26,7 +26,7 @@ export interface User {
 }
 
 export interface PromotedVideo {
-  id: number;
+  id: string | number; // Support both UUID and integer IDs
   promoter_id: string;
   youtube_url: string;
   youtube_video_id: string;
@@ -45,7 +45,7 @@ export interface PromotedVideo {
 export interface WatchSession {
   id: number;
   user_id: string;
-  video_id: number;
+  video_id: string | number; // Support both UUID and integer IDs
   watch_duration: number;
   completion_percentage: number;
   coins_earned: number;
