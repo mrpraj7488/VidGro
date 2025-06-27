@@ -9,16 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Eye, 
-  DollarSign, 
-  Clock, 
-  Calendar,
-  Target,
-  Activity
-} from 'lucide-react-native';
+import { ChartBar as BarChart3, TrendingUp, Eye, DollarSign, Clock, Calendar, Target, Activity } from 'lucide-react-native';
 import { useUserStore } from '@/stores/userStore';
 import { useVideoStore } from '@/stores/videoStore';
 import Header from '@/components/Header';
