@@ -52,7 +52,8 @@
     "dotenv": "^16.3.1",
     "uuid": "^9.0.1",
     "axios": "^1.6.2",
-    "@react-native-async-storage/async-storage": "^1.21.0"
+    "@react-native-async-storage/async-storage": "^1.21.0",
+    "@supabase/supabase-js": "^2.39.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../config/firebase');
 const database = require('../config/database');
+const { supabase } = require('../config/supabase');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
@@ -12,6 +13,50 @@ const generateToken = (userId) => {
 // Verify JWT token
 const verifyJWT = (token) => {
     return jwt.verify(token, JWT_SECRET);
+};
+
+// Get user by ID from appropriate database
+const getUserById = async (userId) => {
+    if (database.useSupabase) {
+        return await database.supabaseGet('users', { id: userId });
+    } else {
+        return await database.get('SELECT * FROM users WHERE id = ?', [userId]);
+    }
+};
+
+// Get user by email from appropriate database
+const getUserByEmail = async (email) => {
+    if (database.useSupabase) {
+        return await database.supabaseGet('users', { email });
+    } else {
+        return await database.get('SELECT * FROM users WHERE email = ?', [email]);
+    }
+};
+
+// Create user in appropriate database
+const createUser = async (userData) => {
+    if (database.useSupabase) {
+        const result = await database.supabaseRun('users', 'insert', userData);
+        const user = await getUserById(result.id);
+        
+        // Create user settings
+        await database.supabaseRun('user_settings', 'insert', { user_id: result.id });
+        
+        return { id: result.id, user };
+    } else {
+        const result = await database.run(
+            'INSERT INTO users (email, password_hash, firebase_uid) VALUES (?, ?, ?)',
+            [userData.email, userData.password_hash, userData.firebase_uid]
+        );
+        
+        await database.run(
+            'INSERT INTO user_settings (user_id) VALUES (?)',
+            [result.id]
+        );
+        
+        const user = await getUserById(result.id);
+        return { id: result.id, user };
+    }
 };
 
 // Authentication middleware
@@ -30,7 +75,7 @@ const authenticate = async (req, res, next) => {
         try {
             // Try JWT first (for our own tokens)
             const decoded = verifyJWT(token);
-            const user = await database.get('SELECT * FROM users WHERE id = ?', [decoded.userId]);
+            const user = await getUserById(decoded.userId);
             
             if (!user) {
                 return res.status(401).json({ 
@@ -45,21 +90,19 @@ const authenticate = async (req, res, next) => {
             // If JWT fails, try Firebase token
             try {
                 const decodedToken = await verifyToken(token);
-                let user = await database.get('SELECT * FROM users WHERE email = ?', [decodedToken.email]);
+                let user = await getUserByEmail(decodedToken.email);
                 
                 // Auto-create user if doesn't exist (Firebase SSO)
                 if (!user) {
-                    const result = await database.run(
-                        'INSERT INTO users (email, password_hash) VALUES (?, ?)',
-                        [decodedToken.email, 'firebase_auth']
-                    );
+                    const userData = {
+                        email: decodedToken.email,
+                        password_hash: 'firebase_auth',
+                        firebase_uid: decodedToken.uid,
+                        coin_balance: 1000
+                    };
                     
-                    await database.run(
-                        'INSERT INTO user_settings (user_id) VALUES (?)',
-                        [result.id]
-                    );
-                    
-                    user = await database.get('SELECT * FROM users WHERE id = ?', [result.id]);
+                    const result = await createUser(userData);
+                    user = result.user;
                 }
 
                 req.user = user;
@@ -111,5 +154,8 @@ module.exports = {
     requireVIP,
     generateToken,
     verifyJWT,
-    validateRequest
+    validateRequest,
+    getUserById,
+    getUserByEmail,
+    createUser
 };

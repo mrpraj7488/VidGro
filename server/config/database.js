@@ -1,11 +1,19 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const { supabase } = require('./supabase');
 
 class Database {
     constructor() {
         this.db = null;
-        this.init();
+        this.useSupabase = process.env.NODE_ENV === 'production' || process.env.USE_SUPABASE === 'true';
+        
+        if (this.useSupabase) {
+            console.log('🚀 Using Supabase as primary database');
+        } else {
+            console.log('🔧 Using SQLite for development (fallback)');
+            this.init();
+        }
     }
 
     init() {
@@ -19,9 +27,9 @@ class Database {
 
         this.db = new sqlite3.Database(dbPath, (err) => {
             if (err) {
-                console.error('❌ Error opening database:', err);
+                console.error('❌ Error opening SQLite database:', err);
             } else {
-                console.log('✅ Connected to SQLite database');
+                console.log('✅ Connected to SQLite database (fallback)');
                 this.createTables();
             }
         });
@@ -144,9 +152,9 @@ class Database {
         
         this.db.exec(schema, (err) => {
             if (err) {
-                console.error('❌ Error creating tables:', err);
+                console.error('❌ Error creating SQLite tables:', err);
             } else {
-                console.log('✅ Database tables created successfully');
+                console.log('✅ SQLite tables created successfully (fallback)');
             }
         });
     }
@@ -155,8 +163,91 @@ class Database {
         return this.db;
     }
 
-    // Promisify database operations
-    run(sql, params = []) {
+    // Supabase operations
+    async supabaseRun(table, operation, data, conditions = {}) {
+        try {
+            let query = supabase.from(table);
+            
+            switch (operation) {
+                case 'insert':
+                    const { data: insertData, error: insertError } = await query.insert(data).select();
+                    if (insertError) throw insertError;
+                    return { id: insertData[0]?.id, changes: 1 };
+                
+                case 'update':
+                    const { data: updateData, error: updateError } = await query
+                        .update(data)
+                        .match(conditions)
+                        .select();
+                    if (updateError) throw updateError;
+                    return { changes: updateData.length };
+                
+                case 'delete':
+                    const { data: deleteData, error: deleteError } = await query
+                        .delete()
+                        .match(conditions);
+                    if (deleteError) throw deleteError;
+                    return { changes: deleteData?.length || 0 };
+                
+                default:
+                    throw new Error(`Unsupported operation: ${operation}`);
+            }
+        } catch (error) {
+            console.error(`Supabase ${operation} error:`, error);
+            throw error;
+        }
+    }
+
+    async supabaseGet(table, conditions = {}, select = '*') {
+        try {
+            let query = supabase.from(table).select(select);
+            
+            Object.entries(conditions).forEach(([key, value]) => {
+                query = query.eq(key, value);
+            });
+            
+            const { data, error } = await query.single();
+            if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows found
+            return data;
+        } catch (error) {
+            console.error('Supabase get error:', error);
+            throw error;
+        }
+    }
+
+    async supabaseAll(table, conditions = {}, select = '*', limit = null, orderBy = null) {
+        try {
+            let query = supabase.from(table).select(select);
+            
+            Object.entries(conditions).forEach(([key, value]) => {
+                query = query.eq(key, value);
+            });
+            
+            if (orderBy) {
+                query = query.order(orderBy.column, { ascending: orderBy.ascending !== false });
+            }
+            
+            if (limit) {
+                query = query.limit(limit);
+            }
+            
+            const { data, error } = await query;
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Supabase all error:', error);
+            throw error;
+        }
+    }
+
+    // Unified database operations that work with both Supabase and SQLite
+    async run(sql, params = []) {
+        if (this.useSupabase) {
+            // For Supabase, we need to parse the SQL and convert to Supabase operations
+            // This is a simplified approach - in production, you'd want more sophisticated SQL parsing
+            throw new Error('Direct SQL not supported with Supabase. Use specific methods.');
+        }
+        
         return new Promise((resolve, reject) => {
             this.db.run(sql, params, function(err) {
                 if (err) {
@@ -168,7 +259,11 @@ class Database {
         });
     }
 
-    get(sql, params = []) {
+    async get(sql, params = []) {
+        if (this.useSupabase) {
+            throw new Error('Direct SQL not supported with Supabase. Use specific methods.');
+        }
+        
         return new Promise((resolve, reject) => {
             this.db.get(sql, params, (err, row) => {
                 if (err) {
@@ -180,7 +275,11 @@ class Database {
         });
     }
 
-    all(sql, params = []) {
+    async all(sql, params = []) {
+        if (this.useSupabase) {
+            throw new Error('Direct SQL not supported with Supabase. Use specific methods.');
+        }
+        
         return new Promise((resolve, reject) => {
             this.db.all(sql, params, (err, rows) => {
                 if (err) {
@@ -192,16 +291,18 @@ class Database {
         });
     }
 
-    close() {
-        return new Promise((resolve, reject) => {
-            this.db.close((err) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
+    async close() {
+        if (this.db) {
+            return new Promise((resolve, reject) => {
+                this.db.close((err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
             });
-        });
+        }
     }
 }
 

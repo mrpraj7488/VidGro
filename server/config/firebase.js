@@ -1,4 +1,6 @@
 const admin = require('firebase-admin');
+const { initializeApp } = require('firebase/app');
+const { getAuth } = require('firebase/auth');
 
 // Firebase configuration
 const firebaseConfig = {
@@ -11,26 +13,52 @@ const firebaseConfig = {
     measurementId: process.env.FIREBASE_MEASUREMENT_ID || "G-NMH0VQBNTH"
 };
 
-// Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-    try {
-        admin.initializeApp({
-            credential: admin.credential.applicationDefault(),
-            projectId: firebaseConfig.projectId
-        });
-        console.log('✅ Firebase Admin SDK initialized');
-    } catch (error) {
-        console.log('⚠️ Firebase Admin SDK initialization failed, using mock auth:', error.message);
-    }
+// Initialize Firebase Client SDK
+let clientAuth;
+try {
+    const app = initializeApp(firebaseConfig);
+    clientAuth = getAuth(app);
+    console.log('✅ Firebase Client SDK initialized');
+} catch (error) {
+    console.log('⚠️ Firebase Client SDK initialization failed:', error.message);
 }
 
-const auth = admin.auth();
+// Initialize Firebase Admin SDK
+let adminAuth;
+if (!admin.apps.length) {
+    try {
+        // Try to initialize with service account (production)
+        if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                projectId: firebaseConfig.projectId
+            });
+        } else {
+            // Fallback to application default credentials (development)
+            admin.initializeApp({
+                credential: admin.credential.applicationDefault(),
+                projectId: firebaseConfig.projectId
+            });
+        }
+        adminAuth = admin.auth();
+        console.log('✅ Firebase Admin SDK initialized');
+    } catch (error) {
+        console.log('⚠️ Firebase Admin SDK initialization failed:', error.message);
+        console.log('📝 Using mock authentication for development');
+    }
+}
 
 // Verify Firebase ID token
 const verifyToken = async (idToken) => {
     try {
-        const decodedToken = await auth.verifyIdToken(idToken);
-        return decodedToken;
+        if (adminAuth) {
+            const decodedToken = await adminAuth.verifyIdToken(idToken);
+            return decodedToken;
+        } else {
+            // Mock verification for development
+            return mockVerifyToken(idToken);
+        }
     } catch (error) {
         throw new Error('Invalid Firebase token');
     }
@@ -48,8 +76,24 @@ const mockVerifyToken = async (idToken) => {
     throw new Error('Invalid mock token');
 };
 
+// Create custom token for user
+const createCustomToken = async (uid) => {
+    try {
+        if (adminAuth) {
+            return await adminAuth.createCustomToken(uid);
+        } else {
+            // Return mock token for development
+            return `mock_${uid}`;
+        }
+    } catch (error) {
+        throw new Error('Failed to create custom token');
+    }
+};
+
 module.exports = {
     firebaseConfig,
-    auth,
-    verifyToken: process.env.NODE_ENV === 'development' ? mockVerifyToken : verifyToken
+    clientAuth,
+    adminAuth,
+    verifyToken,
+    createCustomToken
 };

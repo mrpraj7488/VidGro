@@ -5,6 +5,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const API_BASE_URL = 'http://localhost:3000/api';
 export const HEALTH_CHECK_URL = 'http://localhost:3000/health';
 
+// Supabase Configuration
+export const SUPABASE_URL = 'https://your-project.supabase.co';
+export const SUPABASE_ANON_KEY = 'your-supabase-anon-key';
+
 // YouTube API Configuration
 export const YOUTUBE_API_KEY = 'AIzaSyBJ0Tu-2JFectz7e7ieMEJ7Pl8Yh0o8Kg8';
 
@@ -54,6 +58,7 @@ apiClient.interceptors.response.use(
       // Clear invalid token
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('user_data');
+      await AsyncStorage.removeItem('firebase_token');
     }
     return Promise.reject(error);
   }

@@ -1,5 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import apiClient from '@/config/api';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import apiClient, { firebaseConfig } from '@/config/api';
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 export interface User {
   id: number;
@@ -15,6 +21,7 @@ export interface AuthResponse {
   message: string;
   data: {
     token: string;
+    firebase_token?: string;
     user: User;
   };
 }
@@ -42,13 +49,26 @@ class AuthService {
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
+      // Try Firebase authentication first
+      let firebaseToken = null;
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+        firebaseToken = await userCredential.user.getIdToken();
+      } catch (firebaseError) {
+        console.log('Firebase login failed, trying backend auth:', firebaseError);
+      }
+
+      // Login through our backend (which handles both Firebase and local auth)
       const response = await apiClient.post('/auth/login', credentials);
       
       if (response.data.success) {
-        const { token, user } = response.data.data;
+        const { token, firebase_token, user } = response.data.data;
         
-        // Store token and user data
+        // Store tokens and user data
         await AsyncStorage.setItem('auth_token', token);
+        if (firebase_token || firebaseToken) {
+          await AsyncStorage.setItem('firebase_token', firebase_token || firebaseToken);
+        }
         await AsyncStorage.setItem('user_data', JSON.stringify(user));
         
         this.currentUser = user;
@@ -63,13 +83,26 @@ class AuthService {
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
     try {
+      // Try Firebase registration first
+      let firebaseToken = null;
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, credentials.email, credentials.password);
+        firebaseToken = await userCredential.user.getIdToken();
+      } catch (firebaseError) {
+        console.log('Firebase registration failed, trying backend auth:', firebaseError);
+      }
+
+      // Register through our backend (which handles both Firebase and local auth)
       const response = await apiClient.post('/auth/register', credentials);
       
       if (response.data.success) {
-        const { token, user } = response.data.data;
+        const { token, firebase_token, user } = response.data.data;
         
-        // Store token and user data
+        // Store tokens and user data
         await AsyncStorage.setItem('auth_token', token);
+        if (firebase_token || firebaseToken) {
+          await AsyncStorage.setItem('firebase_token', firebase_token || firebaseToken);
+        }
         await AsyncStorage.setItem('user_data', JSON.stringify(user));
         
         this.currentUser = user;
@@ -84,12 +117,25 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      await apiClient.post('/auth/logout');
+      // Logout from Firebase
+      try {
+        await signOut(auth);
+      } catch (firebaseError) {
+        console.log('Firebase logout error:', firebaseError);
+      }
+
+      // Logout from our backend
+      try {
+        await apiClient.post('/auth/logout');
+      } catch (error) {
+        console.error('Backend logout error:', error);
+      }
     } catch (error) {
-      console.error('Logout API error:', error);
+      console.error('Logout error:', error);
     } finally {
       // Clear local storage regardless of API response
       await AsyncStorage.removeItem('auth_token');
+      await AsyncStorage.removeItem('firebase_token');
       await AsyncStorage.removeItem('user_data');
       this.currentUser = null;
     }
@@ -145,6 +191,15 @@ class AuthService {
       return await AsyncStorage.getItem('auth_token');
     } catch (error) {
       console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  async getFirebaseToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('firebase_token');
+    } catch (error) {
+      console.error('Error getting Firebase token:', error);
       return null;
     }
   }
