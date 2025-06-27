@@ -125,7 +125,7 @@ export default function AnalyticsScreen() {
                 <Activity size={20} color="#1E90FF" />
               </View>
               <View style={styles.historyContent}>
-                <Text style={styles.historyTitle}>Video #{index + 1}</Text>
+                <Text style={styles.historyItemTitle}>Video #{index + 1}</Text>
                 <Text style={styles.historySubtitle} numberOfLines={1}>
                   {promotion.url}
                 </Text>
@@ -449,6 +449,11 @@ const styles = StyleSheet.create({
   historyContent: {
     flex: 1,
     gap: 4,
+  },
+  historyItemTitle: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    color: '#000000',
   },
   historySubtitle: {
     fontSize: 14,

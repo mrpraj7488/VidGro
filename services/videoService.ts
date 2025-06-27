@@ -41,13 +41,10 @@ class VideoService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get videos that user hasn't completed recently
+      // Get videos without joins to avoid relationship issues
       const { data: videos, error } = await supabase
         .from('promoted_videos')
-        .select(`
-          *,
-          users!inner(email)
-        `)
+        .select('*')
         .eq('status', 'active')
         .lt('views_completed', 'views_requested')
         .neq('promoter_id', user.id)
@@ -86,10 +83,7 @@ class VideoService {
     try {
       const { data: video, error } = await supabase
         .from('promoted_videos')
-        .select(`
-          *,
-          users!inner(email)
-        `)
+        .select('*')
         .eq('id', videoId)
         .single();
 
@@ -206,10 +200,7 @@ class VideoService {
       // Get session details
       const { data: session, error: sessionError } = await supabase
         .from('watch_sessions')
-        .select(`
-          *,
-          promoted_videos(duration)
-        `)
+        .select('*, promoted_videos!inner(duration)')
         .eq('id', sessionId)
         .eq('user_id', user.id)
         .eq('completed', false)
@@ -250,10 +241,7 @@ class VideoService {
       // Get session with video details
       const { data: session, error: sessionError } = await supabase
         .from('watch_sessions')
-        .select(`
-          *,
-          promoted_videos(id, duration, coin_reward, promoter_id, title, views_completed, views_requested, status)
-        `)
+        .select('*, promoted_videos!inner(id, duration, coin_reward, promoter_id, title, views_completed, views_requested, status)')
         .eq('id', sessionId)
         .eq('user_id', user.id)
         .eq('completed', false)
