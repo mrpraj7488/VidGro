@@ -1,60 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  Image,
   Switch,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ExternalLink, Play, Pause, Volume2, VolumeX, Maximize, SkipForward } from 'lucide-react-native';
+import { WebView } from 'react-native-webview';
+import { ExternalLink, Play, Pause, SkipForward, Clock, DollarSign } from 'lucide-react-native';
 import { useUserStore } from '@/stores/userStore';
-import { useVideoStore } from '@/stores/videoStore';
+import videoService, { Video, WatchSession } from '@/services/videoService';
+import authService from '@/services/authService';
+import AuthGuard from '@/components/AuthGuard';
 import Header from '@/components/Header';
 
 const { width } = Dimensions.get('window');
 
-export default function ViewScreen() {
-  const { coins, addCoins, incrementVideoCount, videosWatched } = useUserStore();
-  const { currentVideo, getNextVideo, hasVideos } = useVideoStore();
+function ViewScreenContent() {
+  const { coins, addCoins, incrementVideoCount } = useUserStore();
+  const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
+  const [availableVideos, setAvailableVideos] = useState<Video[]>([]);
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [coinsToEarn, setCoinsToEarn] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [autoPlay, setAutoPlay] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const webViewRef = useRef<WebView>(null);
+  const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (hasVideos()) {
-      setTimeout(() => {
-        const video = getNextVideo();
-        if (video) {
-          setTimeLeft(video.duration);
-          setTotalDuration(video.duration);
-          setCoinsToEarn(video.coinReward);
-          setProgress(0);
-          if (autoPlay) {
-            setIsPlaying(true);
-          }
-        }
-      }, 0);
-    }
+    loadVideos();
   }, []);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
     if (isPlaying && timeLeft > 0) {
-      interval = setInterval(() => {
+      progressInterval.current = setInterval(() => {
         setTimeLeft((prev) => {
           const newTime = prev - 1;
           const newProgress = ((totalDuration - newTime) / totalDuration) * 100;
           setProgress(newProgress);
+          
+          // Update progress every 5 seconds
+          if ((totalDuration - newTime) % 5 === 0 && sessionId) {
+            updateWatchProgress(newProgress);
+          }
           
           if (newTime <= 0) {
             handleVideoComplete();
@@ -63,36 +62,110 @@ export default function ViewScreen() {
           return newTime;
         });
       }, 1000);
+    } else {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+        progressInterval.current = null;
+      }
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, timeLeft, totalDuration]);
 
-  const handleVideoComplete = () => {
-    addCoins(coinsToEarn);
-    incrementVideoCount();
-    setIsPlaying(false);
-    
-    Alert.alert(
-      'Congratulations!',
-      `You earned ${coinsToEarn} coins! 🎉`,
-      [{ text: 'Continue', onPress: loadNextVideo }]
-    );
+    return () => {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+    };
+  }, [isPlaying, timeLeft, totalDuration, sessionId]);
+
+  const loadVideos = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const videos = await videoService.getAvailableVideos(10, 0);
+      setAvailableVideos(videos);
+      
+      if (videos.length > 0) {
+        await startWatchingVideo(videos[0]);
+      } else {
+        setError('No videos available to watch. Check back later!');
+      }
+    } catch (error: any) {
+      console.error('Error loading videos:', error);
+      setError('Failed to load videos. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startWatchingVideo = async (video: Video) => {
+    try {
+      const response = await videoService.startWatching(video.id);
+      
+      if (response.success) {
+        setCurrentVideo(video);
+        setSessionId(response.data.session_id);
+        setTimeLeft(video.duration);
+        setTotalDuration(video.duration);
+        setCoinsToEarn(Math.floor(video.coin_reward * video.duration));
+        setProgress(0);
+        
+        if (autoPlay) {
+          setIsPlaying(true);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error starting video:', error);
+      Alert.alert('Error', error.message || 'Failed to start video');
+      loadNextVideo();
+    }
+  };
+
+  const updateWatchProgress = async (completionPercentage: number) => {
+    if (!sessionId) return;
+
+    try {
+      const watchDuration = totalDuration - timeLeft;
+      await videoService.updateProgress(sessionId, watchDuration, completionPercentage);
+    } catch (error) {
+      console.error('Error updating progress:', error);
+    }
+  };
+
+  const handleVideoComplete = async () => {
+    if (!sessionId) return;
+
+    try {
+      setIsPlaying(false);
+      const response = await videoService.completeWatching(sessionId);
+      
+      if (response.success) {
+        addCoins(response.data.coins_earned);
+        incrementVideoCount();
+        
+        // Refresh user data
+        await authService.refreshUserData();
+        
+        Alert.alert(
+          'Congratulations!',
+          `You earned ${response.data.coins_earned} coins! 🎉`,
+          [{ text: 'Continue', onPress: loadNextVideo }]
+        );
+      }
+    } catch (error: any) {
+      console.error('Error completing video:', error);
+      Alert.alert('Error', error.message || 'Failed to complete video');
+      loadNextVideo();
+    }
   };
 
   const loadNextVideo = () => {
-    if (hasVideos()) {
-      setTimeout(() => {
-        const video = getNextVideo();
-        if (video) {
-          setTimeLeft(video.duration);
-          setTotalDuration(video.duration);
-          setCoinsToEarn(video.coinReward);
-          setProgress(0);
-          if (autoPlay) {
-            setIsPlaying(true);
-          }
-        }
-      }, 0);
+    const currentIndex = availableVideos.findIndex(v => v.id === currentVideo?.id);
+    const nextIndex = (currentIndex + 1) % availableVideos.length;
+    
+    if (nextIndex === 0) {
+      // Reload videos if we've reached the end
+      loadVideos();
+    } else {
+      startWatchingVideo(availableVideos[nextIndex]);
     }
   };
 
@@ -102,39 +175,49 @@ export default function ViewScreen() {
       'You won\'t earn any coins if you skip this video.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Skip', onPress: () => {
-          setIsPlaying(false);
-          loadNextVideo();
-        }}
+        { 
+          text: 'Skip', 
+          style: 'destructive',
+          onPress: () => {
+            setIsPlaying(false);
+            loadNextVideo();
+          }
+        }
       ]
     );
   };
 
   const handleOpenYouTube = () => {
-    Alert.alert('Open YouTube', 'This would open the video in YouTube app.');
+    if (currentVideo) {
+      Alert.alert('Open YouTube', `This would open: ${currentVideo.watch_url}`);
+    }
   };
 
   const togglePlayPause = () => {
     setIsPlaying(!isPlaying);
   };
 
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-  };
-
-  const toggleFullScreen = () => {
-    Alert.alert('Full Screen', 'Full screen mode would be activated.');
-  };
-
-  if (!hasVideos()) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
-        <View style={styles.content}>
-          <View style={styles.noVideosContainer}>
-            <Text style={styles.noVideosText}>No videos available to watch</Text>
-            <Text style={styles.noVideosSubtext}>Check back later for new promoted videos!</Text>
-          </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1E90FF" />
+          <Text style={styles.loadingText}>Loading videos...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !currentVideo) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'No videos available'}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadVideos}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -148,10 +231,22 @@ export default function ViewScreen() {
         {/* Video Player */}
         <View style={styles.videoContainer}>
           <View style={styles.videoPlayer}>
-            <Image
-              source={{ uri: 'https://images.pexels.com/photos/3945313/pexels-photo-3945313.jpeg' }}
-              style={styles.videoThumbnail}
-              resizeMode="cover"
+            <WebView
+              ref={webViewRef}
+              source={{ uri: currentVideo.embed_url || '' }}
+              style={styles.webView}
+              allowsInlineMediaPlayback
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              scalesPageToFit
+              scrollEnabled={false}
+              bounces={false}
+              onError={(error) => {
+                console.error('WebView error:', error);
+                loadNextVideo();
+              }}
             />
             
             {/* Video Controls Overlay */}
@@ -163,20 +258,6 @@ export default function ViewScreen() {
                   <Play size={32} color="#FFFFFF" />
                 )}
               </TouchableOpacity>
-              
-              <View style={styles.controlsRight}>
-                <TouchableOpacity style={styles.controlButton} onPress={toggleMute}>
-                  {isMuted ? (
-                    <VolumeX size={24} color="#FFFFFF" />
-                  ) : (
-                    <Volume2 size={24} color="#FFFFFF" />
-                  )}
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.controlButton} onPress={toggleFullScreen}>
-                  <Maximize size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
             </View>
 
             {/* Progress Bar */}
@@ -195,12 +276,13 @@ export default function ViewScreen() {
 
           {/* Video Info */}
           <TouchableOpacity style={styles.youtubeButton} onPress={handleOpenYouTube}>
-            <Image
-              source={{ uri: 'https://images.pexels.com/photos/1557652/pexels-photo-1557652.jpeg' }}
-              style={styles.channelIcon}
-            />
-            <Text style={styles.youtubeText}>Open on YouTube</Text>
-            <ExternalLink size={16} color="#6B7280" />
+            <Text style={styles.videoTitle} numberOfLines={2}>
+              {currentVideo.title}
+            </Text>
+            <View style={styles.youtubeButtonContent}>
+              <Text style={styles.youtubeText}>Open on YouTube</Text>
+              <ExternalLink size={16} color="#6B7280" />
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -223,10 +305,12 @@ export default function ViewScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
+              <Clock size={24} color="#FF0000" />
               <Text style={styles.statNumber}>{timeLeft}</Text>
               <Text style={styles.statLabel}>Seconds Left</Text>
             </View>
             <View style={styles.statCard}>
+              <DollarSign size={24} color="#00FF00" />
               <Text style={styles.statNumber} style={{ color: '#00FF00' }}>{coinsToEarn}</Text>
               <Text style={styles.statLabel}>Coins Reward</Text>
             </View>
@@ -255,6 +339,14 @@ export default function ViewScreen() {
   );
 }
 
+export default function ViewScreen() {
+  return (
+    <AuthGuard>
+      <ViewScreenContent />
+    </AuthGuard>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -262,6 +354,41 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+    color: '#6B7280',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
+    color: '#000000',
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#1E90FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    color: '#FFFFFF',
   },
   videoContainer: {
     margin: 20,
@@ -280,9 +407,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     position: 'relative',
   },
-  videoThumbnail: {
-    width: '100%',
-    height: '100%',
+  webView: {
+    flex: 1,
   },
   videoControls: {
     position: 'absolute',
@@ -290,28 +416,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   playPauseButton: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  controlsRight: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  controlButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -349,23 +461,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Bold',
   },
   youtubeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
-  channelIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  videoTitle: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  youtubeButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   youtubeText: {
-    flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Roboto-Medium',
-    color: '#000000',
+    color: '#1E90FF',
   },
   earningSection: {
     margin: 20,
@@ -430,12 +544,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    gap: 8,
   },
   statNumber: {
-    fontSize: 32,
+    fontSize: 24,
     fontFamily: 'Roboto-Bold',
     color: '#FF0000',
-    marginBottom: 8,
   },
   statLabel: {
     fontSize: 14,
@@ -485,24 +599,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
     color: '#000000',
-  },
-  noVideosContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-  },
-  noVideosText: {
-    fontSize: 20,
-    fontFamily: 'Roboto-Bold',
-    color: '#000000',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  noVideosSubtext: {
-    fontSize: 16,
-    fontFamily: 'Roboto-Regular',
-    color: '#6B7280',
-    textAlign: 'center',
   },
 });

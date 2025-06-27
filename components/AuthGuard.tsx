@@ -1,30 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { Redirect } from 'expo-router';
+import { router } from 'expo-router';
 import authService from '@/services/authService';
-import { checkApiHealth } from '@/config/api';
 
-export default function Index() {
+interface AuthGuardProps {
+  children: React.ReactNode;
+}
+
+export default function AuthGuard({ children }: AuthGuardProps) {
   const [isChecking, setIsChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    checkAuthAndApi();
+    checkAuthentication();
   }, []);
 
-  const checkAuthAndApi = async () => {
+  const checkAuthentication = async () => {
     try {
-      // Check API health
-      await checkApiHealth();
-      console.log('API is healthy');
-      
-      // Check authentication
       const authenticated = await authService.isAuthenticated();
       setIsAuthenticated(authenticated);
+      
+      if (!authenticated) {
+        router.replace('/auth/login');
+      }
     } catch (error) {
-      console.error('API or auth check failed:', error);
-      // Continue to login screen even if API is down
-      setIsAuthenticated(false);
+      console.error('Auth check error:', error);
+      router.replace('/auth/login');
     } finally {
       setIsChecking(false);
     }
@@ -38,11 +39,11 @@ export default function Index() {
     );
   }
 
-  if (isAuthenticated) {
-    return <Redirect href="/(tabs)/view" />;
+  if (!isAuthenticated) {
+    return null;
   }
 
-  return <Redirect href="/auth/login" />;
+  return <>{children}</>;
 }
 
 const styles = StyleSheet.create({
