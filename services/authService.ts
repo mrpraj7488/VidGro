@@ -1,29 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import apiClient, { firebaseConfig } from '@/config/api';
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-export interface User {
-  id: number;
-  email: string;
-  coin_balance: number;
-  is_vip: boolean;
-  vip_expires_at?: string;
-  created_at: string;
-}
+import { supabase, User } from '@/config/supabase';
 
 export interface AuthResponse {
   success: boolean;
   message: string;
-  data: {
-    token: string;
-    firebase_token?: string;
-    user: User;
-  };
+  user?: User;
+  error?: string;
 }
 
 export interface LoginCredentials {
@@ -49,93 +31,153 @@ class AuthService {
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      // Try Firebase authentication first
-      let firebaseToken = null;
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
-        firebaseToken = await userCredential.user.getIdToken();
-      } catch (firebaseError) {
-        console.log('Firebase login failed, trying backend auth:', firebaseError);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      if (error) {
+        throw new Error(error.message);
       }
 
-      // Login through our backend (which handles both Firebase and local auth)
-      const response = await apiClient.post('/auth/login', credentials);
-      
-      if (response.data.success) {
-        const { token, firebase_token, user } = response.data.data;
+      if (data.user && data.session) {
+        // Store session token
+        await AsyncStorage.setItem('supabase_token', data.session.access_token);
         
-        // Store tokens and user data
-        await AsyncStorage.setItem('auth_token', token);
-        if (firebase_token || firebaseToken) {
-          await AsyncStorage.setItem('firebase_token', firebase_token || firebaseToken);
+        // Get or create user profile
+        let { data: userProfile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError && profileError.code === 'PGRST116') {
+          // User doesn't exist, create profile
+          const { data: newProfile, error: createError } = await supabase
+            .from('users')
+            .insert({
+              id: data.user.id,
+              email: data.user.email!,
+              coin_balance: 1000,
+              is_vip: false,
+              ad_frequency: 3
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            throw new Error(createError.message);
+          }
+
+          userProfile = newProfile;
+
+          // Create user settings
+          await supabase.from('user_settings').insert({
+            user_id: data.user.id,
+            notifications_enabled: true,
+            sound_enabled: true,
+            dark_mode: false,
+            auto_play: true,
+            ad_personalization: true,
+            language: 'en'
+          });
         }
-        await AsyncStorage.setItem('user_data', JSON.stringify(user));
-        
-        this.currentUser = user;
+
+        if (userProfile) {
+          await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
+          this.currentUser = userProfile;
+        }
+
+        return {
+          success: true,
+          message: 'Login successful',
+          user: userProfile
+        };
       }
-      
-      return response.data;
+
+      throw new Error('Login failed');
     } catch (error: any) {
       console.error('Login error:', error);
-      throw new Error(error.response?.data?.error || 'Login failed');
+      return {
+        success: false,
+        message: 'Login failed',
+        error: error.message
+      };
     }
   }
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
     try {
-      // Try Firebase registration first
-      let firebaseToken = null;
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, credentials.email, credentials.password);
-        firebaseToken = await userCredential.user.getIdToken();
-      } catch (firebaseError) {
-        console.log('Firebase registration failed, trying backend auth:', firebaseError);
+      const { data, error } = await supabase.auth.signUp({
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      if (error) {
+        throw new Error(error.message);
       }
 
-      // Register through our backend (which handles both Firebase and local auth)
-      const response = await apiClient.post('/auth/register', credentials);
-      
-      if (response.data.success) {
-        const { token, firebase_token, user } = response.data.data;
+      if (data.user && data.session) {
+        // Store session token
+        await AsyncStorage.setItem('supabase_token', data.session.access_token);
         
-        // Store tokens and user data
-        await AsyncStorage.setItem('auth_token', token);
-        if (firebase_token || firebaseToken) {
-          await AsyncStorage.setItem('firebase_token', firebase_token || firebaseToken);
+        // Create user profile
+        const { data: userProfile, error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            email: data.user.email!,
+            coin_balance: 1000,
+            is_vip: false,
+            ad_frequency: 3
+          })
+          .select()
+          .single();
+
+        if (profileError) {
+          throw new Error(profileError.message);
         }
-        await AsyncStorage.setItem('user_data', JSON.stringify(user));
-        
-        this.currentUser = user;
+
+        // Create user settings
+        await supabase.from('user_settings').insert({
+          user_id: data.user.id,
+          notifications_enabled: true,
+          sound_enabled: true,
+          dark_mode: false,
+          auto_play: true,
+          ad_personalization: true,
+          language: 'en'
+        });
+
+        await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
+        this.currentUser = userProfile;
+
+        return {
+          success: true,
+          message: 'Registration successful',
+          user: userProfile
+        };
       }
-      
-      return response.data;
+
+      throw new Error('Registration failed');
     } catch (error: any) {
       console.error('Registration error:', error);
-      throw new Error(error.response?.data?.error || 'Registration failed');
+      return {
+        success: false,
+        message: 'Registration failed',
+        error: error.message
+      };
     }
   }
 
   async logout(): Promise<void> {
     try {
-      // Logout from Firebase
-      try {
-        await signOut(auth);
-      } catch (firebaseError) {
-        console.log('Firebase logout error:', firebaseError);
-      }
-
-      // Logout from our backend
-      try {
-        await apiClient.post('/auth/logout');
-      } catch (error) {
-        console.error('Backend logout error:', error);
-      }
+      await supabase.auth.signOut();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
       // Clear local storage regardless of API response
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('firebase_token');
+      await AsyncStorage.removeItem('supabase_token');
       await AsyncStorage.removeItem('user_data');
       this.currentUser = null;
     }
@@ -161,13 +203,20 @@ class AuthService {
 
   async refreshUserData(): Promise<User | null> {
     try {
-      const response = await apiClient.get('/auth/me');
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (response.data.success) {
-        const user = response.data.data.user;
-        await AsyncStorage.setItem('user_data', JSON.stringify(user));
-        this.currentUser = user;
-        return user;
+      if (user) {
+        const { data: userProfile, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && userProfile) {
+          await AsyncStorage.setItem('user_data', JSON.stringify(userProfile));
+          this.currentUser = userProfile;
+          return userProfile;
+        }
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);
@@ -178,8 +227,8 @@ class AuthService {
 
   async isAuthenticated(): Promise<boolean> {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      return !!token;
+      const { data: { session } } = await supabase.auth.getSession();
+      return !!session;
     } catch (error) {
       console.error('Error checking authentication:', error);
       return false;
@@ -188,18 +237,10 @@ class AuthService {
 
   async getAuthToken(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem('auth_token');
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.access_token || null;
     } catch (error) {
       console.error('Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  async getFirebaseToken(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem('firebase_token');
-    } catch (error) {
-      console.error('Error getting Firebase token:', error);
       return null;
     }
   }

@@ -74,6 +74,8 @@ export default function RegisterScreen() {
           'Your account has been created successfully. You start with 1000 coins!',
           [{ text: 'OK', onPress: () => router.replace('/(tabs)/view') }]
         );
+      } else {
+        Alert.alert('Registration Failed', response.error || 'Please try again.');
       }
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message || 'Please try again.');

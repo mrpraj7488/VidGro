@@ -53,6 +53,8 @@ export default function LoginScreen() {
         Alert.alert('Success', 'Login successful!', [
           { text: 'OK', onPress: () => router.replace('/(tabs)/view') }
         ]);
+      } else {
+        Alert.alert('Login Failed', response.error || 'Please check your credentials and try again.');
       }
     } catch (error: any) {
       Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
@@ -79,6 +81,8 @@ export default function LoginScreen() {
         Alert.alert('Success', `Logged in as ${userType} user!`, [
           { text: 'OK', onPress: () => router.replace('/(tabs)/view') }
         ]);
+      } else {
+        Alert.alert('Login Failed', response.error || 'Demo login failed.');
       }
     } catch (error: any) {
       Alert.alert('Login Failed', error.message || 'Demo login failed.');

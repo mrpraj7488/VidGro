@@ -16,7 +16,7 @@ export default function Index() {
     try {
       // Check API health
       await checkApiHealth();
-      console.log('API is healthy');
+      console.log('Supabase API is healthy');
       
       // Check authentication
       const authenticated = await authService.isAuthenticated();
