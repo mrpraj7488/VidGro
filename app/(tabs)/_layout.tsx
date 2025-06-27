@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Play, Megaphone, BarChart3, User } from 'lucide-react-native';
+import { Play, Megaphone, ChartBar as BarChart3, User } from 'lucide-react-native';
 import { View, StyleSheet } from 'react-native';
 
 export default function TabLayout() {

@@ -10,17 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  DollarSign, 
-  Crown, 
-  Gift, 
-  StopCircle, 
-  Star, 
-  UserPlus, 
-  HelpCircle,
-  X,
-  Play
-} from 'lucide-react-native';
+import { DollarSign, Crown, Gift, CircleStop as StopCircle, Star, UserPlus, CircleHelp as HelpCircle, X, Play } from 'lucide-react-native';
 import { useUserStore } from '@/stores/userStore';
 import { router } from 'expo-router';
 import Header from '@/components/Header';

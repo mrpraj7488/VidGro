@@ -9,19 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  Menu, 
-  DollarSign, 
-  X, 
-  User, 
-  Settings, 
-  Bell, 
-  Lock, 
-  LogOut,
-  Edit3,
-  Mail,
-  Camera
-} from 'lucide-react-native';
+import { Menu, DollarSign, X, User, Settings, Bell, Lock, LogOut, CreditCard as Edit3, Mail, Camera } from 'lucide-react-native';
 import { useUserStore } from '@/stores/userStore';
 import { router } from 'expo-router';
 
