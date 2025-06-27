@@ -46,10 +46,10 @@ class VideoService {
         .from('promoted_videos')
         .select(`
           *,
-          users!promoted_videos_promoter_id_fkey(email)
+          users!inner(email)
         `)
         .eq('status', 'active')
-        .lt('views_completed', supabase.rpc('promoted_videos', 'views_requested'))
+        .lt('views_completed', 'views_requested')
         .neq('promoter_id', user.id)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
@@ -88,7 +88,7 @@ class VideoService {
         .from('promoted_videos')
         .select(`
           *,
-          users!promoted_videos_promoter_id_fkey(email)
+          users!inner(email)
         `)
         .eq('id', videoId)
         .single();
