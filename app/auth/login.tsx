@@ -57,6 +57,7 @@ export default function LoginScreen() {
         Alert.alert('Login Failed', response.error || 'Please check your credentials and try again.');
       }
     } catch (error: any) {
+      console.error('Login error:', error);
       Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
     } finally {
       setLoading(false);
@@ -85,6 +86,7 @@ export default function LoginScreen() {
         Alert.alert('Login Failed', response.error || 'Demo login failed.');
       }
     } catch (error: any) {
+      console.error('Demo login error:', error);
       Alert.alert('Login Failed', error.message || 'Demo login failed.');
     } finally {
       setLoading(false);
