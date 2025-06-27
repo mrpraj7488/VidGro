@@ -7,17 +7,26 @@ import {
   ScrollView,
   Modal,
   Alert,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Menu, DollarSign, Crown, Gift, Settings, Star, X, CreditCard, Play, CircleStop as StopCircle, Share, UserPlus, Globe, Shield, FileText, MessageCircle, LogOut, Trash2, User } from 'lucide-react-native';
+import { 
+  DollarSign, 
+  Crown, 
+  Gift, 
+  StopCircle, 
+  Star, 
+  UserPlus, 
+  HelpCircle,
+  X,
+  Play
+} from 'lucide-react-native';
 import { useUserStore } from '@/stores/userStore';
 import { router } from 'expo-router';
+import Header from '@/components/Header';
 
 export default function OthersScreen() {
-  const { coins, isVip, addCoins } = useUserStore();
-  const [showDrawer, setShowDrawer] = useState(false);
+  const { coins, addCoins } = useUserStore();
   const [showCoinPurchase, setShowCoinPurchase] = useState(false);
   const [showVipModal, setShowVipModal] = useState(false);
 
@@ -37,7 +46,6 @@ export default function OthersScreen() {
         { 
           text: 'Buy', 
           onPress: () => {
-            // In real app, this would process payment
             addCoins(coins);
             setShowCoinPurchase(false);
             Alert.alert('Success!', `${coins} coins have been added to your account! 🎉`);
@@ -56,8 +64,7 @@ export default function OthersScreen() {
         { 
           text: 'Watch Ad', 
           onPress: () => {
-            // Simulate ad watching
-            const earnedCoins = Math.floor(Math.random() * 251) + 150; // 150-400 coins
+            const earnedCoins = Math.floor(Math.random() * 251) + 150;
             addCoins(earnedCoins);
             Alert.alert('Congratulations!', `You earned ${earnedCoins} coins! 🎉`);
           }
@@ -70,13 +77,12 @@ export default function OthersScreen() {
     const price = type === 'monthly' ? '$4.99/month' : '$19.99 lifetime';
     Alert.alert(
       'VIP Subscription',
-      `Purchase VIP membership for ${price}?\n\n✅ Ad-free experience\n✅ Promotional discounts\n✅ Priority support`,
+      `Purchase VIP membership for ${price}?\n\n✅ Ad-free experience\n✅ 20% discount on promotions\n✅ Priority support\n✅ Exclusive VIP badge`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Purchase', 
           onPress: () => {
-            // In real app, this would process payment
             setShowVipModal(false);
             Alert.alert('Welcome to VIP!', 'Your VIP membership is now active! 👑');
           }
@@ -95,7 +101,6 @@ export default function OthersScreen() {
           text: 'Confirm', 
           onPress: () => {
             if (coins >= 50) {
-              // spendCoins(50) - would implement this
               Alert.alert('Success!', 'Ads stopped for 6 hours! 🎉');
             } else {
               Alert.alert('Insufficient Coins', 'You need 50 coins to stop ads.');
@@ -110,87 +115,91 @@ export default function OthersScreen() {
     router.push('/referral');
   };
 
-  const handleSettings = () => {
-    router.push('/settings');
+  const handleRateUs = () => {
+    Alert.alert('Rate Us', 'Thank you for using VidGro! Please rate us on the app store.');
   };
 
-  const renderDrawer = () => (
-    <Modal
-      visible={showDrawer}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowDrawer(false)}
-    >
-      <View style={styles.drawerOverlay}>
-        <TouchableOpacity 
-          style={styles.drawerBackdrop} 
-          onPress={() => setShowDrawer(false)}
-        />
-        <View style={styles.drawer}>
-          <View style={styles.drawerHeader}>
-            <View style={styles.profileSection}>
-              <View style={styles.profileImage}>
-                <User size={32} color="#FFFFFF" />
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>VidGro User</Text>
-                <Text style={styles.profileEmail}>user@vidgro.com</Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={() => setShowDrawer(false)}>
-              <X size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
+  const handleSupport = () => {
+    Alert.alert(
+      'Support',
+      'How can we help you?',
+      [
+        { text: 'FAQ', onPress: () => Alert.alert('FAQ', 'Frequently asked questions coming soon!') },
+        { text: 'Contact', onPress: () => Alert.alert('Contact', 'Contact form coming soon!') },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
 
-          <ScrollView style={styles.drawerContent}>
-            <TouchableOpacity style={styles.drawerItem} onPress={handleReferFriend}>
-              <Share size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Refer a Friend</Text>
-            </TouchableOpacity>
+  const featureCards = [
+    {
+      title: 'Buy Coins',
+      subtitle: 'Purchase coins for promotions',
+      icon: DollarSign,
+      gradient: ['#FFA500', '#FF8C00'],
+      onPress: () => setShowCoinPurchase(true),
+    },
+    {
+      title: 'Become VIP',
+      subtitle: 'Go Ad-Free and get 20% off on all promotions',
+      icon: Crown,
+      gradient: ['#FFD700', '#FFA500'],
+      onPress: () => setShowVipModal(true),
+    },
+    {
+      title: 'Free Coins',
+      subtitle: 'Watch 30-45 seconds of ads to earn 150-400 coins',
+      icon: Gift,
+      gradient: ['#00FF00', '#32CD32'],
+      onPress: handleFreeCoins,
+    },
+    {
+      title: 'Stop Ads',
+      subtitle: 'Disable ads for 6 hours (50 coins)',
+      icon: StopCircle,
+      gradient: ['#FF0000', '#DC143C'],
+      onPress: handleStopAds,
+    },
+    {
+      title: 'Rate Us',
+      subtitle: 'Rate VidGro on the app store',
+      icon: Star,
+      gradient: ['#8A2BE2', '#9370DB'],
+      onPress: handleRateUs,
+    },
+    {
+      title: 'Refer a Friend',
+      subtitle: 'Share referral code and earn coins',
+      icon: UserPlus,
+      gradient: ['#1E90FF', '#4169E1'],
+      onPress: handleReferFriend,
+    },
+    {
+      title: 'Support',
+      subtitle: 'FAQ or contact form',
+      icon: HelpCircle,
+      gradient: ['#6B7280', '#4B5563'],
+      onPress: handleSupport,
+    },
+  ];
 
-            <TouchableOpacity style={styles.drawerItem} onPress={handleSettings}>
-              <Settings size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Settings</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.drawerItem}>
-              <FileText size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Consent</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.drawerItem}>
-              <Shield size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Privacy Policy</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.drawerItem}>
-              <Globe size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Languages</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.drawerItem}>
-              <Settings size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Configure Ads</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.drawerItem}>
-              <MessageCircle size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Contact Us</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.drawerItem}>
-              <LogOut size={20} color="#EF4444" />
-              <Text style={styles.drawerItemText}>Log Out</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.drawerItem, styles.deleteItem]}>
-              <Trash2 size={20} color="#DC2626" />
-              <Text style={[styles.drawerItemText, styles.deleteText]}>Delete Account</Text>
-            </TouchableOpacity>
-          </ScrollView>
+  const renderFeatureCard = (card: any, index: number) => (
+    <TouchableOpacity key={index} style={styles.featureCard} onPress={card.onPress}>
+      <LinearGradient
+        colors={card.gradient}
+        style={styles.cardGradient}
+      >
+        <View style={styles.cardIcon}>
+          <card.icon size={28} color="#FFFFFF" />
         </View>
-      </View>
-    </Modal>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{card.title}</Text>
+          {card.subtitle && (
+            <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
+          )}
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 
   const renderCoinPurchaseModal = () => (
@@ -222,8 +231,8 @@ export default function OthersScreen() {
                   </View>
                 )}
                 <View style={styles.packageContent}>
-                  <View style={styles.coinIcon}>
-                    <DollarSign size={24} color="#F59E0B" />
+                  <View style={styles.packageIcon}>
+                    <DollarSign size={24} color="#FFA500" />
                   </View>
                   <View style={styles.packageInfo}>
                     <Text style={styles.coinAmount}>{pack.coins} Coins</Text>
@@ -287,131 +296,16 @@ export default function OthersScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#FDF2F8', '#FCE7F3', '#FBBF24']}
-        style={styles.gradient}
-      >
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.menuButton} onPress={() => setShowDrawer(true)}>
-            <Menu size={24} color="#374151" />
-          </TouchableOpacity>
-          <Text style={styles.title}>VidGro</Text>
-          <View style={styles.coinContainer}>
-            <Text style={styles.coinText}>{coins}</Text>
-            <View style={styles.coinIcon}>
-              <DollarSign size={20} color="#FFFFFF" />
-            </View>
-          </View>
+      <Header title="Others" />
+      
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.cardsContainer}>
+          {featureCards.map(renderFeatureCard)}
         </View>
+      </ScrollView>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <TouchableOpacity 
-            style={styles.featureCard}
-            onPress={() => setShowCoinPurchase(true)}
-          >
-            <LinearGradient
-              colors={['#EF4444', '#DC2626']}
-              style={styles.cardGradient}
-            >
-              <View style={styles.cardIcon}>
-                <DollarSign size={28} color="#FFFFFF" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Buy Coins</Text>
-              </View>
-              <View style={styles.cardArrow}>
-                <DollarSign size={24} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.featureCard}
-            onPress={() => setShowVipModal(true)}
-          >
-            <LinearGradient
-              colors={['#F59E0B', '#D97706']}
-              style={styles.cardGradient}
-            >
-              <View style={styles.cardIcon}>
-                <Crown size={28} color="#FFFFFF" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Become VIP</Text>
-                <Text style={styles.cardSubtitle}>Go Ad-Free and get off on all promotions</Text>
-              </View>
-              <View style={styles.cardArrow}>
-                <Crown size={24} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.featureCard}
-            onPress={handleFreeCoins}
-          >
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              style={styles.cardGradient}
-            >
-              <View style={styles.cardIcon}>
-                <Gift size={28} color="#FFFFFF" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Free Coins</Text>
-                <Text style={styles.cardSubtitle}>Watch 30-45 seconds of ads to earn 150-400 coins</Text>
-              </View>
-              <View style={styles.cardArrow}>
-                <Play size={24} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.featureCard}
-            onPress={handleStopAds}
-          >
-            <LinearGradient
-              colors={['#EF4444', '#DC2626']}
-              style={styles.cardGradient}
-            >
-              <View style={styles.cardIcon}>
-                <StopCircle size={28} color="#FFFFFF" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Stop ads for as long as 6 hours</Text>
-              </View>
-              <View style={styles.cardArrow}>
-                <StopCircle size={24} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.featureCard}
-            onPress={() => Alert.alert('Rate Us', 'Thank you for using VidGro! Please rate us on the app store.')}
-          >
-            <LinearGradient
-              colors={['#F59E0B', '#D97706']}
-              style={styles.cardGradient}
-            >
-              <View style={styles.cardIcon}>
-                <Star size={28} color="#FFFFFF" />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Rate Us</Text>
-              </View>
-              <View style={styles.cardArrow}>
-                <Star size={24} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {renderDrawer()}
-        {renderCoinPurchaseModal()}
-        {renderVipModal()}
-      </LinearGradient>
+      {renderCoinPurchaseModal()}
+      {renderVipModal()}
     </SafeAreaView>
   );
 }
@@ -419,50 +313,16 @@ export default function OthersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
-  },
-  coinContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  coinText: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
-  },
-  coinIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+  },
+  cardsContainer: {
+    padding: 20,
+    gap: 16,
   },
   featureCard: {
-    marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -484,91 +344,15 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Roboto-Bold',
     color: '#FFFFFF',
     marginBottom: 4,
   },
   cardSubtitle: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Roboto-Regular',
     color: '#FFFFFF',
     opacity: 0.9,
-  },
-  cardArrow: {
-    marginLeft: 12,
-  },
-  // Drawer Styles
-  drawerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  drawerBackdrop: {
-    flex: 1,
-  },
-  drawer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
-    marginBottom: 2,
-  },
-  profileEmail: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#6B7280',
-  },
-  drawerContent: {
-    flex: 1,
-    padding: 20,
-  },
-  drawerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  drawerItemText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    color: '#374151',
-  },
-  deleteItem: {
-    borderBottomWidth: 0,
-  },
-  deleteText: {
-    color: '#DC2626',
   },
   // Modal Styles
   modalOverlay: {
@@ -590,12 +374,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
     fontSize: 20,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
+    fontFamily: 'Roboto-Bold',
+    color: '#000000',
   },
   modalContent: {
     padding: 20,
@@ -610,20 +394,20 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   popularPackage: {
-    borderColor: '#EF4444',
+    borderColor: '#FFA500',
   },
   popularBadge: {
     position: 'absolute',
     top: 0,
     right: 0,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#FFA500',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderBottomLeftRadius: 8,
   },
   popularText: {
     fontSize: 10,
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Roboto-Bold',
     color: '#FFFFFF',
   },
   packageContent: {
@@ -631,20 +415,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  packageIcon: {
+    marginRight: 16,
+  },
   packageInfo: {
     flex: 1,
-    marginLeft: 16,
   },
   coinAmount: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
+    fontFamily: 'Roboto-Bold',
+    color: '#000000',
     marginBottom: 4,
   },
   coinPrice: {
     fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    color: '#10B981',
+    fontFamily: 'Roboto-Medium',
+    color: '#00FF00',
   },
   // VIP Modal Styles
   vipBenefits: {
@@ -655,13 +441,13 @@ const styles = StyleSheet.create({
   },
   benefitsTitle: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
+    fontFamily: 'Roboto-Bold',
+    color: '#000000',
     marginBottom: 12,
   },
   benefit: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Roboto-Regular',
     color: '#059669',
     marginBottom: 4,
   },
@@ -674,24 +460,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lifetimeOption: {
-    borderColor: '#F59E0B',
+    borderColor: '#FFD700',
     backgroundColor: '#FFFBEB',
   },
   vipOptionTitle: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#374151',
+    fontFamily: 'Roboto-Bold',
+    color: '#000000',
     marginBottom: 8,
   },
   vipOptionPrice: {
     fontSize: 24,
-    fontFamily: 'Inter-Bold',
-    color: '#EF4444',
+    fontFamily: 'Roboto-Bold',
+    color: '#FF0000',
   },
   saveText: {
     fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: '#F59E0B',
+    fontFamily: 'Roboto-Bold',
+    color: '#FFA500',
     marginTop: 4,
   },
 });

@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Megaphone, Play, DollarSign } from 'lucide-react-native';
+import { Play, Megaphone, BarChart3, User } from 'lucide-react-native';
 import { View, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
@@ -8,14 +8,25 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#EF4444',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: '#FF0000',
+        tabBarInactiveTintColor: '#6B7280',
         tabBarLabelStyle: styles.tabLabel,
       }}>
       <Tabs.Screen
+        name="view"
+        options={{
+          title: 'View',
+          tabBarIcon: ({ size, color }) => (
+            <View style={styles.iconContainer}>
+              <Play size={size} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="promote"
         options={{
-          title: 'Promote',
+          title: 'Video Promote',
           tabBarIcon: ({ size, color }) => (
             <View style={styles.iconContainer}>
               <Megaphone size={size} color={color} />
@@ -24,12 +35,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="view"
+        name="analytics"
         options={{
-          title: 'View',
+          title: 'Analytics',
           tabBarIcon: ({ size, color }) => (
-            <View style={[styles.iconContainer, color === '#EF4444' && styles.activeIconContainer]}>
-              <Play size={size} color={color} />
+            <View style={styles.iconContainer}>
+              <BarChart3 size={size} color={color} />
             </View>
           ),
         }}
@@ -40,7 +51,7 @@ export default function TabLayout() {
           title: 'Others',
           tabBarIcon: ({ size, color }) => (
             <View style={styles.iconContainer}>
-              <DollarSign size={size} color={color} />
+              <User size={size} color={color} />
             </View>
           ),
         }}
@@ -53,23 +64,23 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: '#E5E7EB',
     paddingTop: 8,
     paddingBottom: 8,
     height: 70,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   tabLabel: {
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'Roboto-Medium',
     fontSize: 12,
     marginTop: 4,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  activeIconContainer: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: 20,
-    padding: 8,
   },
 });

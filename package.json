@@ -39,7 +39,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
-    "@expo-google-fonts/inter": "^0.2.3",
+    "@expo-google-fonts/roboto": "^0.2.3",
     "expo-av": "~15.0.1",
     "zustand": "^5.0.2"
   },
