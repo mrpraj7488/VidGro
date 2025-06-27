@@ -9,10 +9,11 @@ interface UserState {
   spendCoins: (amount: number) => void;
   incrementVideoCount: () => void;
   setVipStatus: (status: boolean) => void;
+  clearCache: () => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
-  coins: 1000, // Start with some coins for demo
+  coins: 1000,
   isVip: false,
   videosWatched: 0,
   totalEarned: 0,
@@ -31,4 +32,7 @@ export const useUserStore = create<UserState>((set) => ({
   
   setVipStatus: (status: boolean) => 
     set({ isVip: status }),
+
+  clearCache: () => 
+    set({ coins: 1000, isVip: false, videosWatched: 0, totalEarned: 0 }),
 }));

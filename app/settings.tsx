@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Bell, Volume2, Moon, Globe, Shield, CircleHelp as HelpCircle, MessageCircle, Star, Trash2, LogOut, ChevronRight, DollarSign } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useUserStore } from '@/stores/userStore';
+import CacheManager from '@/components/CacheManager';
 
 export default function SettingsScreen() {
   const { coins } = useUserStore();
@@ -88,7 +89,6 @@ export default function SettingsScreen() {
           text: 'Log Out', 
           style: 'destructive',
           onPress: () => {
-            // In real app, this would clear user session
             Alert.alert('Logged Out', 'You have been logged out successfully.');
           }
         }
@@ -180,6 +180,9 @@ export default function SettingsScreen() {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Cache Management */}
+          <CacheManager />
+
           {/* App Preferences */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>App Preferences</Text>
@@ -333,7 +336,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Roboto-Bold',
     color: '#374151',
   },
   coinContainer: {
@@ -343,7 +346,7 @@ const styles = StyleSheet.create({
   },
   coinText: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Roboto-Bold',
     color: '#374151',
   },
   coinIcon: {
@@ -371,7 +374,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Roboto-Bold',
     color: '#374151',
     paddingHorizontal: 20,
     paddingTop: 20,
@@ -411,7 +414,7 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 16,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'Roboto-Medium',
     color: '#374151',
     marginBottom: 2,
   },
@@ -420,7 +423,7 @@ const styles = StyleSheet.create({
   },
   settingSubtitle: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Roboto-Regular',
     color: '#6B7280',
   },
   settingRight: {
@@ -433,19 +436,19 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 24,
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Roboto-Bold',
     color: '#374151',
     marginBottom: 8,
   },
   appVersion: {
     fontSize: 16,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'Roboto-Medium',
     color: '#6B7280',
     marginBottom: 4,
   },
   appCopyright: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Roboto-Regular',
     color: '#9CA3AF',
     textAlign: 'center',
   },

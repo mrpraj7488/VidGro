@@ -19,38 +19,41 @@ interface VideoState {
   hasVideos: () => boolean;
   getUserPromotions: () => Video[];
   incrementViews: (videoId: string) => void;
+  clearCache: () => void;
 }
 
+const defaultVideos: Video[] = [
+  {
+    id: '1',
+    url: 'https://youtube.com/watch?v=sample1',
+    duration: 45,
+    coinReward: 36,
+    promoterId: 'demo-user',
+    createdAt: new Date(),
+    views: 0,
+  },
+  {
+    id: '2',
+    url: 'https://youtube.com/watch?v=sample2',
+    duration: 60,
+    coinReward: 48,
+    promoterId: 'demo-user2',
+    createdAt: new Date(),
+    views: 0,
+  },
+  {
+    id: '3',
+    url: 'https://youtube.com/watch?v=sample3',
+    duration: 30,
+    coinReward: 24,
+    promoterId: 'demo-user3',
+    createdAt: new Date(),
+    views: 0,
+  },
+];
+
 export const useVideoStore = create<VideoState>((set, get) => ({
-  videos: [
-    {
-      id: '1',
-      url: 'https://youtube.com/watch?v=sample1',
-      duration: 45,
-      coinReward: 36,
-      promoterId: 'demo-user',
-      createdAt: new Date(),
-      views: 0,
-    },
-    {
-      id: '2',
-      url: 'https://youtube.com/watch?v=sample2',
-      duration: 60,
-      coinReward: 48,
-      promoterId: 'demo-user2',
-      createdAt: new Date(),
-      views: 0,
-    },
-    {
-      id: '3',
-      url: 'https://youtube.com/watch?v=sample3',
-      duration: 30,
-      coinReward: 24,
-      promoterId: 'demo-user3',
-      createdAt: new Date(),
-      views: 0,
-    },
-  ],
+  videos: defaultVideos,
   currentVideoIndex: 0,
   userPromotions: [],
 
@@ -97,5 +100,13 @@ export const useVideoStore = create<VideoState>((set, get) => ({
         video.id === videoId ? { ...video, views: video.views + 1 } : video
       ),
     }));
+  },
+
+  clearCache: () => {
+    set({
+      videos: defaultVideos,
+      currentVideoIndex: 0,
+      userPromotions: [],
+    });
   },
 }));
