@@ -194,7 +194,7 @@ export default function PromoteScreen() {
                 <Text style={styles.promoteButtonText}>Promote Video</Text>
               </LinearGradient>
             </TouchableOpacity>
-          </div>
+          </View>
         </View>
 
         {/* Active Promotions */}
