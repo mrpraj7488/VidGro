@@ -9,13 +9,14 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WebView } from 'react-native-webview';
-import { ExternalLink, Play, Pause, SkipForward, Clock, DollarSign } from 'lucide-react-native';
+import { ExternalLink, Play, Pause, SkipForward, Clock, DollarSign, Eye, Star } from 'lucide-react-native';
 import { useUserStore } from '@/stores/userStore';
-import videoService, { Video, WatchSession } from '@/services/videoService';
+import videoService, { Video, StartWatchResponse } from '@/services/videoService';
 import authService from '@/services/authService';
 import AuthGuard from '@/components/AuthGuard';
 import Header from '@/components/Header';
@@ -217,8 +218,13 @@ function ViewScreenContent() {
       <SafeAreaView style={styles.container}>
         <Header />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1E90FF" />
-          <Text style={styles.loadingText}>Loading videos...</Text>
+          <LinearGradient
+            colors={['#1E90FF', '#8A2BE2']}
+            style={styles.loadingGradient}
+          >
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingText}>Loading amazing videos...</Text>
+          </LinearGradient>
         </View>
       </SafeAreaView>
     );
@@ -229,10 +235,15 @@ function ViewScreenContent() {
       <SafeAreaView style={styles.container}>
         <Header />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error || 'No videos available'}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadVideos}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
+          <LinearGradient
+            colors={['#FF6B6B', '#FF8E8E']}
+            style={styles.errorGradient}
+          >
+            <Text style={styles.errorText}>{error || 'No videos available'}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadVideos}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
       </SafeAreaView>
     );
@@ -245,109 +256,169 @@ function ViewScreenContent() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Video Player */}
         <View style={styles.videoContainer}>
-          <View style={styles.videoPlayer}>
-            <WebView
-              ref={webViewRef}
-              source={{ uri: currentVideo.embed_url || '' }}
-              style={styles.webView}
-              allowsInlineMediaPlayback
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptEnabled
-              domStorageEnabled
-              startInLoadingState
-              scalesPageToFit
-              scrollEnabled={false}
-              bounces={false}
-              onError={(error) => {
-                console.error('WebView error:', error);
-                loadNextVideo();
-              }}
-            />
-            
-            {/* Video Controls Overlay */}
-            <View style={styles.videoControls}>
-              <TouchableOpacity style={styles.playPauseButton} onPress={togglePlayPause}>
-                {isPlaying ? (
-                  <Pause size={32} color="#FFFFFF" />
-                ) : (
-                  <Play size={32} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Progress Bar */}
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          <LinearGradient
+            colors={['#FFFFFF', '#F8FAFC']}
+            style={styles.videoGradient}
+          >
+            <View style={styles.videoPlayer}>
+              {currentVideo.thumbnail_url ? (
+                <Image 
+                  source={{ uri: currentVideo.thumbnail_url }}
+                  style={styles.videoThumbnail}
+                  resizeMode="cover"
+                />
+              ) : (
+                <WebView
+                  ref={webViewRef}
+                  source={{ uri: currentVideo.embed_url || '' }}
+                  style={styles.webView}
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  startInLoadingState
+                  scalesPageToFit
+                  scrollEnabled={false}
+                  bounces={false}
+                  onError={(error) => {
+                    console.error('WebView error:', error);
+                    loadNextVideo();
+                  }}
+                />
+              )}
+              
+              {/* Video Controls Overlay */}
+              <View style={styles.videoControls}>
+                <TouchableOpacity style={styles.playPauseButton} onPress={togglePlayPause}>
+                  {isPlaying ? (
+                    <Pause size={32} color="#FFFFFF" />
+                  ) : (
+                    <Play size={32} color="#FFFFFF" />
+                  )}
+                </TouchableOpacity>
               </View>
-            </View>
 
-            {isPlaying && (
-              <View style={styles.playingIndicator}>
-                <Text style={styles.playingText}>Playing...</Text>
+              {/* Progress Bar */}
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <LinearGradient
+                    colors={['#FF0000', '#FF4444']}
+                    style={[styles.progressFill, { width: `${progress}%` }]}
+                  />
+                </View>
               </View>
-            )}
-          </View>
 
-          {/* Video Info */}
-          <TouchableOpacity style={styles.youtubeButton} onPress={handleOpenYouTube}>
-            <Text style={styles.videoTitle} numberOfLines={2}>
-              {currentVideo.title}
-            </Text>
-            <View style={styles.youtubeButtonContent}>
-              <Text style={styles.youtubeText}>Open on YouTube</Text>
-              <ExternalLink size={16} color="#6B7280" />
+              {isPlaying && (
+                <View style={styles.playingIndicator}>
+                  <LinearGradient
+                    colors={['#FF0000', '#FF4444']}
+                    style={styles.playingGradient}
+                  >
+                    <Text style={styles.playingText}>● LIVE</Text>
+                  </LinearGradient>
+                </View>
+              )}
             </View>
-          </TouchableOpacity>
+
+            {/* Video Info */}
+            <TouchableOpacity style={styles.youtubeButton} onPress={handleOpenYouTube}>
+              <View style={styles.videoInfo}>
+                <Text style={styles.videoTitle} numberOfLines={2}>
+                  {currentVideo.title}
+                </Text>
+                <View style={styles.videoMeta}>
+                  <View style={styles.metaItem}>
+                    <Eye size={16} color="#6B7280" />
+                    <Text style={styles.metaText}>{currentVideo.views_completed || 0} views</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Star size={16} color="#FFA500" />
+                    <Text style={styles.metaText}>Promoted</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.youtubeButtonContent}>
+                <Text style={styles.youtubeText}>Watch on YouTube</Text>
+                <ExternalLink size={16} color="#1E90FF" />
+              </View>
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
 
         {/* Earning Progress */}
         <View style={styles.earningSection}>
-          <Text style={styles.sectionTitle}>Earning Progress</Text>
-          
-          <View style={styles.progressCard}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressText}>Watch 100% to earn {coinsToEarn} coins</Text>
-              <Text style={styles.progressPercentage}>{Math.round(progress)}%</Text>
-            </View>
-            <View style={styles.earningProgressBar}>
+          <LinearGradient
+            colors={['#FFFFFF', '#F8FAFC']}
+            style={styles.sectionGradient}
+          >
+            <Text style={styles.sectionTitle}>Earning Progress</Text>
+            
+            <View style={styles.progressCard}>
               <LinearGradient
-                colors={['#00FF00', '#32CD32']}
-                style={[styles.earningProgressFill, { width: `${progress}%` }]}
-              />
+                colors={['#10B981', '#059669']}
+                style={styles.progressCardGradient}
+              >
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressText}>Watch 100% to earn {coinsToEarn} coins</Text>
+                  <Text style={styles.progressPercentage}>{Math.round(progress)}%</Text>
+                </View>
+                <View style={styles.earningProgressBar}>
+                  <View style={[styles.earningProgressFill, { width: `${progress}%` }]} />
+                </View>
+              </LinearGradient>
             </View>
-          </View>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Clock size={24} color="#FF0000" />
-              <Text style={styles.statNumber}>{timeLeft}</Text>
-              <Text style={styles.statLabel}>Seconds Left</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <LinearGradient
+                  colors={['#FF6B6B', '#FF8E8E']}
+                  style={styles.statGradient}
+                >
+                  <Clock size={24} color="#FFFFFF" />
+                  <Text style={styles.statNumber}>{timeLeft}</Text>
+                  <Text style={styles.statLabel}>Seconds Left</Text>
+                </LinearGradient>
+              </View>
+              <View style={styles.statCard}>
+                <LinearGradient
+                  colors={['#10B981', '#059669']}
+                  style={styles.statGradient}
+                >
+                  <DollarSign size={24} color="#FFFFFF" />
+                  <Text style={[styles.statNumber, { color: '#FFFFFF' }]}>{coinsToEarn}</Text>
+                  <Text style={styles.statLabel}>Coins Reward</Text>
+                </LinearGradient>
+              </View>
             </View>
-            <View style={styles.statCard}>
-              <DollarSign size={24} color="#00FF00" />
-              <Text style={[styles.statNumber, { color: '#00FF00' }]}>{coinsToEarn}</Text>
-              <Text style={styles.statLabel}>Coins Reward</Text>
-            </View>
-          </View>
+          </LinearGradient>
         </View>
 
         {/* Controls */}
         <View style={styles.controlsSection}>
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
-            <SkipForward size={20} color="#FFFFFF" />
-            <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
-          </TouchableOpacity>
+          <LinearGradient
+            colors={['#FFFFFF', '#F8FAFC']}
+            style={styles.sectionGradient}
+          >
+            <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
+              <LinearGradient
+                colors={['#FFA500', '#FF8C00']}
+                style={styles.skipGradient}
+              >
+                <SkipForward size={20} color="#FFFFFF" />
+                <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
+              </LinearGradient>
+            </TouchableOpacity>
 
-          <View style={styles.autoPlayContainer}>
-            <Text style={styles.autoPlayText}>Auto Play Next Video</Text>
-            <Switch
-              value={autoPlay}
-              onValueChange={setAutoPlay}
-              trackColor={{ false: '#E5E7EB', true: '#00FF00' }}
-              thumbColor={autoPlay ? '#FFFFFF' : '#9CA3AF'}
-            />
-          </View>
+            <View style={styles.autoPlayContainer}>
+              <Text style={styles.autoPlayText}>Auto Play Next Video</Text>
+              <Switch
+                value={autoPlay}
+                onValueChange={setAutoPlay}
+                trackColor={{ false: '#E5E7EB', true: '#10B981' }}
+                thumbColor={autoPlay ? '#FFFFFF' : '#9CA3AF'}
+              />
+            </View>
+          </LinearGradient>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -374,15 +445,33 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    margin: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  loadingGradient: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 16,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Roboto-Medium',
-    color: '#6B7280',
+    color: '#FFFFFF',
   },
   errorContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  errorGradient: {
+    flex: 1,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
@@ -391,11 +480,11 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 18,
     fontFamily: 'Roboto-Bold',
-    color: '#000000',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#1E90FF',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -407,20 +496,26 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     margin: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  videoGradient: {
+    overflow: 'hidden',
   },
   videoPlayer: {
     width: '100%',
     height: 220,
     backgroundColor: '#000000',
     position: 'relative',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
   },
   webView: {
     flex: 1,
@@ -459,16 +554,18 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#FF0000',
+    borderRadius: 2,
   },
   playingIndicator: {
     position: 'absolute',
     top: 20,
     right: 20,
-    backgroundColor: 'rgba(255, 0, 0, 0.9)',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  playingGradient: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
   },
   playingText: {
     color: '#FFFFFF',
@@ -476,15 +573,33 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Bold',
   },
   youtubeButton: {
-    padding: 16,
+    padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
+  videoInfo: {
+    marginBottom: 12,
+  },
   videoTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: 'Roboto-Bold',
     color: '#000000',
     marginBottom: 8,
+    lineHeight: 24,
+  },
+  videoMeta: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#6B7280',
   },
   youtubeButtonContent: {
     flexDirection: 'row',
@@ -492,30 +607,42 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   youtubeText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Roboto-Medium',
     color: '#1E90FF',
   },
   earningSection: {
     margin: 20,
     marginTop: 0,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  sectionGradient: {
+    padding: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: 'Roboto-Bold',
     color: '#000000',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   progressCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
     borderRadius: 16,
-    marginBottom: 16,
+    overflow: 'hidden',
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  progressCardGradient: {
+    padding: 20,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -526,22 +653,23 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
-    color: '#000000',
+    color: '#FFFFFF',
     flex: 1,
   },
   progressPercentage: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: 'Roboto-Bold',
-    color: '#00FF00',
+    color: '#FFFFFF',
   },
   earningProgressBar: {
     height: 8,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 4,
     overflow: 'hidden',
   },
   earningProgressFill: {
     height: '100%',
+    backgroundColor: '#FFFFFF',
     borderRadius: 4,
   },
   statsRow: {
@@ -550,46 +678,58 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 20,
     borderRadius: 16,
-    alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statGradient: {
+    padding: 20,
+    alignItems: 'center',
     gap: 8,
   },
   statNumber: {
     fontSize: 24,
     fontFamily: 'Roboto-Bold',
-    color: '#FF0000',
+    color: '#FFFFFF',
   },
   statLabel: {
     fontSize: 14,
     fontFamily: 'Roboto-Medium',
-    color: '#6B7280',
+    color: '#FFFFFF',
     textAlign: 'center',
+    opacity: 0.9,
   },
   controlsSection: {
     margin: 20,
     marginTop: 0,
-    gap: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
   },
   skipButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  skipGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FFA500',
     paddingVertical: 16,
-    borderRadius: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   skipButtonText: {
     fontSize: 16,
@@ -600,19 +740,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   autoPlayText: {
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
-    color: '#000000',
+    color: '#374151',
   },
 });
