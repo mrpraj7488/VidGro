@@ -1,31 +1,37 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
+const Joi = require('joi');
 const database = require('../config/database');
-const { generateToken, authenticate } = require('../middleware/auth');
+const { generateToken, authenticate, validateRequest } = require('../middleware/auth');
 const router = express.Router();
 
+// Validation schemas
+const registerSchema = Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().min(6).required()
+});
+
+const loginSchema = Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().required()
+});
+
 // Register
-router.post('/register', async (req, res) => {
+router.post('/register', validateRequest(registerSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
-        }
 
         // Check if user already exists
         const existingUser = await database.get('SELECT id FROM users WHERE email = ?', [email]);
         if (existingUser) {
-            return res.status(400).json({ error: 'User already exists' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'User already exists with this email' 
+            });
         }
 
         // Hash password
-        const passwordHash = await bcrypt.hash(password, 10);
+        const passwordHash = await bcrypt.hash(password, 12);
 
         // Create user
         const result = await database.run(
@@ -43,38 +49,49 @@ router.post('/register', async (req, res) => {
         const token = generateToken(result.id);
 
         // Get user data
-        const user = await database.get('SELECT id, email, coin_balance, is_vip FROM users WHERE id = ?', [result.id]);
+        const user = await database.get(
+            'SELECT id, email, coin_balance, is_vip, created_at FROM users WHERE id = ?', 
+            [result.id]
+        );
 
         res.status(201).json({
+            success: true,
             message: 'User created successfully',
-            token,
-            user
+            data: {
+                token,
+                user
+            }
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Registration failed' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Registration failed' 
+        });
     }
 });
 
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', validateRequest(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
-        }
 
         // Find user
         const user = await database.get('SELECT * FROM users WHERE email = ?', [email]);
         if (!user) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ 
+                success: false,
+                error: 'Invalid email or password' 
+            });
         }
 
         // Verify password
         const isValidPassword = await bcrypt.compare(password, user.password_hash);
         if (!isValidPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ 
+                success: false,
+                error: 'Invalid email or password' 
+            });
         }
 
         // Generate token
@@ -84,18 +101,25 @@ router.post('/login', async (req, res) => {
         await database.run('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
 
         res.json({
+            success: true,
             message: 'Login successful',
-            token,
-            user: {
-                id: user.id,
-                email: user.email,
-                coin_balance: user.coin_balance,
-                is_vip: user.is_vip
+            data: {
+                token,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    coin_balance: user.coin_balance,
+                    is_vip: user.is_vip,
+                    vip_expires_at: user.vip_expires_at
+                }
             }
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Login failed' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Login failed' 
+        });
     }
 });
 
@@ -110,12 +134,18 @@ router.get('/me', authenticate, async (req, res) => {
         const settings = await database.get('SELECT * FROM user_settings WHERE user_id = ?', [req.user.id]);
 
         res.json({
-            user,
-            settings
+            success: true,
+            data: {
+                user,
+                settings
+            }
         });
     } catch (error) {
         console.error('Get user error:', error);
-        res.status(500).json({ error: 'Failed to get user data' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get user data' 
+        });
     }
 });
 
@@ -143,10 +173,16 @@ router.put('/settings', authenticate, async (req, res) => {
             WHERE user_id = ?
         `, [notifications_enabled, sound_enabled, dark_mode, auto_play, ad_personalization, language, req.user.id]);
 
-        res.json({ message: 'Settings updated successfully' });
+        res.json({ 
+            success: true,
+            message: 'Settings updated successfully' 
+        });
     } catch (error) {
         console.error('Update settings error:', error);
-        res.status(500).json({ error: 'Failed to update settings' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to update settings' 
+        });
     }
 });
 
@@ -162,23 +198,35 @@ router.delete('/account', authenticate, async (req, res) => {
         await database.run('DELETE FROM promoted_videos WHERE promoter_id = ?', [req.user.id]);
         await database.run('DELETE FROM users WHERE id = ?', [req.user.id]);
 
-        res.json({ message: 'Account deleted successfully' });
+        res.json({ 
+            success: true,
+            message: 'Account deleted successfully' 
+        });
     } catch (error) {
         console.error('Delete account error:', error);
-        res.status(500).json({ error: 'Failed to delete account' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to delete account' 
+        });
     }
 });
 
-// Logout (client-side token removal, but we can log it)
+// Logout
 router.post('/logout', authenticate, async (req, res) => {
     try {
         // Log logout activity
         await database.run('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id]);
         
-        res.json({ message: 'Logout successful' });
+        res.json({ 
+            success: true,
+            message: 'Logout successful' 
+        });
     } catch (error) {
         console.error('Logout error:', error);
-        res.status(500).json({ error: 'Logout failed' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Logout failed' 
+        });
     }
 });
 

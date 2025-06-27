@@ -1,14 +1,19 @@
 const express = require('express');
+const Joi = require('joi');
 const database = require('../config/database');
-const { authenticate } = require('../middleware/auth');
-const { v4: uuidv4 } = require('uuid');
+const { authenticate, validateRequest } = require('../middleware/auth');
 const router = express.Router();
+
+// Validation schemas
+const applyReferralSchema = Joi.object({
+    referral_code: Joi.string().pattern(/^VIDGRO\d+$/).required()
+});
 
 // Get user's referral code and stats
 router.get('/my', authenticate, async (req, res) => {
     try {
-        // Get or create referral code
-        let referralCode = `VIDGRO${req.user.id.toString().padStart(3, '0')}`;
+        // Generate referral code
+        const referralCode = `VIDGRO${req.user.id.toString().padStart(3, '0')}`;
 
         // Get referral stats
         const stats = await database.get(`
@@ -31,30 +36,43 @@ router.get('/my', authenticate, async (req, res) => {
             LIMIT 10
         `, [req.user.id]);
 
+        // Get monthly stats
+        const monthlyStats = await database.get(`
+            SELECT 
+                COUNT(*) as this_month_referrals,
+                SUM(CASE WHEN status = 'completed' THEN bonus_coins ELSE 0 END) as this_month_earned
+            FROM referrals 
+            WHERE referrer_id = ? AND created_at > datetime('now', 'start of month')
+        `, [req.user.id]);
+
         res.json({
-            referral_code: referralCode,
-            stats: {
-                total_referrals: stats.total_referrals || 0,
-                completed_referrals: stats.completed_referrals || 0,
-                pending_referrals: stats.pending_referrals || 0,
-                total_earned: stats.total_earned || 0
-            },
-            recent_referrals: recentReferrals
+            success: true,
+            data: {
+                referral_code: referralCode,
+                stats: {
+                    total_referrals: stats.total_referrals || 0,
+                    completed_referrals: stats.completed_referrals || 0,
+                    pending_referrals: stats.pending_referrals || 0,
+                    total_earned: stats.total_earned || 0,
+                    this_month_referrals: monthlyStats.this_month_referrals || 0,
+                    this_month_earned: monthlyStats.this_month_earned || 0
+                },
+                recent_referrals: recentReferrals
+            }
         });
     } catch (error) {
         console.error('Get referral data error:', error);
-        res.status(500).json({ error: 'Failed to get referral data' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get referral data' 
+        });
     }
 });
 
 // Apply referral code during registration
-router.post('/apply', authenticate, async (req, res) => {
+router.post('/apply', authenticate, validateRequest(applyReferralSchema), async (req, res) => {
     try {
         const { referral_code } = req.body;
-
-        if (!referral_code) {
-            return res.status(400).json({ error: 'Referral code required' });
-        }
 
         // Check if user already used a referral code
         const existingReferral = await database.get(`
@@ -62,13 +80,19 @@ router.post('/apply', authenticate, async (req, res) => {
         `, [req.user.id]);
 
         if (existingReferral) {
-            return res.status(400).json({ error: 'You have already used a referral code' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'You have already used a referral code' 
+            });
         }
 
         // Extract referrer ID from code (format: VIDGRO001, VIDGRO002, etc.)
         const codeMatch = referral_code.match(/^VIDGRO(\d+)$/);
         if (!codeMatch) {
-            return res.status(400).json({ error: 'Invalid referral code format' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid referral code format' 
+            });
         }
 
         const referrerId = parseInt(codeMatch[1]);
@@ -76,11 +100,17 @@ router.post('/apply', authenticate, async (req, res) => {
         // Check if referrer exists and is not the same user
         const referrer = await database.get('SELECT * FROM users WHERE id = ?', [referrerId]);
         if (!referrer) {
-            return res.status(400).json({ error: 'Invalid referral code' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid referral code' 
+            });
         }
 
         if (referrerId === req.user.id) {
-            return res.status(400).json({ error: 'Cannot use your own referral code' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Cannot use your own referral code' 
+            });
         }
 
         // Create referral record
@@ -89,10 +119,16 @@ router.post('/apply', authenticate, async (req, res) => {
             VALUES (?, ?, ?, 'pending')
         `, [referrerId, req.user.id, referral_code]);
 
-        res.json({ message: 'Referral code applied successfully' });
+        res.json({ 
+            success: true,
+            message: 'Referral code applied successfully. Complete your first video to activate the bonus!' 
+        });
     } catch (error) {
         console.error('Apply referral error:', error);
-        res.status(500).json({ error: 'Failed to apply referral code' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to apply referral code' 
+        });
     }
 });
 
@@ -106,7 +142,10 @@ router.post('/complete', authenticate, async (req, res) => {
         `, [req.user.id]);
 
         if (!referral) {
-            return res.json({ message: 'No pending referral to complete' });
+            return res.json({ 
+                success: true,
+                message: 'No pending referral to complete' 
+            });
         }
 
         // Check if user has completed at least one video
@@ -116,7 +155,10 @@ router.post('/complete', authenticate, async (req, res) => {
         `, [req.user.id]);
 
         if (!completedVideo) {
-            return res.status(400).json({ error: 'Must complete at least one video to activate referral' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Must complete at least one video to activate referral bonus' 
+            });
         }
 
         const bonusCoins = 500;
@@ -135,7 +177,7 @@ router.post('/complete', authenticate, async (req, res) => {
             // Give bonus coins to both users
             await database.run(`
                 UPDATE users 
-                SET coin_balance = coin_balance + ?
+                SET coin_balance = coin_balance + ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id IN (?, ?)
             `, [bonusCoins, referral.referrer_id, referral.referred_id]);
 
@@ -153,8 +195,11 @@ router.post('/complete', authenticate, async (req, res) => {
             await database.run('COMMIT');
 
             res.json({
-                message: 'Referral completed successfully',
-                bonus_coins: bonusCoins
+                success: true,
+                message: 'Referral completed successfully! Both users received bonus coins.',
+                data: {
+                    bonus_coins: bonusCoins
+                }
             });
         } catch (error) {
             await database.run('ROLLBACK');
@@ -162,37 +207,46 @@ router.post('/complete', authenticate, async (req, res) => {
         }
     } catch (error) {
         console.error('Complete referral error:', error);
-        res.status(500).json({ error: 'Failed to complete referral' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to complete referral' 
+        });
     }
 });
 
-// Claim pending referral rewards
+// Claim pending referral rewards (informational endpoint)
 router.post('/claim', authenticate, async (req, res) => {
     try {
-        // Get completed but unclaimed referrals
+        // Get completed referrals
         const completedReferrals = await database.all(`
             SELECT * FROM referrals 
             WHERE referrer_id = ? AND status = 'completed'
         `, [req.user.id]);
 
         if (completedReferrals.length === 0) {
-            return res.status(400).json({ error: 'No referral rewards to claim' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'No referral rewards to claim' 
+            });
         }
 
-        const totalReward = completedReferrals.length * 500;
-
-        // In a real app, you might want to track claimed status separately
-        // For now, we'll just return the information since coins were already added
+        const totalReward = completedReferrals.reduce((sum, ref) => sum + ref.bonus_coins, 0);
 
         res.json({
+            success: true,
             message: 'Referral rewards information',
-            completed_referrals: completedReferrals.length,
-            total_reward: totalReward,
-            note: 'Rewards are automatically added when referrals complete their first video'
+            data: {
+                completed_referrals: completedReferrals.length,
+                total_reward: totalReward,
+                note: 'Rewards are automatically added when referrals complete their first video'
+            }
         });
     } catch (error) {
         console.error('Claim referral rewards error:', error);
-        res.status(500).json({ error: 'Failed to claim referral rewards' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get referral rewards information' 
+        });
     }
 });
 

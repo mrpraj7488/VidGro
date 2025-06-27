@@ -1,16 +1,36 @@
 const express = require('express');
+const Joi = require('joi');
 const database = require('../config/database');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, validateRequest } = require('../middleware/auth');
 const router = express.Router();
+
+// Validation schemas
+const purchaseSchema = Joi.object({
+    package_id: Joi.string().valid('small', 'medium', 'large', 'mega').required(),
+    payment_method: Joi.string().optional()
+});
+
+const freeCoinsSchema = Joi.object({
+    ad_type: Joi.string().valid('rewarded', 'interstitial').default('rewarded')
+});
 
 // Get coin balance
 router.get('/balance', authenticate, async (req, res) => {
     try {
         const user = await database.get('SELECT coin_balance FROM users WHERE id = ?', [req.user.id]);
-        res.json({ balance: user.coin_balance });
+        
+        res.json({ 
+            success: true,
+            data: {
+                balance: user.coin_balance
+            }
+        });
     } catch (error) {
         console.error('Get balance error:', error);
-        res.status(500).json({ error: 'Failed to get balance' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get balance' 
+        });
     }
 });
 
@@ -22,7 +42,7 @@ router.get('/transactions', authenticate, async (req, res) => {
         let whereClause = 'WHERE user_id = ?';
         let params = [req.user.id];
 
-        if (type) {
+        if (type && ['earned', 'spent', 'purchased', 'bonus'].includes(type)) {
             whereClause += ' AND transaction_type = ?';
             params.push(type);
         }
@@ -34,30 +54,61 @@ router.get('/transactions', authenticate, async (req, res) => {
             LIMIT ? OFFSET ?
         `, [...params, parseInt(limit), parseInt(offset)]);
 
-        res.json({ transactions });
+        // Get total count
+        const totalResult = await database.get(`
+            SELECT COUNT(*) as total FROM coin_transactions ${whereClause}
+        `, params);
+
+        // Get summary stats
+        const stats = await database.get(`
+            SELECT 
+                SUM(CASE WHEN transaction_type = 'earned' THEN amount ELSE 0 END) as total_earned,
+                SUM(CASE WHEN transaction_type = 'spent' THEN amount ELSE 0 END) as total_spent,
+                SUM(CASE WHEN transaction_type = 'purchased' THEN amount ELSE 0 END) as total_purchased
+            FROM coin_transactions 
+            WHERE user_id = ?
+        `, [req.user.id]);
+
+        res.json({ 
+            success: true,
+            data: {
+                transactions,
+                pagination: {
+                    total: totalResult.total,
+                    limit: parseInt(limit),
+                    offset: parseInt(offset),
+                    has_more: (parseInt(offset) + transactions.length) < totalResult.total
+                },
+                stats: {
+                    total_earned: stats.total_earned || 0,
+                    total_spent: stats.total_spent || 0,
+                    total_purchased: stats.total_purchased || 0
+                }
+            }
+        });
     } catch (error) {
         console.error('Get transactions error:', error);
-        res.status(500).json({ error: 'Failed to get transactions' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get transactions' 
+        });
     }
 });
 
 // Buy coins (simulate purchase)
-router.post('/purchase', authenticate, async (req, res) => {
+router.post('/purchase', authenticate, validateRequest(purchaseSchema), async (req, res) => {
     try {
-        const { package_id, payment_method } = req.body;
+        const { package_id, payment_method = 'credit_card' } = req.body;
 
         // Define coin packages
         const packages = {
-            'small': { coins: 100, price: 0.99 },
-            'medium': { coins: 500, price: 3.99 },
-            'large': { coins: 1000, price: 6.99 },
-            'mega': { coins: 2500, price: 14.99 }
+            'small': { coins: 100, price: 0.99, popular: false },
+            'medium': { coins: 500, price: 3.99, popular: true },
+            'large': { coins: 1000, price: 6.99, popular: false },
+            'mega': { coins: 2500, price: 14.99, popular: false }
         };
 
         const selectedPackage = packages[package_id];
-        if (!selectedPackage) {
-            return res.status(400).json({ error: 'Invalid package' });
-        }
 
         // In a real app, you would process the payment here
         // For demo purposes, we'll just add the coins
@@ -69,7 +120,7 @@ router.post('/purchase', authenticate, async (req, res) => {
             // Add coins to user balance
             await database.run(`
                 UPDATE users 
-                SET coin_balance = coin_balance + ?
+                SET coin_balance = coin_balance + ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `, [selectedPackage.coins, req.user.id]);
 
@@ -77,7 +128,7 @@ router.post('/purchase', authenticate, async (req, res) => {
             await database.run(`
                 INSERT INTO coin_transactions (user_id, transaction_type, amount, description)
                 VALUES (?, 'purchased', ?, ?)
-            `, [req.user.id, selectedPackage.coins, `Purchased ${package_id} package`]);
+            `, [req.user.id, selectedPackage.coins, `Purchased ${package_id} package ($${selectedPackage.price})`]);
 
             await database.run('COMMIT');
 
@@ -85,9 +136,17 @@ router.post('/purchase', authenticate, async (req, res) => {
             const user = await database.get('SELECT coin_balance FROM users WHERE id = ?', [req.user.id]);
 
             res.json({
+                success: true,
                 message: 'Coins purchased successfully',
-                coins_added: selectedPackage.coins,
-                new_balance: user.coin_balance
+                data: {
+                    coins_added: selectedPackage.coins,
+                    new_balance: user.coin_balance,
+                    package: {
+                        id: package_id,
+                        coins: selectedPackage.coins,
+                        price: selectedPackage.price
+                    }
+                }
             });
         } catch (error) {
             await database.run('ROLLBACK');
@@ -95,14 +154,17 @@ router.post('/purchase', authenticate, async (req, res) => {
         }
     } catch (error) {
         console.error('Purchase coins error:', error);
-        res.status(500).json({ error: 'Failed to purchase coins' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to purchase coins' 
+        });
     }
 });
 
 // Earn free coins by watching ads
-router.post('/free-coins', authenticate, async (req, res) => {
+router.post('/free-coins', authenticate, validateRequest(freeCoinsSchema), async (req, res) => {
     try {
-        const { ad_type = 'rewarded' } = req.body;
+        const { ad_type } = req.body;
 
         // Check if user has watched an ad recently (limit to once per hour)
         const recentAd = await database.get(`
@@ -111,7 +173,16 @@ router.post('/free-coins', authenticate, async (req, res) => {
         `, [req.user.id]);
 
         if (recentAd) {
-            return res.status(400).json({ error: 'You can only watch one ad per hour' });
+            const timeRemaining = new Date(recentAd.timestamp);
+            timeRemaining.setHours(timeRemaining.getHours() + 1);
+            
+            return res.status(400).json({ 
+                success: false,
+                error: 'You can only watch one ad per hour',
+                data: {
+                    next_available: timeRemaining.toISOString()
+                }
+            });
         }
 
         // Random coins between 150-400
@@ -124,7 +195,7 @@ router.post('/free-coins', authenticate, async (req, res) => {
             // Add coins to user balance
             await database.run(`
                 UPDATE users 
-                SET coin_balance = coin_balance + ?
+                SET coin_balance = coin_balance + ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `, [coinsEarned, req.user.id]);
 
@@ -137,8 +208,8 @@ router.post('/free-coins', authenticate, async (req, res) => {
             // Record coin transaction
             await database.run(`
                 INSERT INTO coin_transactions (user_id, transaction_type, amount, description)
-                VALUES (?, 'earned', ?, 'Watched advertisement')
-            `, [req.user.id, coinsEarned]);
+                VALUES (?, 'earned', ?, ?)
+            `, [req.user.id, coinsEarned, `Watched ${ad_type} advertisement`]);
 
             await database.run('COMMIT');
 
@@ -146,9 +217,13 @@ router.post('/free-coins', authenticate, async (req, res) => {
             const user = await database.get('SELECT coin_balance FROM users WHERE id = ?', [req.user.id]);
 
             res.json({
+                success: true,
                 message: 'Free coins earned successfully',
-                coins_earned: coinsEarned,
-                new_balance: user.coin_balance
+                data: {
+                    coins_earned: coinsEarned,
+                    new_balance: user.coin_balance,
+                    ad_type
+                }
             });
         } catch (error) {
             await database.run('ROLLBACK');
@@ -156,7 +231,10 @@ router.post('/free-coins', authenticate, async (req, res) => {
         }
     } catch (error) {
         console.error('Free coins error:', error);
-        res.status(500).json({ error: 'Failed to earn free coins' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to earn free coins' 
+        });
     }
 });
 
@@ -166,7 +244,14 @@ router.post('/stop-ads', authenticate, async (req, res) => {
         const cost = 50;
 
         if (req.user.coin_balance < cost) {
-            return res.status(400).json({ error: 'Insufficient coins' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Insufficient coins',
+                data: {
+                    required: cost,
+                    available: req.user.coin_balance
+                }
+            });
         }
 
         // Begin transaction
@@ -176,7 +261,9 @@ router.post('/stop-ads', authenticate, async (req, res) => {
             // Deduct coins
             await database.run(`
                 UPDATE users 
-                SET coin_balance = coin_balance - ?, stop_ads_until = datetime('now', '+6 hours')
+                SET coin_balance = coin_balance - ?, 
+                    stop_ads_until = datetime('now', '+6 hours'),
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `, [cost, req.user.id]);
 
@@ -192,9 +279,13 @@ router.post('/stop-ads', authenticate, async (req, res) => {
             const user = await database.get('SELECT coin_balance, stop_ads_until FROM users WHERE id = ?', [req.user.id]);
 
             res.json({
+                success: true,
                 message: 'Ads stopped for 6 hours',
-                new_balance: user.coin_balance,
-                ads_stopped_until: user.stop_ads_until
+                data: {
+                    new_balance: user.coin_balance,
+                    ads_stopped_until: user.stop_ads_until,
+                    cost
+                }
             });
         } catch (error) {
             await database.run('ROLLBACK');
@@ -202,8 +293,28 @@ router.post('/stop-ads', authenticate, async (req, res) => {
         }
     } catch (error) {
         console.error('Stop ads error:', error);
-        res.status(500).json({ error: 'Failed to stop ads' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to stop ads' 
+        });
     }
+});
+
+// Get available coin packages
+router.get('/packages', (req, res) => {
+    const packages = [
+        { id: 'small', coins: 100, price: 0.99, popular: false },
+        { id: 'medium', coins: 500, price: 3.99, popular: true },
+        { id: 'large', coins: 1000, price: 6.99, popular: false },
+        { id: 'mega', coins: 2500, price: 14.99, popular: false }
+    ];
+
+    res.json({
+        success: true,
+        data: {
+            packages
+        }
+    });
 });
 
 module.exports = router;

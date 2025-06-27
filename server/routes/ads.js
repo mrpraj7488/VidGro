@@ -1,7 +1,17 @@
 const express = require('express');
+const Joi = require('joi');
 const database = require('../config/database');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, validateRequest } = require('../middleware/auth');
 const router = express.Router();
+
+// Validation schemas
+const configureSchema = Joi.object({
+    ad_frequency: Joi.number().integer().min(1).max(10).optional()
+});
+
+const adShownSchema = Joi.object({
+    ad_type: Joi.string().valid('interstitial', 'rewarded', 'banner').default('interstitial')
+});
 
 // Get ad configuration for user
 router.get('/', authenticate, async (req, res) => {
@@ -30,50 +40,58 @@ router.get('/', authenticate, async (req, res) => {
         const shouldShowAdNow = shouldShowAds && (recentWatches.count >= user.ad_frequency);
 
         res.json({
-            should_show_ads: shouldShowAds,
-            should_show_ad_now: shouldShowAdNow,
-            ad_frequency: user.ad_frequency,
-            videos_until_next_ad: shouldShowAds ? Math.max(0, user.ad_frequency - recentWatches.count) : 0,
-            ads_stopped_until: user.stop_ads_until,
-            is_vip: user.is_vip,
-            ad_personalization: settings.ad_personalization
+            success: true,
+            data: {
+                should_show_ads: shouldShowAds,
+                should_show_ad_now: shouldShowAdNow,
+                ad_frequency: user.ad_frequency,
+                videos_until_next_ad: shouldShowAds ? Math.max(0, user.ad_frequency - recentWatches.count) : 0,
+                ads_stopped_until: user.stop_ads_until,
+                is_vip: user.is_vip,
+                ad_personalization: settings?.ad_personalization || true
+            }
         });
     } catch (error) {
         console.error('Get ads config error:', error);
-        res.status(500).json({ error: 'Failed to get ad configuration' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get ad configuration' 
+        });
     }
 });
 
 // Configure ad settings
-router.post('/configure', authenticate, async (req, res) => {
+router.post('/configure', authenticate, validateRequest(configureSchema), async (req, res) => {
     try {
         const { ad_frequency } = req.body;
 
-        if (ad_frequency && (ad_frequency < 1 || ad_frequency > 10)) {
-            return res.status(400).json({ error: 'Ad frequency must be between 1 and 10' });
-        }
-
         await database.run(`
             UPDATE users 
-            SET ad_frequency = COALESCE(?, ad_frequency)
+            SET ad_frequency = COALESCE(?, ad_frequency), updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `, [ad_frequency, req.user.id]);
 
-        res.json({ message: 'Ad settings updated successfully' });
+        res.json({ 
+            success: true,
+            message: 'Ad settings updated successfully' 
+        });
     } catch (error) {
         console.error('Configure ads error:', error);
-        res.status(500).json({ error: 'Failed to configure ads' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to configure ads' 
+        });
     }
 });
 
 // Record ad shown
-router.post('/shown', authenticate, async (req, res) => {
+router.post('/shown', authenticate, validateRequest(adShownSchema), async (req, res) => {
     try {
-        const { ad_type = 'interstitial' } = req.body;
+        const { ad_type } = req.body;
 
         await database.run(`
             UPDATE users 
-            SET last_ad_shown = CURRENT_TIMESTAMP
+            SET last_ad_shown = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `, [req.user.id]);
 
@@ -83,10 +101,16 @@ router.post('/shown', authenticate, async (req, res) => {
             VALUES (?, ?, 0, 30)
         `, [req.user.id, ad_type]);
 
-        res.json({ message: 'Ad shown recorded' });
+        res.json({ 
+            success: true,
+            message: 'Ad shown recorded' 
+        });
     } catch (error) {
         console.error('Record ad shown error:', error);
-        res.status(500).json({ error: 'Failed to record ad shown' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to record ad shown' 
+        });
     }
 });
 
@@ -108,15 +132,29 @@ router.get('/stats', authenticate, async (req, res) => {
             WHERE user_id = ? AND timestamp > datetime('now', '-7 days')
         `, [req.user.id]);
 
+        const adTypes = await database.all(`
+            SELECT ad_type, COUNT(*) as count
+            FROM ad_sessions 
+            WHERE user_id = ?
+            GROUP BY ad_type
+        `, [req.user.id]);
+
         res.json({
-            ...stats,
-            ...recentAds,
-            total_coins_from_ads: stats.total_coins_from_ads || 0,
-            avg_ad_duration: Math.round(stats.avg_ad_duration || 0)
+            success: true,
+            data: {
+                total_ads_watched: stats.total_ads_watched || 0,
+                total_coins_from_ads: stats.total_coins_from_ads || 0,
+                avg_ad_duration: Math.round(stats.avg_ad_duration || 0),
+                ads_this_week: recentAds.ads_this_week || 0,
+                ad_types: adTypes
+            }
         });
     } catch (error) {
         console.error('Get ad stats error:', error);
-        res.status(500).json({ error: 'Failed to get ad statistics' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to get ad statistics' 
+        });
     }
 });
 

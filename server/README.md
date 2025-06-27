@@ -2,7 +2,7 @@
 
 A comprehensive backend system for the VidGro video promotion and earning platform.
 
-## Features
+## 🚀 Features
 
 - **User Authentication**: Registration, login, JWT tokens, Firebase integration
 - **Video Management**: YouTube API integration, video validation, metadata extraction
@@ -13,7 +13,7 @@ A comprehensive backend system for the VidGro video promotion and earning platfo
 - **Analytics**: Comprehensive user and promotion analytics
 - **Database**: SQLite for development, easily migrable to PostgreSQL
 
-## Quick Start
+## 📋 Quick Start
 
 ### Prerequisites
 
@@ -22,7 +22,7 @@ A comprehensive backend system for the VidGro video promotion and earning platfo
 
 ### Installation
 
-1. Clone and navigate to the server directory:
+1. Navigate to the server directory:
 ```bash
 cd server
 ```
@@ -53,7 +53,7 @@ npm start
 npm run seed
 ```
 
-## API Endpoints
+## 🔌 API Endpoints
 
 ### Authentication
 - `POST /api/auth/register` - Register new user
@@ -80,6 +80,7 @@ npm run seed
 ### Coins
 - `GET /api/coins/balance` - Get coin balance
 - `GET /api/coins/transactions` - Get transaction history
+- `GET /api/coins/packages` - Get available coin packages
 - `POST /api/coins/purchase` - Purchase coins
 - `POST /api/coins/free-coins` - Earn free coins by watching ads
 - `POST /api/coins/stop-ads` - Stop ads for 6 hours
@@ -102,7 +103,7 @@ npm run seed
 - `GET /api/analytics/promotions` - Get promotion analytics
 - `GET /api/analytics/earnings` - Get earning trends
 
-## Database Schema
+## 🗄️ Database Schema
 
 ### Users
 - User accounts with email/password authentication
@@ -124,7 +125,7 @@ npm run seed
 - Earning, spending, and purchase records
 - Reference tracking for related activities
 
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
@@ -152,7 +153,7 @@ Configured for Firebase Auth integration:
 - User management
 - Secure authentication flow
 
-## Demo Accounts
+## 👥 Demo Accounts
 
 After running `npm run seed`, these demo accounts are available:
 
@@ -160,16 +161,17 @@ After running `npm run seed`, these demo accounts are available:
 2. **vip@vidgro.com** / vip123 - VIP user (5000 coins)  
 3. **promoter@vidgro.com** / promoter123 - Promoter (10000 coins)
 
-## Security Features
+## 🔒 Security Features
 
 - JWT token authentication
 - Password hashing with bcrypt
 - Input validation and sanitization
 - CORS configuration
-- Rate limiting ready
+- Rate limiting
 - SQL injection prevention
+- Helmet security headers
 
-## Development
+## 🛠️ Development
 
 ### Database Management
 
@@ -194,7 +196,7 @@ npm test
 curl -X GET http://localhost:3000/health
 ```
 
-## Production Deployment
+## 🚀 Production Deployment
 
 1. Set `NODE_ENV=production`
 2. Use strong JWT secret
@@ -204,7 +206,7 @@ curl -X GET http://localhost:3000/health
 6. Configure proper logging
 7. Set up monitoring and alerts
 
-## API Response Format
+## 📊 API Response Format
 
 All API responses follow this format:
 
@@ -212,8 +214,7 @@ All API responses follow this format:
 {
   "success": true,
   "data": {},
-  "message": "Success message",
-  "error": null
+  "message": "Success message"
 }
 ```
 
@@ -221,19 +222,18 @@ Error responses:
 ```json
 {
   "success": false,
-  "error": "Error message",
-  "code": "ERROR_CODE"
+  "error": "Error message"
 }
 ```
 
-## Rate Limiting
+## 🔄 Rate Limiting
 
 API endpoints are rate limited to prevent abuse:
 - 100 requests per 15 minutes per IP
 - Configurable via environment variables
 - Different limits for different endpoint types
 
-## Monitoring
+## 🏥 Monitoring
 
 Health check endpoint available at `/health`:
 
@@ -241,11 +241,12 @@ Health check endpoint available at `/health`:
 {
   "status": "OK",
   "timestamp": "2024-01-01T00:00:00.000Z",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "environment": "development"
 }
 ```
 
-## Support
+## 📞 Support
 
 For issues and questions:
 1. Check the API documentation
