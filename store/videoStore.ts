@@ -47,17 +47,34 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     try {
       console.log('Fetching video queue for user:', userId);
       
-      // Fetch multiple videos using enhanced query
-      const { data: videos, error } = await supabase
+      // First, get videos that the user has already watched
+      const { data: watchedVideos, error: watchedError } = await supabase
+        .from('video_views')
+        .select('video_id')
+        .eq('viewer_id', userId);
+
+      if (watchedError) {
+        console.error('Error fetching watched videos:', watchedError);
+        throw watchedError;
+      }
+
+      const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
+      
+      // Build the query to exclude watched videos
+      let query = supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id')
         .eq('status', 'active')
         .neq('user_id', userId)
-        .not('id', 'in', `(
-          SELECT video_id FROM video_views WHERE viewer_id = '${userId}'
-        )`)
         .order('created_at', { ascending: false })
         .limit(QUEUE_SIZE);
+
+      // If there are watched videos, exclude them
+      if (watchedVideoIds.length > 0) {
+        query = query.not('id', 'in', `(${watchedVideoIds.map(id => `'${id}'`).join(',')})`);
+      }
+
+      const { data: videos, error } = await query;
 
       if (error) {
         console.error('Error fetching video queue:', error);
@@ -170,10 +187,6 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       currentVideoIndex: 0,
       lastFetchTime: 0 // Force refresh on next fetch
     });
-    
-    // Immediately fetch new videos without delay
-    const userId = get().cachedVideoIds.length > 0 ? 'current-user' : 'unknown';
-    // Note: In real implementation, you'd get the actual user ID from auth context
   },
 
   clearQueue: () => {
