@@ -54,13 +54,18 @@ export default function SeamlessVideoPlayer({
   const [retryCount, setRetryCount] = useState(0);
   const [appState, setAppState] = useState(AppState.currentState);
   const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [lastProgressTime, setLastProgressTime] = useState(0);
+  const [stuckProgressCount, setStuckProgressCount] = useState(0);
   
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
   const webviewRef = useRef<WebView>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const stuckCheckRef = useRef<NodeJS.Timeout | null>(null);
   const maxRetries = 1; // Reduced retries for faster skipping
   const errorTimeoutDuration = 5000; // 5 seconds timeout
+  const maxStuckCount = 5; // Max times progress can be stuck before action
 
   const showToast = (message: string) => {
     if (Platform.OS === 'android') {
@@ -105,7 +110,7 @@ export default function SeamlessVideoPlayer({
 
   const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
 
-  // Enhanced HTML content with better error handling and logging
+  // Enhanced HTML content with better buffering handling and stuck progress detection
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -173,12 +178,17 @@ export default function SeamlessVideoPlayer({
         var player;
         var isPlayerReady = false;
         var currentTime = 0;
+        var lastReportedTime = 0;
         var maxDuration = ${duration};
         var hasCompleted = false;
         var errorCount = 0;
         var maxErrors = 3;
         var retryAttempts = 0;
         var maxRetries = 2;
+        var isBuffering = false;
+        var stuckCount = 0;
+        var maxStuckCount = 3;
+        var progressCheckInterval;
 
         function onYouTubeIframeAPIReady() {
           console.log('YouTube API ready, creating player for video ID: ${youtubeVideoId}');
@@ -201,7 +211,9 @@ export default function SeamlessVideoPlayer({
                 'origin': window.location.origin,
                 'iv_load_policy': 3,
                 'cc_load_policy': 0,
-                'start': 0
+                'start': 0,
+                'mute': 0,
+                'loop': 0
               },
               events: {
                 'onReady': onPlayerReady,
@@ -265,22 +277,60 @@ export default function SeamlessVideoPlayer({
             }
           }, 1000);
           
-          // Start progress tracking
-          setInterval(function() {
-            if (player && player.getCurrentTime && isPlayerReady) {
+          // Start enhanced progress tracking with stuck detection
+          startProgressTracking();
+        }
+
+        function startProgressTracking() {
+          if (progressCheckInterval) {
+            clearInterval(progressCheckInterval);
+          }
+          
+          progressCheckInterval = setInterval(function() {
+            if (player && player.getCurrentTime && isPlayerReady && !hasCompleted) {
               try {
-                currentTime = player.getCurrentTime();
+                var newTime = player.getCurrentTime();
+                
+                // Check if progress is stuck
+                if (Math.abs(newTime - lastReportedTime) < 0.1 && newTime > 0) {
+                  stuckCount++;
+                  console.log('Progress stuck at', newTime, 'count:', stuckCount);
+                  
+                  if (stuckCount >= maxStuckCount) {
+                    console.log('Progress stuck too long, attempting to resume playback');
+                    try {
+                      // Try to resume playback
+                      if (player.getPlayerState() !== 1) { // Not playing
+                        player.playVideo();
+                      }
+                      // Reset stuck count after intervention
+                      stuckCount = 0;
+                    } catch (error) {
+                      console.error('Error resuming playback:', error);
+                    }
+                  }
+                } else {
+                  stuckCount = 0; // Reset stuck count if progress is moving
+                }
+                
+                currentTime = newTime;
+                lastReportedTime = newTime;
                 
                 // Limit to user-set duration
                 if (currentTime >= maxDuration && !hasCompleted) {
                   hasCompleted = true;
-                  player.pauseVideo();
+                  try {
+                    player.pauseVideo();
+                  } catch (error) {
+                    console.error('Error pausing video:', error);
+                  }
                   console.log('Video completed at', currentTime, 'seconds');
                   window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'VIDEO_COMPLETED',
                     currentTime: currentTime
                   }));
                 } else if (currentTime < maxDuration) {
+                  // Only send progress updates if time has actually changed
                   window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'PROGRESS_UPDATE',
                     currentTime: currentTime,
@@ -315,6 +365,14 @@ export default function SeamlessVideoPlayer({
           
           console.log('Player state changed to:', stateNames[state] || state);
           
+          // Handle buffering state
+          if (state === 3) { // BUFFERING
+            isBuffering = true;
+            console.log('Video buffering...');
+          } else {
+            isBuffering = false;
+          }
+          
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'STATE_CHANGE',
             state: state,
@@ -322,8 +380,9 @@ export default function SeamlessVideoPlayer({
           }));
 
           // Handle video ended before user-set duration
-          if (state === 0 && currentTime < maxDuration) {
+          if (state === 0 && currentTime < maxDuration && !hasCompleted) {
             console.log('Video ended early at', currentTime, 'seconds');
+            hasCompleted = true;
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_ENDED_EARLY',
               currentTime: currentTime
@@ -430,6 +489,13 @@ export default function SeamlessVideoPlayer({
             message: 'Page error: ' + msg
           }));
         };
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+          if (progressCheckInterval) {
+            clearInterval(progressCheckInterval);
+          }
+        });
       </script>
     </body>
     </html>
@@ -461,11 +527,19 @@ export default function SeamlessVideoPlayer({
     setIsCompleted(false);
     setPlayerError(null);
     setRetryCount(0);
+    setIsBuffering(false);
+    setLastProgressTime(0);
+    setStuckProgressCount(0);
     progressValue.value = 0;
     
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
+    }
+
+    if (stuckCheckRef.current) {
+      clearTimeout(stuckCheckRef.current);
+      stuckCheckRef.current = null;
     }
 
     if (errorTimeout) {
@@ -519,6 +593,7 @@ export default function SeamlessVideoPlayer({
           console.log('Player ready message received for video:', data.videoId || youtubeVideoId);
           setIsLoaded(true);
           setPlayerError(null);
+          setIsBuffering(false);
           if (errorTimeout) {
             clearTimeout(errorTimeout);
             setErrorTimeout(null);
@@ -534,6 +609,7 @@ export default function SeamlessVideoPlayer({
           if (data.state === 1) { // PLAYING
             console.log('Video started playing:', youtubeVideoId);
             setIsPlaying(true);
+            setIsBuffering(false);
             if (!hasStarted) {
               setHasStarted(true);
             }
@@ -544,12 +620,34 @@ export default function SeamlessVideoPlayer({
             }
           } else if (data.state === 2) { // PAUSED
             setIsPlaying(false);
+            setIsBuffering(false);
+          } else if (data.state === 3) { // BUFFERING
+            setIsBuffering(true);
+            console.log('Video buffering...');
           }
           break;
           
         case 'PROGRESS_UPDATE':
-          setCurrentTime(data.currentTime);
-          const progress = Math.min(data.currentTime / duration, 1);
+          const newTime = data.currentTime;
+          
+          // Check for stuck progress
+          if (Math.abs(newTime - lastProgressTime) < 0.1 && newTime > 0) {
+            setStuckProgressCount(prev => {
+              const newCount = prev + 1;
+              if (newCount >= maxStuckCount) {
+                console.log('Progress stuck, attempting to resume playback');
+                playVideo(); // Try to resume
+                return 0; // Reset count
+              }
+              return newCount;
+            });
+          } else {
+            setStuckProgressCount(0);
+            setLastProgressTime(newTime);
+          }
+          
+          setCurrentTime(newTime);
+          const progress = Math.min(newTime / duration, 1);
           progressValue.value = withTiming(progress, {
             duration: 300,
             easing: Easing.out(Easing.quad),
@@ -561,6 +659,7 @@ export default function SeamlessVideoPlayer({
             console.log('Video completed:', youtubeVideoId);
             setIsCompleted(true);
             setIsPlaying(false);
+            setIsBuffering(false);
             
             // Silent coin animation
             coinBounce.value = withTiming(1.2, { duration: 200 }, () => {
@@ -580,6 +679,7 @@ export default function SeamlessVideoPlayer({
             console.log('Video ended early:', youtubeVideoId);
             setIsCompleted(true);
             setIsPlaying(false);
+            setIsBuffering(false);
             
             coinBounce.value = withTiming(1.2, { duration: 200 }, () => {
               coinBounce.value = withTiming(1, { duration: 200 });
@@ -600,7 +700,7 @@ export default function SeamlessVideoPlayer({
       console.error('Error parsing WebView message:', error);
       handleVideoError('Failed to parse video message');
     }
-  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoError, errorTimeout, youtubeVideoId]);
+  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoError, errorTimeout, youtubeVideoId, lastProgressTime, maxStuckCount, playVideo]);
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -709,6 +809,14 @@ export default function SeamlessVideoPlayer({
             <AlertTriangle color="#FF4757" size={24} />
             <Text style={styles.errorText}>Loading next video...</Text>
             <Text style={styles.errorSubtext}>{playerError}</Text>
+          </View>
+        )}
+
+        {/* Buffering Overlay */}
+        {isBuffering && isLoaded && (
+          <View style={styles.bufferingOverlay}>
+            <ActivityIndicator size="large" color="#FF4757" />
+            <Text style={styles.bufferingText}>Buffering...</Text>
           </View>
         )}
       </View>
@@ -823,6 +931,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     zIndex: 20,
+  },
+  bufferingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    zIndex: 15,
+  },
+  bufferingText: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
   errorContainer: {
     flex: 1,
