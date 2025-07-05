@@ -68,10 +68,10 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
       console.log('User has watched videos:', watchedVideoIds.length);
       
-      // Get all active videos that are not owned by the user and are embeddable
+      // Get all active videos that are not owned by the user
       let query = supabase
         .from('videos')
-        .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id, description')
+        .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id')
         .eq('status', 'active')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -95,18 +95,15 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         return;
       }
 
-      // Filter videos on the client side - exclude videos that had embedding errors
+      // Filter videos on the client side
       const availableVideos = allVideos
         .filter(video => {
           // Check if video has remaining views
           const hasRemainingViews = video.views_count < video.target_views;
           // Check if user hasn't watched this video
           const notWatched = !watchedVideoIds.includes(video.id);
-          // Check if video doesn't have embedding error in description
-          const notEmbeddingError = !video.description?.includes('not embeddable') && 
-                                   !video.description?.includes('embedding error');
           
-          return hasRemainingViews && notWatched && notEmbeddingError;
+          return hasRemainingViews && notWatched;
         })
         .slice(0, QUEUE_SIZE) // Limit to queue size
         .map(video => ({
@@ -176,14 +173,11 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     
     console.log('Removing unplayable video from queue:', currentVideo.id);
     
-    // Mark video as paused in Supabase to prevent it from being fetched again
+    // Remove from Supabase by marking as paused
     try {
       await supabase
         .from('videos')
-        .update({ 
-          status: 'paused',
-          description: supabase.raw(`description || ' - Video marked as unplayable due to embedding restrictions'`)
-        })
+        .update({ status: 'paused' })
         .eq('id', currentVideo.id);
       
       console.log('Video marked as paused in Supabase:', currentVideo.id);
@@ -228,7 +222,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       // Strategy 1: Get all active videos and filter client-side
       const { data: allVideos, error } = await supabase
         .from('videos')
-        .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, description')
+        .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views')
         .eq('status', 'active')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -240,11 +234,9 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       if (allVideos && allVideos.length > 0) {
-        // Filter videos with remaining views and no embedding errors
+        // Filter videos with remaining views on the client side
         const availableVideos = allVideos.filter(video => 
-          video.views_count < video.target_views &&
-          !video.description?.includes('not embeddable') &&
-          !video.description?.includes('embedding error')
+          video.views_count < video.target_views
         );
 
         if (availableVideos.length > 0) {
@@ -275,10 +267,6 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         console.log('No videos with remaining views, using any active videos for seamless looping...');
         
         const videoQueue = allVideos
-          .filter(video => 
-            !video.description?.includes('not embeddable') &&
-            !video.description?.includes('embedding error')
-          )
           .slice(0, QUEUE_SIZE) // Limit to queue size
           .map(video => ({
             id: video.id,
