@@ -24,6 +24,9 @@ interface VideoData {
   thumbnail: string;
   valid: boolean;
   embeddable: boolean;
+  embedUrl: string;
+  watchUrl: string;
+  originalUrl: string;
   warning?: string;
 }
 
@@ -88,7 +91,21 @@ export default function PromoteTab() {
       console.log('Video data received:', data);
 
       if (data.valid && data.embeddable) {
-        setVideoData(data);
+        // Create VideoData object with all required fields
+        const processedVideoData: VideoData = {
+          id: data.id,
+          title: data.title,
+          duration: data.duration,
+          thumbnail: data.thumbnail,
+          valid: data.valid,
+          embeddable: data.embeddable,
+          embedUrl: data.embedUrl || `https://www.youtube.com/embed/${data.id}`,
+          watchUrl: data.watchUrl || `https://www.youtube.com/watch?v=${data.id}`,
+          originalUrl: data.originalUrl || youtubeUrl,
+          warning: data.warning
+        };
+
+        setVideoData(processedVideoData);
         setTitle(data.title || '');
         setError(null);
         
@@ -216,7 +233,7 @@ export default function PromoteTab() {
         title,
         duration: durationSeconds,
         targetViews: views,
-        youtubeUrl,
+        youtubeUrl: videoData.embedUrl, // Store embed URL for playback
         embeddable: videoData.embeddable
       });
 
@@ -240,12 +257,12 @@ export default function PromoteTab() {
 
       console.log('Coins deducted successfully');
 
-      // Create video promotion with embeddability confirmation
+      // Create video promotion with embed URL for playback
       const videoInsertData = {
         user_id: user.id,
-        youtube_url: youtubeUrl,
+        youtube_url: videoData.embedUrl, // Store embed URL for seamless playback
         title,
-        description: `User-set duration: ${durationSeconds}s${videoData?.duration ? ` (Actual: ${videoData.duration}s)` : ''} - Embeddable: ${videoData.embeddable}${videoData?.warning ? ` - Warning: ${videoData.warning}` : ''}`,
+        description: `Original URL: ${videoData.originalUrl} | User-set duration: ${durationSeconds}s${videoData?.duration ? ` (Actual: ${videoData.duration}s)` : ''} - Embeddable: ${videoData.embeddable}${videoData?.warning ? ` - Warning: ${videoData.warning}` : ''}`,
         duration_seconds: durationSeconds,
         coin_cost: totalCost,
         coin_reward: rewardPerView,
@@ -337,7 +354,7 @@ export default function PromoteTab() {
                 <Link color="#666" size={20} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="https://youtube.com/watch?v=..."
+                  placeholder="https://youtube.com/watch?v=... or https://youtu.be/..."
                   value={youtubeUrl}
                   onChangeText={setYoutubeUrl}
                   autoCapitalize="none"
@@ -352,10 +369,10 @@ export default function PromoteTab() {
                 </TouchableOpacity>
               </View>
               {fetchingVideo && (
-                <Text style={styles.helperText}>Validating video embeddability...</Text>
+                <Text style={styles.helperText}>Validating video embeddability and converting URL...</Text>
               )}
               <Text style={styles.helperText}>
-                Paste a YouTube video URL to validate embeddability and fetch details
+                Supports both youtube.com/watch and youtu.be formats. URL will be automatically converted for optimal playback.
               </Text>
             </View>
 
@@ -364,7 +381,7 @@ export default function PromoteTab() {
               <View style={styles.videoPreview}>
                 <View style={styles.videoPreviewHeader}>
                   <CheckCircle color="#2ECC71" size={20} />
-                  <Text style={styles.videoPreviewTitle}>Video Validated & Embeddable</Text>
+                  <Text style={styles.videoPreviewTitle}>Video Validated & URL Converted</Text>
                 </View>
                 <View style={styles.videoPreviewContent}>
                   <Image 
@@ -382,12 +399,21 @@ export default function PromoteTab() {
                     <Text style={styles.videoNote}>
                       ✅ Embeddable - Ready for promotion
                     </Text>
+                    <Text style={styles.urlConversion}>
+                      🔄 URL converted to embed format for optimal playback
+                    </Text>
                     {videoData.warning && (
                       <Text style={styles.videoWarning}>
                         ⚠️ {videoData.warning}
                       </Text>
                     )}
                   </View>
+                </View>
+                <View style={styles.urlDetails}>
+                  <Text style={styles.urlLabel}>Original URL:</Text>
+                  <Text style={styles.urlText} numberOfLines={1}>{videoData.originalUrl}</Text>
+                  <Text style={styles.urlLabel}>Embed URL (stored):</Text>
+                  <Text style={styles.urlText} numberOfLines={1}>{videoData.embedUrl}</Text>
                 </View>
               </View>
             )}
@@ -476,8 +502,8 @@ export default function PromoteTab() {
                 </View>
                 {videoData && videoData.embeddable && (
                   <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>Embeddability:</Text>
-                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Verified</Text>
+                    <Text style={styles.costLabel}>URL Format:</Text>
+                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Optimized for playback</Text>
                   </View>
                 )}
               </View>
@@ -500,13 +526,13 @@ export default function PromoteTab() {
 
             {/* Instructions */}
             <View style={styles.instructionsCard}>
-              <Text style={styles.instructionsTitle}>How it works:</Text>
+              <Text style={styles.instructionsTitle}>How URL conversion works:</Text>
               <Text style={styles.instructionsText}>
-                1. Enter a YouTube video URL and validate embeddability{'\n'}
-                2. Set your preferred viewing duration (up to actual video length){'\n'}
-                3. Choose how many views you want{'\n'}
-                4. Pay coins based on duration × views{'\n'}
-                5. Other users will watch your video and earn coins{'\n'}
+                1. Enter any YouTube URL format (youtube.com/watch or youtu.be){'\n'}
+                2. System validates embeddability and extracts video ID{'\n'}
+                3. URL is automatically converted to embed format for optimal playback{'\n'}
+                4. Both original and embed URLs are stored for reference{'\n'}
+                5. Viewers see seamless video playback in the app{'\n'}
                 6. Your video gets promoted to more viewers!
               </Text>
             </View>
@@ -668,6 +694,7 @@ const styles = StyleSheet.create({
   },
   videoPreviewContent: {
     flexDirection: 'row',
+    marginBottom: 12,
   },
   videoThumbnail: {
     width: 120,
@@ -695,10 +722,34 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 4,
   },
+  urlConversion: {
+    fontSize: 11,
+    color: '#4A90E2',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
   videoWarning: {
     fontSize: 11,
     color: '#FF4757',
     fontWeight: '500',
+  },
+  urlDetails: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  urlLabel: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  urlText: {
+    fontSize: 10,
+    color: '#333',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 8,
   },
   costCard: {
     backgroundColor: 'white',
