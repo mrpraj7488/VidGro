@@ -151,6 +151,10 @@ export default function SeamlessVideoPlayer({
         
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
+        tag.async = true;
+        tag.onload = function() {
+          console.log('YouTube API script loaded successfully');
+        };
         tag.onerror = function() {
           console.error('Failed to load YouTube iframe API');
           document.getElementById('loading').style.display = 'none';
@@ -228,13 +232,13 @@ export default function SeamlessVideoPlayer({
             videoId: '${youtubeVideoId}'
           }));
           
-          // Test if video is available
+          // Test video availability
           try {
             var videoData = player.getVideoData();
             console.log('Video data:', videoData);
             
-            if (!videoData || !videoData.title || videoData.title === '') {
-              console.warn('Video may not be available or private');
+            if (!videoData || !videoData.title) {
+              console.warn('Video may not be available, but continuing...');
               window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'PLAYER_WARNING',
                 message: 'Video may not be available or private'
