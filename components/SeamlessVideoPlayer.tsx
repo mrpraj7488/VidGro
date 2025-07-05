@@ -70,17 +70,17 @@ export default function SeamlessVideoPlayer({
     }
   };
 
-  // Enhanced YouTube video ID extraction that handles all formats
+  // Enhanced YouTube video ID extraction that handles all formats including embed URLs
   const extractVideoIdFromUrl = (url: string): string | null => {
     console.log('Extracting video ID from URL:', url);
     
     const patterns = [
+      // Embed URLs: https://www.youtube.com/embed/VIDEO_ID (most common in our case)
+      /youtube\.com\/embed\/([^"&?\/\s]{11})/,
       // Standard watch URLs: https://www.youtube.com/watch?v=VIDEO_ID
       /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=))([^"&?\/\s]{11})/,
       // Short URLs: https://youtu.be/VIDEO_ID
       /(?:youtu\.be\/)([^"&?\/\s]{11})/,
-      // Embed URLs: https://www.youtube.com/embed/VIDEO_ID
-      /youtube\.com\/embed\/([^"&?\/\s]{11})/,
       // Shorts URLs: https://www.youtube.com/shorts/VIDEO_ID
       /youtube\.com\/shorts\/([^"&?\/\s]{11})/,
       // Mobile URLs: https://m.youtube.com/watch?v=VIDEO_ID
@@ -94,7 +94,7 @@ export default function SeamlessVideoPlayer({
     for (const pattern of patterns) {
       const match = url.match(pattern);
       if (match && match[1]) {
-        console.log('Extracted video ID:', match[1]);
+        console.log('Extracted video ID:', match[1], 'from pattern:', pattern.source);
         return match[1];
       }
     }
@@ -105,7 +105,7 @@ export default function SeamlessVideoPlayer({
 
   const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
 
-  // HTML content for YouTube iframe with enhanced error handling
+  // Enhanced HTML content with better error handling and logging
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -121,34 +121,48 @@ export default function SeamlessVideoPlayer({
           align-items: center;
           height: 100vh;
           overflow: hidden;
+          font-family: Arial, sans-serif;
         }
         #player {
           width: 100%;
           height: 100%;
           border: none;
         }
-        .error-overlay {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.8);
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
+        .loading {
           color: white;
-          font-family: Arial, sans-serif;
-          z-index: 1000;
+          text-align: center;
+          padding: 20px;
+        }
+        .error {
+          color: #ff4757;
+          text-align: center;
+          padding: 20px;
         }
       </style>
     </head>
     <body>
       <div id="player"></div>
+      <div id="loading" class="loading">Loading YouTube player...</div>
+      <div id="error" class="error" style="display: none;"></div>
+      
       <script>
+        console.log('Initializing YouTube player for video ID: ${youtubeVideoId}');
+        console.log('Original URL: ${youtubeUrl}');
+        
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
+        tag.onerror = function() {
+          console.error('Failed to load YouTube iframe API');
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').style.display = 'block';
+          document.getElementById('error').textContent = 'Failed to load YouTube API';
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'PLAYER_ERROR',
+            error: 'API_LOAD_FAILED',
+            message: 'Failed to load YouTube iframe API'
+          }));
+        };
+        
         var firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
@@ -159,48 +173,93 @@ export default function SeamlessVideoPlayer({
         var hasCompleted = false;
         var errorCount = 0;
         var maxErrors = 3;
+        var retryAttempts = 0;
+        var maxRetries = 2;
 
         function onYouTubeIframeAPIReady() {
           console.log('YouTube API ready, creating player for video ID: ${youtubeVideoId}');
+          document.getElementById('loading').textContent = 'Creating player...';
           
-          player = new YT.Player('player', {
-            height: '100%',
-            width: '100%',
-            videoId: '${youtubeVideoId}',
-            playerVars: {
-              'autoplay': 1,
-              'controls': 0,
-              'modestbranding': 1,
-              'rel': 0,
-              'fs': 0,
-              'disablekb': 1,
-              'playsinline': 1,
-              'enablejsapi': 1,
-              'origin': window.location.origin
-            },
-            events: {
-              'onReady': onPlayerReady,
-              'onStateChange': onPlayerStateChange,
-              'onError': onPlayerError
-            }
-          });
+          try {
+            player = new YT.Player('player', {
+              height: '100%',
+              width: '100%',
+              videoId: '${youtubeVideoId}',
+              playerVars: {
+                'autoplay': 1,
+                'controls': 0,
+                'modestbranding': 1,
+                'rel': 0,
+                'fs': 0,
+                'disablekb': 1,
+                'playsinline': 1,
+                'enablejsapi': 1,
+                'origin': window.location.origin,
+                'iv_load_policy': 3,
+                'cc_load_policy': 0,
+                'start': 0
+              },
+              events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange,
+                'onError': onPlayerError
+              }
+            });
+          } catch (error) {
+            console.error('Error creating YouTube player:', error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = 'Failed to create player: ' + error.message;
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'PLAYER_ERROR',
+              error: 'PLAYER_CREATION_FAILED',
+              message: 'Failed to create YouTube player: ' + error.message
+            }));
+          }
         }
 
         function onPlayerReady(event) {
           console.log('Player ready for video ID: ${youtubeVideoId}');
+          document.getElementById('loading').style.display = 'none';
           isPlayerReady = true;
+          
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_READY',
             videoId: '${youtubeVideoId}'
           }));
           
-          // Auto-start playing
-          setTimeout(function() {
-            if (player && player.playVideo) {
-              console.log('Auto-starting video playback');
-              player.playVideo();
+          // Test if video is available
+          try {
+            var videoData = player.getVideoData();
+            console.log('Video data:', videoData);
+            
+            if (!videoData || !videoData.title || videoData.title === '') {
+              console.warn('Video may not be available or private');
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAYER_WARNING',
+                message: 'Video may not be available or private'
+              }));
             }
-          }, 500);
+          } catch (error) {
+            console.error('Error getting video data:', error);
+          }
+          
+          // Auto-start playing with delay
+          setTimeout(function() {
+            if (player && player.playVideo && isPlayerReady) {
+              console.log('Auto-starting video playback');
+              try {
+                player.playVideo();
+              } catch (error) {
+                console.error('Error starting playback:', error);
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'PLAYER_ERROR',
+                  error: 'PLAYBACK_START_FAILED',
+                  message: 'Failed to start video playback'
+                }));
+              }
+            }
+          }, 1000);
           
           // Start progress tracking
           setInterval(function() {
@@ -270,15 +329,63 @@ export default function SeamlessVideoPlayer({
 
         function onPlayerError(event) {
           var errorMessages = {
-            2: 'Invalid video ID',
-            5: 'HTML5 player error',
+            2: 'Invalid video ID - Video may have been removed',
+            5: 'HTML5 player error - Try refreshing',
             100: 'Video not found or private',
-            101: 'Video not embeddable',
-            150: 'Video not embeddable'
+            101: 'Video not allowed to be played in embedded players',
+            150: 'Video not allowed to be played in embedded players'
           };
           
           var errorMessage = errorMessages[event.data] || 'Video playback error';
           console.error('YouTube player error:', event.data, errorMessage);
+          
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').style.display = 'block';
+          document.getElementById('error').textContent = errorMessage;
+          
+          // For embedding errors (101, 150), try to retry with different parameters
+          if ((event.data === 101 || event.data === 150) && retryAttempts < maxRetries) {
+            retryAttempts++;
+            console.log('Retrying with different parameters, attempt:', retryAttempts);
+            
+            setTimeout(function() {
+              try {
+                // Destroy current player and recreate with different settings
+                if (player && player.destroy) {
+                  player.destroy();
+                }
+                
+                player = new YT.Player('player', {
+                  height: '100%',
+                  width: '100%',
+                  videoId: '${youtubeVideoId}',
+                  playerVars: {
+                    'autoplay': 0, // Try without autoplay
+                    'controls': 1, // Enable controls
+                    'modestbranding': 1,
+                    'rel': 0,
+                    'fs': 0,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin
+                  },
+                  events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                  }
+                });
+              } catch (retryError) {
+                console.error('Retry failed:', retryError);
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'PLAYER_ERROR',
+                  error: event.data,
+                  message: errorMessage + ' (Retry failed)'
+                }));
+              }
+            }, 2000);
+            
+            return;
+          }
           
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_ERROR',
@@ -291,15 +398,33 @@ export default function SeamlessVideoPlayer({
         window.playVideo = function() {
           if (player && player.playVideo && isPlayerReady) {
             console.log('Playing video');
-            player.playVideo();
+            try {
+              player.playVideo();
+            } catch (error) {
+              console.error('Error playing video:', error);
+            }
           }
         };
 
         window.pauseVideo = function() {
           if (player && player.pauseVideo && isPlayerReady) {
             console.log('Pausing video');
-            player.pauseVideo();
+            try {
+              player.pauseVideo();
+            } catch (error) {
+              console.error('Error pausing video:', error);
+            }
           }
+        };
+
+        // Handle page errors
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+          console.error('Page error:', msg, 'at', url, ':', lineNo);
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'PLAYER_ERROR',
+            error: 'PAGE_ERROR',
+            message: 'Page error: ' + msg
+          }));
         };
       </script>
     </body>
@@ -383,6 +508,7 @@ export default function SeamlessVideoPlayer({
   const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+      console.log('WebView message received:', data.type, data);
       
       switch (data.type) {
         case 'PLAYER_READY':
@@ -393,6 +519,11 @@ export default function SeamlessVideoPlayer({
             clearTimeout(errorTimeout);
             setErrorTimeout(null);
           }
+          break;
+          
+        case 'PLAYER_WARNING':
+          console.warn('Player warning:', data.message);
+          // Don't treat warnings as errors, just log them
           break;
           
         case 'STATE_CHANGE':
@@ -535,6 +666,7 @@ export default function SeamlessVideoPlayer({
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.loadingText}>Loading video...</Text>
             <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
+            <Text style={styles.loadingSubtext}>URL: {youtubeUrl}</Text>
           </View>
         )}
         
@@ -554,6 +686,10 @@ export default function SeamlessVideoPlayer({
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
           mixedContentMode="compatibility"
+          originWhitelist={['*']}
+          allowsFullscreenVideo={false}
+          allowsProtectedMedia={false}
+          dataDetectorTypes="none"
         />
         
         {/* Progress Bar Overlay */}
@@ -568,6 +704,7 @@ export default function SeamlessVideoPlayer({
           <View style={styles.errorOverlay}>
             <AlertTriangle color="#FF4757" size={24} />
             <Text style={styles.errorText}>Loading next video...</Text>
+            <Text style={styles.errorSubtext}>{playerError}</Text>
           </View>
         )}
       </View>
