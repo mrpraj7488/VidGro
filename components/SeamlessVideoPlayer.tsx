@@ -689,7 +689,7 @@ export default function SeamlessVideoPlayer({
           originWhitelist={['*']}
           allowsFullscreenVideo={false}
           allowsProtectedMedia={false}
-          dataDetectorTypes="none"
+          dataDetectorTypes={['none']}
         />
         
         {/* Progress Bar Overlay */}
