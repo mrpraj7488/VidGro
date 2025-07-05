@@ -128,37 +128,67 @@ export default function ViewTab() {
       console.log('Completing video silently:', currentVideo.id);
       setStatusMessage('Processing completion...');
 
-      // Use a more robust approach to complete video view
-      const { data: viewData, error: viewError } = await supabase
+      // Check if user has already watched this video
+      const { data: existingView } = await supabase
         .from('video_views')
-        .insert({
-          video_id: currentVideo.id,
-          viewer_id: user.id,
-          watched_duration: currentVideo.duration_seconds,
-          completed: true,
-          coins_earned: currentVideo.coin_reward
-        })
-        .select()
+        .select('id, coins_earned')
+        .eq('video_id', currentVideo.id)
+        .eq('viewer_id', user.id)
         .single();
 
-      if (viewError) {
-        // Check if it's a duplicate view error (user already watched this video)
-        if (viewError.code === '23505') {
-          console.log('User already watched this video, skipping...');
-          moveToNextVideo();
-          return;
+      let coinsToAward = currentVideo.coin_reward;
+      let shouldUpdateVideoCount = true;
+
+      if (existingView) {
+        // User has watched this video before (looping scenario)
+        console.log('User has watched this video before, updating existing view...');
+        
+        // Update the existing view record
+        const { error: updateError } = await supabase
+          .from('video_views')
+          .update({
+            watched_duration: currentVideo.duration_seconds,
+            completed: true,
+            coins_earned: existingView.coins_earned + currentVideo.coin_reward,
+            created_at: new Date().toISOString() // Update timestamp for latest view
+          })
+          .eq('id', existingView.id);
+
+        if (updateError) {
+          console.error('Error updating existing video view:', updateError);
+          throw new Error(`Failed to update video view: ${updateError.message}`);
         }
-        console.error('Error creating video view:', viewError);
-        throw new Error(`Failed to record video view: ${viewError.message}`);
+
+        // Don't update video view count for repeat views
+        shouldUpdateVideoCount = false;
+        console.log('Existing video view updated successfully');
+      } else {
+        // First time watching this video
+        console.log('First time watching this video, creating new view...');
+        
+        const { error: viewError } = await supabase
+          .from('video_views')
+          .insert({
+            video_id: currentVideo.id,
+            viewer_id: user.id,
+            watched_duration: currentVideo.duration_seconds,
+            completed: true,
+            coins_earned: currentVideo.coin_reward
+          });
+
+        if (viewError) {
+          console.error('Error creating video view:', viewError);
+          throw new Error(`Failed to record video view: ${viewError.message}`);
+        }
+
+        console.log('New video view recorded successfully');
       }
 
-      console.log('Video view recorded successfully:', viewData);
-
-      // Update user coins directly
+      // Always update user coins (both for new and repeat views)
       const { error: coinError } = await supabase
         .from('profiles')
         .update({ 
-          coins: (profile.coins || 0) + currentVideo.coin_reward,
+          coins: (profile.coins || 0) + coinsToAward,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -173,9 +203,9 @@ export default function ViewTab() {
         .from('coin_transactions')
         .insert({
           user_id: user.id,
-          amount: currentVideo.coin_reward,
+          amount: coinsToAward,
           transaction_type: 'video_watch',
-          description: `Watched video: ${currentVideo.title}`,
+          description: `Watched video: ${currentVideo.title}${existingView ? ' (repeat view)' : ''}`,
           reference_id: currentVideo.id
         });
 
@@ -184,18 +214,20 @@ export default function ViewTab() {
         // Don't throw error for transaction recording failure
       }
 
-      // Update video view count
-      const { error: videoUpdateError } = await supabase
-        .from('videos')
-        .update({ 
-          views_count: supabase.raw('views_count + 1'),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentVideo.id);
+      // Update video view count only for first-time views
+      if (shouldUpdateVideoCount) {
+        const { error: videoUpdateError } = await supabase
+          .from('videos')
+          .update({ 
+            views_count: supabase.raw('views_count + 1'),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentVideo.id);
 
-      if (videoUpdateError) {
-        console.error('Error updating video view count:', videoUpdateError);
-        // Don't throw error for view count update failure
+        if (videoUpdateError) {
+          console.error('Error updating video view count:', videoUpdateError);
+          // Don't throw error for view count update failure
+        }
       }
 
       console.log('Video completion processed successfully');
