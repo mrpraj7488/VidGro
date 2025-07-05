@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 interface Video {
   id: string;
-  youtube_url: string;
+  youtube_url: string; // This now contains the video ID
   title: string;
   duration_seconds: number;
   coin_reward: number;
@@ -108,7 +108,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         .slice(0, QUEUE_SIZE) // Limit to queue size
         .map(video => ({
           id: video.id,
-          youtube_url: video.youtube_url,
+          youtube_url: video.youtube_url, // This is now the video ID
           title: video.title,
           duration_seconds: video.duration_seconds,
           coin_reward: video.coin_reward
@@ -123,6 +123,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       console.log(`Fetched ${availableVideos.length} videos for queue`);
+      console.log('Sample video data:', availableVideos[0]);
       
       // Cache video IDs for performance
       const videoIds = availableVideos.map(v => v.id);
@@ -245,7 +246,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
             .slice(0, QUEUE_SIZE) // Limit to queue size
             .map(video => ({
               id: video.id,
-              youtube_url: video.youtube_url,
+              youtube_url: video.youtube_url, // This is now the video ID
               title: video.title,
               duration_seconds: video.duration_seconds,
               coin_reward: video.coin_reward
@@ -269,7 +270,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           .slice(0, QUEUE_SIZE) // Limit to queue size
           .map(video => ({
             id: video.id,
-            youtube_url: video.youtube_url,
+            youtube_url: video.youtube_url, // This is now the video ID
             title: video.title,
             duration_seconds: video.duration_seconds,
             coin_reward: video.coin_reward

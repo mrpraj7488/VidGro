@@ -24,8 +24,6 @@ interface VideoData {
   thumbnail: string;
   valid: boolean;
   embeddable: boolean;
-  embedUrl: string;
-  watchUrl: string;
   originalUrl: string;
   warning?: string;
 }
@@ -99,8 +97,6 @@ export default function PromoteTab() {
           thumbnail: data.thumbnail,
           valid: data.valid,
           embeddable: data.embeddable,
-          embedUrl: data.embedUrl || `https://www.youtube.com/embed/${data.id}`,
-          watchUrl: data.watchUrl || `https://www.youtube.com/watch?v=${data.id}`,
           originalUrl: data.originalUrl || youtubeUrl,
           warning: data.warning
         };
@@ -233,7 +229,7 @@ export default function PromoteTab() {
         title,
         duration: durationSeconds,
         targetViews: views,
-        youtubeUrl: videoData.embedUrl, // Store embed URL for playback
+        videoId: videoData.id, // Store only video ID
         embeddable: videoData.embeddable
       });
 
@@ -257,12 +253,12 @@ export default function PromoteTab() {
 
       console.log('Coins deducted successfully');
 
-      // Create video promotion with embed URL for playback
+      // Create video promotion with only video ID (no URLs stored)
       const videoInsertData = {
         user_id: user.id,
-        youtube_url: videoData.embedUrl, // Store embed URL for seamless playback
+        youtube_url: videoData.id, // Store only the video ID
         title,
-        description: `Original URL: ${videoData.originalUrl} | User-set duration: ${durationSeconds}s${videoData?.duration ? ` (Actual: ${videoData.duration}s)` : ''} - Embeddable: ${videoData.embeddable}${videoData?.warning ? ` - Warning: ${videoData.warning}` : ''}`,
+        description: `Original URL: ${videoData.originalUrl} | User-set duration: ${durationSeconds}s${videoData?.duration ? ` (Actual: ${videoData.duration}s)` : ''} - Video ID: ${videoData.id}${videoData?.warning ? ` - Warning: ${videoData.warning}` : ''}`,
         duration_seconds: durationSeconds,
         coin_cost: totalCost,
         coin_reward: rewardPerView,
@@ -369,10 +365,10 @@ export default function PromoteTab() {
                 </TouchableOpacity>
               </View>
               {fetchingVideo && (
-                <Text style={styles.helperText}>Validating video embeddability and converting URL...</Text>
+                <Text style={styles.helperText}>Validating video embeddability and extracting video ID...</Text>
               )}
               <Text style={styles.helperText}>
-                Supports both youtube.com/watch and youtu.be formats. URL will be automatically converted for optimal playback.
+                Supports both youtube.com/watch and youtu.be formats. Only video ID will be stored for optimal playback.
               </Text>
             </View>
 
@@ -381,7 +377,7 @@ export default function PromoteTab() {
               <View style={styles.videoPreview}>
                 <View style={styles.videoPreviewHeader}>
                   <CheckCircle color="#2ECC71" size={20} />
-                  <Text style={styles.videoPreviewTitle}>Video Validated & URL Converted</Text>
+                  <Text style={styles.videoPreviewTitle}>Video Validated & ID Extracted</Text>
                 </View>
                 <View style={styles.videoPreviewContent}>
                   <Image 
@@ -400,7 +396,7 @@ export default function PromoteTab() {
                       ✅ Embeddable - Ready for promotion
                     </Text>
                     <Text style={styles.urlConversion}>
-                      🔄 URL converted to embed format for optimal playback
+                      🆔 Video ID: {videoData.id}
                     </Text>
                     {videoData.warning && (
                       <Text style={styles.videoWarning}>
@@ -412,8 +408,10 @@ export default function PromoteTab() {
                 <View style={styles.urlDetails}>
                   <Text style={styles.urlLabel}>Original URL:</Text>
                   <Text style={styles.urlText} numberOfLines={1}>{videoData.originalUrl}</Text>
-                  <Text style={styles.urlLabel}>Embed URL (stored):</Text>
-                  <Text style={styles.urlText} numberOfLines={1}>{videoData.embedUrl}</Text>
+                  <Text style={styles.urlLabel}>Video ID (stored):</Text>
+                  <Text style={styles.urlText} numberOfLines={1}>{videoData.id}</Text>
+                  <Text style={styles.urlLabel}>Embed URL (generated):</Text>
+                  <Text style={styles.urlText} numberOfLines={1}>https://www.youtube.com/embed/{videoData.id}</Text>
                 </View>
               </View>
             )}
@@ -502,8 +500,8 @@ export default function PromoteTab() {
                 </View>
                 {videoData && videoData.embeddable && (
                   <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>URL Format:</Text>
-                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Optimized for playback</Text>
+                    <Text style={styles.costLabel}>Storage:</Text>
+                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Video ID only</Text>
                   </View>
                 )}
               </View>
@@ -526,14 +524,14 @@ export default function PromoteTab() {
 
             {/* Instructions */}
             <View style={styles.instructionsCard}>
-              <Text style={styles.instructionsTitle}>How URL conversion works:</Text>
+              <Text style={styles.instructionsTitle}>How video ID storage works:</Text>
               <Text style={styles.instructionsText}>
                 1. Enter any YouTube URL format (youtube.com/watch or youtu.be){'\n'}
                 2. System validates embeddability and extracts video ID{'\n'}
-                3. URL is automatically converted to embed format for optimal playback{'\n'}
-                4. Both original and embed URLs are stored for reference{'\n'}
-                5. Viewers see seamless video playback in the app{'\n'}
-                6. Your video gets promoted to more viewers!
+                3. Only the 11-character video ID is stored in database{'\n'}
+                4. Embed URLs are generated dynamically during playback{'\n'}
+                5. This ensures optimal performance and compatibility{'\n'}
+                6. Your video gets promoted to more viewers efficiently!
               </Text>
             </View>
           </View>

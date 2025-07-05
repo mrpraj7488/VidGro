@@ -112,10 +112,7 @@ export async function GET(request: Request) {
         warning = 'Video may have age restrictions';
       }
 
-      // Convert any YouTube URL format to standard embed URL
-      const embedUrl = convertToEmbedUrl(videoId);
-      const standardWatchUrl = convertToStandardWatchUrl(videoId);
-
+      // Return only the video ID and metadata - no URLs
       return Response.json({
         id: videoId,
         title: title,
@@ -124,9 +121,7 @@ export async function GET(request: Request) {
         valid: true,
         embeddable: true,
         warning: warning,
-        // Return both formats for flexibility
-        embedUrl: embedUrl,
-        watchUrl: standardWatchUrl,
+        // Return the original URL for reference
         originalUrl: videoUrl,
         metadata: {
           embeddable: isEmbeddable,
@@ -173,7 +168,7 @@ export async function GET(request: Request) {
 }
 
 function extractVideoId(url: string): string | null {
-  // Enhanced video ID extraction with more patterns including youtu.be
+  // Enhanced video ID extraction with comprehensive patterns
   const patterns = [
     // Standard watch URLs: https://www.youtube.com/watch?v=VIDEO_ID
     /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=))([^"&?\/\s]{11})/,
@@ -203,16 +198,6 @@ function extractVideoId(url: string): string | null {
   }
 
   return null;
-}
-
-function convertToEmbedUrl(videoId: string): string {
-  // Convert any YouTube URL to standard embed format
-  return `https://www.youtube.com/embed/${videoId}`;
-}
-
-function convertToStandardWatchUrl(videoId: string): string {
-  // Convert any YouTube URL to standard watch format
-  return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
 function parseDuration(duration: string): number {

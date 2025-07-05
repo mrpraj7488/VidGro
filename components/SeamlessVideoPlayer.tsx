@@ -26,7 +26,7 @@ const isSmallScreen = screenWidth < 375;
 
 interface SeamlessVideoPlayerProps {
   videoId: string;
-  youtubeUrl: string;
+  youtubeUrl: string; // This now contains the video ID
   duration: number; // User-set duration in seconds
   coinReward: number;
   onVideoComplete: () => void;
@@ -37,7 +37,7 @@ interface SeamlessVideoPlayerProps {
 
 export default function SeamlessVideoPlayer({
   videoId,
-  youtubeUrl,
+  youtubeUrl, // This is actually the video ID from database
   duration,
   coinReward,
   onVideoComplete,
@@ -75,10 +75,17 @@ export default function SeamlessVideoPlayer({
     }
   };
 
-  // Enhanced YouTube video ID extraction that handles all formats including embed URLs
-  const extractVideoIdFromUrl = (url: string): string | null => {
-    console.log('Extracting video ID from URL:', url);
+  // Extract YouTube video ID from the stored value (which is now just the video ID)
+  const extractVideoIdFromUrl = (videoIdOrUrl: string): string | null => {
+    console.log('Processing video ID/URL:', videoIdOrUrl);
     
+    // If it's already a video ID (11 characters), return it directly
+    if (/^[a-zA-Z0-9_-]{11}$/.test(videoIdOrUrl)) {
+      console.log('Already a video ID:', videoIdOrUrl);
+      return videoIdOrUrl;
+    }
+    
+    // Otherwise, try to extract from URL patterns
     const patterns = [
       // Embed URLs: https://www.youtube.com/embed/VIDEO_ID (most common in our case)
       /youtube\.com\/embed\/([^"&?\/\s]{11})/,
@@ -92,19 +99,17 @@ export default function SeamlessVideoPlayer({
       /m\.youtube\.com\/watch\?v=([^"&?\/\s]{11})/,
       // Gaming URLs: https://gaming.youtube.com/watch?v=VIDEO_ID
       /gaming\.youtube\.com\/watch\?v=([^"&?\/\s]{11})/,
-      // Direct video ID: VIDEO_ID (11 characters)
-      /^([a-zA-Z0-9_-]{11})$/
     ];
 
     for (const pattern of patterns) {
-      const match = url.match(pattern);
+      const match = videoIdOrUrl.match(pattern);
       if (match && match[1]) {
         console.log('Extracted video ID:', match[1], 'from pattern:', pattern.source);
         return match[1];
       }
     }
     
-    console.log('Could not extract video ID from URL:', url);
+    console.log('Could not extract video ID from:', videoIdOrUrl);
     return null;
   };
 
@@ -152,7 +157,7 @@ export default function SeamlessVideoPlayer({
       
       <script>
         console.log('Initializing YouTube player for video ID: ${youtubeVideoId}');
-        console.log('Original URL: ${youtubeUrl}');
+        console.log('Embed URL will be: https://www.youtube.com/embed/${youtubeVideoId}');
         
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
@@ -745,13 +750,13 @@ export default function SeamlessVideoPlayer({
 
   // Show error if no video ID could be extracted
   if (!youtubeVideoId) {
-    console.error('Could not extract video ID from URL:', youtubeUrl);
+    console.error('Could not extract video ID from:', youtubeUrl);
     return (
       <View style={styles.container}>
         <View style={styles.errorContainer}>
           <AlertTriangle color="#FF4757" size={32} />
-          <Text style={styles.errorText}>Invalid YouTube URL format</Text>
-          <Text style={styles.errorSubtext}>URL: {youtubeUrl}</Text>
+          <Text style={styles.errorText}>Invalid video ID format</Text>
+          <Text style={styles.errorSubtext}>Video ID/URL: {youtubeUrl}</Text>
           <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
             <SkipForward color="#666" size={16} />
             <Text style={styles.skipButtonText}>Skip Video</Text>
@@ -770,7 +775,7 @@ export default function SeamlessVideoPlayer({
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.loadingText}>Loading video...</Text>
             <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
-            <Text style={styles.loadingSubtext}>URL: {youtubeUrl}</Text>
+            <Text style={styles.loadingSubtext}>Embed URL: https://www.youtube.com/embed/{youtubeVideoId}</Text>
           </View>
         )}
         
