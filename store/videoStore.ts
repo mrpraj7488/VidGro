@@ -224,7 +224,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views')
         .eq('status', 'active')
         .neq('user_id', userId)
-        .lt('views_count', supabase.raw('target_views'))
+        .filter('views_count', 'lt', 'target_views')
         .order('created_at', { ascending: false })
         .limit(QUEUE_SIZE);
 
