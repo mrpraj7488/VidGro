@@ -218,69 +218,62 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     set({ isResetting: true });
 
     try {
-      // Strategy 1: Get videos that haven't reached their target views yet
-      const { data: availableVideos, error } = await supabase
+      // Strategy 1: Get all active videos and filter client-side
+      const { data: allVideos, error } = await supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views')
         .eq('status', 'active')
         .neq('user_id', userId)
-        .filter('views_count', 'lt', 'target_views')
         .order('created_at', { ascending: false })
-        .limit(QUEUE_SIZE);
+        .limit(QUEUE_SIZE * 2); // Get more videos to filter from
 
       if (error) {
         console.error('Error fetching videos for reset:', error);
         throw error;
       }
 
-      if (availableVideos && availableVideos.length > 0) {
-        console.log(`Found ${availableVideos.length} videos with remaining views for reset`);
+      if (allVideos && allVideos.length > 0) {
+        // Filter videos with remaining views on the client side
+        const availableVideos = allVideos.filter(video => 
+          video.views_count < video.target_views
+        );
+
+        if (availableVideos.length > 0) {
+          console.log(`Found ${availableVideos.length} videos with remaining views for reset`);
+          
+          const videoQueue = availableVideos
+            .slice(0, QUEUE_SIZE) // Limit to queue size
+            .map(video => ({
+              id: video.id,
+              youtube_url: video.youtube_url,
+              title: video.title,
+              duration_seconds: video.duration_seconds,
+              coin_reward: video.coin_reward
+            }));
+
+          set({
+            videoQueue,
+            currentVideoIndex: 0,
+            lastFetchTime: Date.now(),
+            cachedVideoIds: videoQueue.map(v => v.id),
+            isResetting: false
+          });
+
+          return;
+        }
+
+        // If no videos with remaining views, use any active videos for seamless looping
+        console.log('No videos with remaining views, using any active videos for seamless looping...');
         
-        const videoQueue = availableVideos.map(video => ({
-          id: video.id,
-          youtube_url: video.youtube_url,
-          title: video.title,
-          duration_seconds: video.duration_seconds,
-          coin_reward: video.coin_reward
-        }));
-
-        set({
-          videoQueue,
-          currentVideoIndex: 0,
-          lastFetchTime: Date.now(),
-          cachedVideoIds: videoQueue.map(v => v.id),
-          isResetting: false
-        });
-
-        return;
-      }
-
-      // Strategy 2: If no videos with remaining views, get any active videos
-      console.log('No videos with remaining views, getting any active videos...');
-      
-      const { data: anyVideos, error: anyError } = await supabase
-        .from('videos')
-        .select('id, youtube_url, title, duration_seconds, coin_reward')
-        .eq('status', 'active')
-        .neq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(QUEUE_SIZE);
-
-      if (anyError) {
-        console.error('Error fetching any videos:', anyError);
-        throw anyError;
-      }
-
-      if (anyVideos && anyVideos.length > 0) {
-        console.log(`Found ${anyVideos.length} active videos for reset`);
-        
-        const videoQueue = anyVideos.map(video => ({
-          id: video.id,
-          youtube_url: video.youtube_url,
-          title: video.title,
-          duration_seconds: video.duration_seconds,
-          coin_reward: video.coin_reward
-        }));
+        const videoQueue = allVideos
+          .slice(0, QUEUE_SIZE) // Limit to queue size
+          .map(video => ({
+            id: video.id,
+            youtube_url: video.youtube_url,
+            title: video.title,
+            duration_seconds: video.duration_seconds,
+            coin_reward: video.coin_reward
+          }));
 
         set({
           videoQueue,
