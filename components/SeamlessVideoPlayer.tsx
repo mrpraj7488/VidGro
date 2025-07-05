@@ -70,19 +70,36 @@ export default function SeamlessVideoPlayer({
     }
   };
 
-  // Extract YouTube video ID from URL
+  // Enhanced YouTube video ID extraction that handles all formats
   const extractVideoIdFromUrl = (url: string): string | null => {
+    console.log('Extracting video ID from URL:', url);
+    
     const patterns = [
-      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/,
+      // Standard watch URLs: https://www.youtube.com/watch?v=VIDEO_ID
+      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=))([^"&?\/\s]{11})/,
+      // Short URLs: https://youtu.be/VIDEO_ID
+      /(?:youtu\.be\/)([^"&?\/\s]{11})/,
+      // Embed URLs: https://www.youtube.com/embed/VIDEO_ID
+      /youtube\.com\/embed\/([^"&?\/\s]{11})/,
+      // Shorts URLs: https://www.youtube.com/shorts/VIDEO_ID
+      /youtube\.com\/shorts\/([^"&?\/\s]{11})/,
+      // Mobile URLs: https://m.youtube.com/watch?v=VIDEO_ID
+      /m\.youtube\.com\/watch\?v=([^"&?\/\s]{11})/,
+      // Gaming URLs: https://gaming.youtube.com/watch?v=VIDEO_ID
+      /gaming\.youtube\.com\/watch\?v=([^"&?\/\s]{11})/,
+      // Direct video ID: VIDEO_ID (11 characters)
       /^([a-zA-Z0-9_-]{11})$/
     ];
 
     for (const pattern of patterns) {
       const match = url.match(pattern);
       if (match && match[1]) {
+        console.log('Extracted video ID:', match[1]);
         return match[1];
       }
     }
+    
+    console.log('Could not extract video ID from URL:', url);
     return null;
   };
 
@@ -144,6 +161,8 @@ export default function SeamlessVideoPlayer({
         var maxErrors = 3;
 
         function onYouTubeIframeAPIReady() {
+          console.log('YouTube API ready, creating player for video ID: ${youtubeVideoId}');
+          
           player = new YT.Player('player', {
             height: '100%',
             width: '100%',
@@ -168,14 +187,17 @@ export default function SeamlessVideoPlayer({
         }
 
         function onPlayerReady(event) {
+          console.log('Player ready for video ID: ${youtubeVideoId}');
           isPlayerReady = true;
           window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'PLAYER_READY'
+            type: 'PLAYER_READY',
+            videoId: '${youtubeVideoId}'
           }));
           
           // Auto-start playing
           setTimeout(function() {
             if (player && player.playVideo) {
+              console.log('Auto-starting video playback');
               player.playVideo();
             }
           }, 500);
@@ -190,6 +212,7 @@ export default function SeamlessVideoPlayer({
                 if (currentTime >= maxDuration && !hasCompleted) {
                   hasCompleted = true;
                   player.pauseVideo();
+                  console.log('Video completed at', currentTime, 'seconds');
                   window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'VIDEO_COMPLETED',
                     currentTime: currentTime
@@ -227,6 +250,8 @@ export default function SeamlessVideoPlayer({
             '5': 'CUED'
           };
           
+          console.log('Player state changed to:', stateNames[state] || state);
+          
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'STATE_CHANGE',
             state: state,
@@ -235,6 +260,7 @@ export default function SeamlessVideoPlayer({
 
           // Handle video ended before user-set duration
           if (state === 0 && currentTime < maxDuration) {
+            console.log('Video ended early at', currentTime, 'seconds');
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_ENDED_EARLY',
               currentTime: currentTime
@@ -251,22 +277,27 @@ export default function SeamlessVideoPlayer({
             150: 'Video not embeddable'
           };
           
+          var errorMessage = errorMessages[event.data] || 'Video playback error';
+          console.error('YouTube player error:', event.data, errorMessage);
+          
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_ERROR',
             error: event.data,
-            message: errorMessages[event.data] || 'Video playback error'
+            message: errorMessage
           }));
         }
 
         // Expose functions for React Native to call
         window.playVideo = function() {
           if (player && player.playVideo && isPlayerReady) {
+            console.log('Playing video');
             player.playVideo();
           }
         };
 
         window.pauseVideo = function() {
           if (player && player.pauseVideo && isPlayerReady) {
+            console.log('Pausing video');
             player.pauseVideo();
           }
         };
@@ -293,6 +324,7 @@ export default function SeamlessVideoPlayer({
 
   // Reset states when video changes
   useEffect(() => {
+    console.log('Video changed, resetting player state for:', videoId, youtubeUrl);
     setIsPlaying(false);
     setCurrentTime(0);
     setIsLoaded(false);
@@ -331,7 +363,7 @@ export default function SeamlessVideoPlayer({
   }, [injectJavaScript]);
 
   const handleVideoError = useCallback((errorMessage: string) => {
-    console.log('Video error detected:', errorMessage);
+    console.log('Video error detected:', errorMessage, 'for video:', youtubeVideoId);
     
     // Clear any existing timeout
     if (errorTimeout) {
@@ -346,7 +378,7 @@ export default function SeamlessVideoPlayer({
 
     setErrorTimeout(timeout);
     setPlayerError(errorMessage);
-  }, [errorTimeout, onVideoUnplayable]);
+  }, [errorTimeout, onVideoUnplayable, youtubeVideoId]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
@@ -354,6 +386,7 @@ export default function SeamlessVideoPlayer({
       
       switch (data.type) {
         case 'PLAYER_READY':
+          console.log('Player ready message received for video:', data.videoId || youtubeVideoId);
           setIsLoaded(true);
           setPlayerError(null);
           if (errorTimeout) {
@@ -364,6 +397,7 @@ export default function SeamlessVideoPlayer({
           
         case 'STATE_CHANGE':
           if (data.state === 1) { // PLAYING
+            console.log('Video started playing:', youtubeVideoId);
             setIsPlaying(true);
             if (!hasStarted) {
               setHasStarted(true);
@@ -389,6 +423,7 @@ export default function SeamlessVideoPlayer({
           
         case 'VIDEO_COMPLETED':
           if (!isCompleted) {
+            console.log('Video completed:', youtubeVideoId);
             setIsCompleted(true);
             setIsPlaying(false);
             
@@ -407,6 +442,7 @@ export default function SeamlessVideoPlayer({
         case 'VIDEO_ENDED_EARLY':
           // Video ended before user-set duration, still award coins
           if (!isCompleted) {
+            console.log('Video ended early:', youtubeVideoId);
             setIsCompleted(true);
             setIsPlaying(false);
             
@@ -421,6 +457,7 @@ export default function SeamlessVideoPlayer({
           break;
           
         case 'PLAYER_ERROR':
+          console.log('Player error received:', data.message, 'for video:', youtubeVideoId);
           handleVideoError(data.message || 'Video playback error');
           break;
       }
@@ -428,7 +465,7 @@ export default function SeamlessVideoPlayer({
       console.error('Error parsing WebView message:', error);
       handleVideoError('Failed to parse video message');
     }
-  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoError, errorTimeout]);
+  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoError, errorTimeout, youtubeVideoId]);
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -445,12 +482,14 @@ export default function SeamlessVideoPlayer({
   }, [pauseVideo, onVideoSkip]);
 
   const handleWebViewLoad = useCallback(() => {
+    console.log('WebView loaded for video:', youtubeVideoId);
     // Video will auto-play via iframe settings
-  }, []);
+  }, [youtubeVideoId]);
 
   const handleWebViewError = useCallback(() => {
+    console.log('WebView error for video:', youtubeVideoId);
     handleVideoError('Failed to load video player');
-  }, [handleVideoError]);
+  }, [handleVideoError, youtubeVideoId]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -469,6 +508,24 @@ export default function SeamlessVideoPlayer({
   const progressPercentage = Math.round((currentTime / duration) * 100);
   const remainingTime = Math.max(0, duration - currentTime);
 
+  // Show error if no video ID could be extracted
+  if (!youtubeVideoId) {
+    console.error('Could not extract video ID from URL:', youtubeUrl);
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <AlertTriangle color="#FF4757" size={32} />
+          <Text style={styles.errorText}>Invalid YouTube URL format</Text>
+          <Text style={styles.errorSubtext}>URL: {youtubeUrl}</Text>
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+            <SkipForward color="#666" size={16} />
+            <Text style={styles.skipButtonText}>Skip Video</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* WebView Video Player */}
@@ -477,6 +534,7 @@ export default function SeamlessVideoPlayer({
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.loadingText}>Loading video...</Text>
+            <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
           </View>
         )}
         
@@ -592,6 +650,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  loadingSubtext: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   progressOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -619,11 +683,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     zIndex: 20,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 20,
+  },
   errorText: {
     color: 'white',
     fontSize: 12,
     textAlign: 'center',
     marginTop: 8,
+  },
+  errorSubtext: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   videoInfo: {
     padding: 12,
@@ -670,5 +748,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  skipButtonText: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
   },
 });
