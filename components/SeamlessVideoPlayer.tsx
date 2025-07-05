@@ -686,7 +686,7 @@ export default function SeamlessVideoPlayer({
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
           mixedContentMode="compatibility"
-          originWhitelist={['*']}
+          originWhitelist={['http://*', 'https://*']}
           allowsFullscreenVideo={false}
           allowsProtectedMedia={false}
           dataDetectorTypes="none"
