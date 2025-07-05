@@ -616,6 +616,11 @@ export default function EnhancedVideoPlayer({
   }, [injectJavaScript]);
 
   const handleVideoError = useCallback((errorMessage: string) => {
+    // Add guard to prevent infinite re-renders
+    if (isRetrying) {
+      return;
+    }
+    
     addDebugInfo(`Video error detected: ${errorMessage} for video: ${youtubeVideoId}`);
     
     // Clear any existing timeout
@@ -637,7 +642,7 @@ export default function EnhancedVideoPlayer({
       }, errorTimeoutDuration);
       setErrorTimeout(timeout);
     }
-  }, [errorTimeout, onVideoUnplayable, youtubeVideoId, currentStrategyIndex, currentRetryAttempt, maxStrategies, maxRetries, errorTimeoutDuration]);
+  }, [isRetrying, errorTimeout, onVideoUnplayable, youtubeVideoId, currentStrategyIndex, currentRetryAttempt, maxStrategies, maxRetries, errorTimeoutDuration]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
