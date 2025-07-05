@@ -57,8 +57,8 @@ export default function EnhancedVideoPlayer({
   const [hasStarted, setHasStarted] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
-  const [currentStrategy, setCurrentStrategy] = useState(0);
-  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [currentStrategyIndex, setCurrentStrategyIndex] = useState(0);
+  const [currentRetryAttempt, setCurrentRetryAttempt] = useState(0);
   const [appState, setAppState] = useState(AppState.currentState);
   const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isBuffering, setIsBuffering] = useState(false);
@@ -66,6 +66,7 @@ export default function EnhancedVideoPlayer({
   const [stuckProgressCount, setStuckProgressCount] = useState(0);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [pendingRetry, setPendingRetry] = useState(false);
   
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
@@ -151,7 +152,7 @@ export default function EnhancedVideoPlayer({
   // Enhanced HTML content with better error handling and multiple strategies
   const getCurrentEmbedUrl = () => {
     if (!youtubeVideoId) return '';
-    return embedStrategies[currentStrategy].getUrl(youtubeVideoId);
+    return embedStrategies[currentStrategyIndex].getUrl(youtubeVideoId);
   };
 
   const htmlContent = `
@@ -202,17 +203,17 @@ export default function EnhancedVideoPlayer({
       <div id="player"></div>
       <div id="loading" class="loading">
         Loading video...<br>
-        Strategy: ${embedStrategies[currentStrategy].name}<br>
-        Attempt: ${retryAttempt + 1}/${maxRetries + 1}
+        Strategy: ${embedStrategies[currentStrategyIndex].name}<br>
+        Attempt: ${currentRetryAttempt + 1}/${maxRetries + 1}
       </div>
       <div id="error" class="error" style="display: none;"></div>
       <div class="strategy-info">
-        ${embedStrategies[currentStrategy].description}
+        ${embedStrategies[currentStrategyIndex].description}
       </div>
       
       <script>
         console.log('Enhanced player initializing for video ID: ${youtubeVideoId}');
-        console.log('Strategy: ${embedStrategies[currentStrategy].name}');
+        console.log('Strategy: ${embedStrategies[currentStrategyIndex].name}');
         console.log('Embed URL: ${getCurrentEmbedUrl()}');
         
         var tag = document.createElement('script');
@@ -230,8 +231,8 @@ export default function EnhancedVideoPlayer({
             type: 'PLAYER_ERROR',
             error: 'API_LOAD_FAILED',
             message: 'Failed to load YouTube iframe API',
-            strategy: '${embedStrategies[currentStrategy].name}',
-            attempt: ${retryAttempt}
+            strategy: '${embedStrategies[currentStrategyIndex].name}',
+            attempt: ${currentRetryAttempt}
           }));
         };
         
@@ -247,8 +248,8 @@ export default function EnhancedVideoPlayer({
         var errorCount = 0;
         var maxErrors = 5;
         var progressCheckInterval;
-        var embedStrategy = '${embedStrategies[currentStrategy].name}';
-        var attemptNumber = ${retryAttempt};
+        var embedStrategy = '${embedStrategies[currentStrategyIndex].name}';
+        var attemptNumber = ${currentRetryAttempt};
 
         function onYouTubeIframeAPIReady() {
           console.log('YouTube API ready, creating player with strategy: ' + embedStrategy);
@@ -260,12 +261,12 @@ export default function EnhancedVideoPlayer({
               width: '100%',
               videoId: '${youtubeVideoId}',
               playerVars: {
-                'autoplay': ${currentStrategy < 2 ? 1 : 0},
-                'controls': ${currentStrategy >= 2 ? 1 : 0},
+                'autoplay': ${currentStrategyIndex < 2 ? 1 : 0},
+                'controls': ${currentStrategyIndex >= 2 ? 1 : 0},
                 'modestbranding': 1,
                 'rel': 0,
                 'fs': 0,
-                'disablekb': ${currentStrategy < 2 ? 1 : 0},
+                'disablekb': ${currentStrategyIndex < 2 ? 1 : 0},
                 'playsinline': 1,
                 'enablejsapi': 1,
                 'origin': window.location.origin,
@@ -333,7 +334,7 @@ export default function EnhancedVideoPlayer({
             if (player && player.playVideo && isPlayerReady) {
               console.log('Auto-starting video playback with strategy:', embedStrategy);
               try {
-                if (${currentStrategy} < 2) {
+                if (${currentStrategyIndex} < 2) {
                   // For autoplay strategies, just ensure it's playing
                   var state = player.getPlayerState();
                   if (state !== 1) {
@@ -354,7 +355,7 @@ export default function EnhancedVideoPlayer({
                 }));
               }
             }
-          }, ${currentStrategy < 2 ? 1000 : 2000});
+          }, ${currentStrategyIndex < 2 ? 1000 : 2000});
           
           // Start enhanced progress tracking
           startProgressTracking();
@@ -476,7 +477,7 @@ export default function EnhancedVideoPlayer({
             message: errorMessage,
             strategy: embedStrategy,
             attempt: attemptNumber,
-            canRetry: ${currentStrategy < maxStrategies - 1 || retryAttempt < maxRetries}
+            canRetry: ${currentStrategyIndex < maxStrategies - 1 || currentRetryAttempt < maxRetries}
           }));
         }
 
@@ -551,13 +552,14 @@ export default function EnhancedVideoPlayer({
     setHasStarted(false);
     setIsCompleted(false);
     setPlayerError(null);
-    setCurrentStrategy(0);
-    setRetryAttempt(0);
+    setCurrentStrategyIndex(0);
+    setCurrentRetryAttempt(0);
     setIsBuffering(false);
     setLastProgressTime(0);
     setStuckProgressCount(0);
     setDebugInfo([]);
     setIsRetrying(false);
+    setPendingRetry(false);
     progressValue.value = 0;
     
     if (errorTimeout) {
@@ -565,6 +567,36 @@ export default function EnhancedVideoPlayer({
       setErrorTimeout(null);
     }
   }, [videoId]);
+
+  // Handle delayed retry logic to prevent infinite re-renders
+  useEffect(() => {
+    if (pendingRetry && playerError) {
+      const timeout = setTimeout(() => {
+        addDebugInfo(`Processing delayed retry for error: ${playerError}`);
+        
+        if (currentStrategyIndex < maxStrategies - 1) {
+          addDebugInfo(`Trying next strategy: ${embedStrategies[currentStrategyIndex + 1].name}`);
+          setCurrentStrategyIndex(prev => prev + 1);
+          setCurrentRetryAttempt(0);
+        } else if (currentRetryAttempt < maxRetries) {
+          addDebugInfo(`Retrying current strategy: ${embedStrategies[currentStrategyIndex].name}, attempt ${currentRetryAttempt + 1}`);
+          setCurrentRetryAttempt(prev => prev + 1);
+        } else {
+          // All strategies exhausted
+          addDebugInfo('All strategies exhausted, marking video as unplayable');
+          showToast('Video unavailable, skipping...');
+          onVideoUnplayable();
+          return;
+        }
+        
+        setPlayerError(null);
+        setIsRetrying(false);
+        setPendingRetry(false);
+      }, 500); // Small delay to allow React to complete re-render cycle
+
+      return () => clearTimeout(timeout);
+    }
+  }, [pendingRetry, playerError, currentStrategyIndex, currentRetryAttempt, maxStrategies, maxRetries, onVideoUnplayable, embedStrategies]);
 
   const injectJavaScript = useCallback((script: string) => {
     try {
@@ -592,30 +624,20 @@ export default function EnhancedVideoPlayer({
     }
 
     setPlayerError(errorMessage);
+    setIsRetrying(true);
     
-    // Try next strategy or retry
-    if (currentStrategy < maxStrategies - 1) {
-      addDebugInfo(`Trying next strategy: ${embedStrategies[currentStrategy + 1].name}`);
-      setCurrentStrategy(prev => prev + 1);
-      setRetryAttempt(0);
-      setIsRetrying(true);
-      return;
-    } else if (retryAttempt < maxRetries) {
-      addDebugInfo(`Retrying current strategy: ${embedStrategies[currentStrategy].name}, attempt ${retryAttempt + 1}`);
-      setRetryAttempt(prev => prev + 1);
-      setIsRetrying(true);
-      return;
+    // Check if we can retry with different strategy or attempt
+    if (currentStrategyIndex < maxStrategies - 1 || currentRetryAttempt < maxRetries) {
+      setPendingRetry(true);
+    } else {
+      // All strategies exhausted - set timeout for final error handling
+      const timeout = setTimeout(() => {
+        showToast('Video unavailable, skipping...');
+        onVideoUnplayable();
+      }, errorTimeoutDuration);
+      setErrorTimeout(timeout);
     }
-
-    // All strategies exhausted
-    addDebugInfo('All strategies exhausted, marking video as unplayable');
-    const timeout = setTimeout(() => {
-      showToast('Video unavailable, skipping...');
-      onVideoUnplayable();
-    }, errorTimeoutDuration);
-
-    setErrorTimeout(timeout);
-  }, [errorTimeout, onVideoUnplayable, youtubeVideoId, currentStrategy, retryAttempt]);
+  }, [errorTimeout, onVideoUnplayable, youtubeVideoId, currentStrategyIndex, currentRetryAttempt, maxStrategies, maxRetries, errorTimeoutDuration]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
@@ -629,6 +651,7 @@ export default function EnhancedVideoPlayer({
           setPlayerError(null);
           setIsBuffering(false);
           setIsRetrying(false);
+          setPendingRetry(false);
           if (errorTimeout) {
             clearTimeout(errorTimeout);
             setErrorTimeout(null);
@@ -762,18 +785,18 @@ export default function EnhancedVideoPlayer({
     addDebugInfo('Manual retry requested');
     setPlayerError(null);
     setIsRetrying(true);
-    if (currentStrategy < maxStrategies - 1) {
-      setCurrentStrategy(prev => prev + 1);
-      setRetryAttempt(0);
+    if (currentStrategyIndex < maxStrategies - 1) {
+      setCurrentStrategyIndex(prev => prev + 1);
+      setCurrentRetryAttempt(0);
     } else {
-      setCurrentStrategy(0);
-      setRetryAttempt(prev => prev + 1);
+      setCurrentStrategyIndex(0);
+      setCurrentRetryAttempt(prev => prev + 1);
     }
-  }, [currentStrategy]);
+  }, [currentStrategyIndex, maxStrategies]);
 
   const handleWebViewLoad = useCallback(() => {
-    addDebugInfo(`WebView loaded for video: ${youtubeVideoId} with strategy: ${embedStrategies[currentStrategy].name}`);
-  }, [youtubeVideoId, currentStrategy]);
+    addDebugInfo(`WebView loaded for video: ${youtubeVideoId} with strategy: ${embedStrategies[currentStrategyIndex].name}`);
+  }, [youtubeVideoId, currentStrategyIndex]);
 
   const handleWebViewError = useCallback(() => {
     addDebugInfo(`WebView error for video: ${youtubeVideoId}`);
@@ -827,14 +850,14 @@ export default function EnhancedVideoPlayer({
             </Text>
             <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
             <Text style={styles.loadingSubtext}>
-              Strategy: {embedStrategies[currentStrategy].name} ({currentStrategy + 1}/{maxStrategies})
+              Strategy: {embedStrategies[currentStrategyIndex].name} ({currentStrategyIndex + 1}/{maxStrategies})
             </Text>
             <Text style={styles.loadingSubtext}>
-              Attempt: {retryAttempt + 1}/{maxRetries + 1}
+              Attempt: {currentRetryAttempt + 1}/{maxRetries + 1}
             </Text>
             {isRetrying && (
               <Text style={styles.retryText}>
-                Trying {embedStrategies[currentStrategy].description}...
+                Trying {embedStrategies[currentStrategyIndex].description}...
               </Text>
             )}
           </View>
@@ -860,7 +883,7 @@ export default function EnhancedVideoPlayer({
           allowsFullscreenVideo={false}
           allowsProtectedMedia={false}
           dataDetectorTypes={['none']}
-          key={`${videoId}-${currentStrategy}-${retryAttempt}`} // Force re-render on strategy change
+          key={`${videoId}-${currentStrategyIndex}-${currentRetryAttempt}`} // Force re-render on strategy change
         />
         
         {/* Progress Bar Overlay */}
@@ -877,7 +900,7 @@ export default function EnhancedVideoPlayer({
             <Text style={styles.errorText}>Loading next video...</Text>
             <Text style={styles.errorSubtext}>{playerError}</Text>
             <Text style={styles.strategyText}>
-              Tried: {embedStrategies[currentStrategy].name} strategy
+              Tried: {embedStrategies[currentStrategyIndex].name} strategy
             </Text>
             <TouchableOpacity style={styles.retryButton} onPress={handleManualRetry}>
               <RefreshCw color="white" size={16} />
@@ -892,7 +915,7 @@ export default function EnhancedVideoPlayer({
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.bufferingText}>Buffering...</Text>
             <Text style={styles.strategyText}>
-              Using: {embedStrategies[currentStrategy].name}
+              Using: {embedStrategies[currentStrategyIndex].name}
             </Text>
           </View>
         )}
@@ -921,8 +944,8 @@ export default function EnhancedVideoPlayer({
         {/* Strategy Info */}
         <View style={styles.strategyInfo}>
           <Text style={styles.strategyLabel}>
-            Strategy: {embedStrategies[currentStrategy].name} 
-            {retryAttempt > 0 && ` (Attempt ${retryAttempt + 1})`}
+            Strategy: {embedStrategies[currentStrategyIndex].name} 
+            {currentRetryAttempt > 0 && ` (Attempt ${currentRetryAttempt + 1})`}
           </Text>
         </View>
 
