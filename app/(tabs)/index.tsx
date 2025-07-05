@@ -128,24 +128,77 @@ export default function ViewTab() {
       console.log('Completing video silently:', currentVideo.id);
       setStatusMessage('Processing completion...');
 
-      // Complete video view with user-set duration
-      const { data: completionResult, error: completionError } = await supabase
-        .rpc('complete_video_view', {
-          user_uuid: user.id,
-          video_uuid: currentVideo.id,
-          watch_duration: currentVideo.duration_seconds
+      // Use a more robust approach to complete video view
+      const { data: viewData, error: viewError } = await supabase
+        .from('video_views')
+        .insert({
+          video_id: currentVideo.id,
+          viewer_id: user.id,
+          watched_duration: currentVideo.duration_seconds,
+          completed: true,
+          coins_earned: currentVideo.coin_reward
+        })
+        .select()
+        .single();
+
+      if (viewError) {
+        // Check if it's a duplicate view error (user already watched this video)
+        if (viewError.code === '23505') {
+          console.log('User already watched this video, skipping...');
+          moveToNextVideo();
+          return;
+        }
+        console.error('Error creating video view:', viewError);
+        throw new Error(`Failed to record video view: ${viewError.message}`);
+      }
+
+      console.log('Video view recorded successfully:', viewData);
+
+      // Update user coins directly
+      const { error: coinError } = await supabase
+        .from('profiles')
+        .update({ 
+          coins: (profile.coins || 0) + currentVideo.coin_reward,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (coinError) {
+        console.error('Error updating coins:', coinError);
+        throw new Error(`Failed to update coins: ${coinError.message}`);
+      }
+
+      // Record coin transaction
+      const { error: transactionError } = await supabase
+        .from('coin_transactions')
+        .insert({
+          user_id: user.id,
+          amount: currentVideo.coin_reward,
+          transaction_type: 'video_watch',
+          description: `Watched video: ${currentVideo.title}`,
+          reference_id: currentVideo.id
         });
 
-      if (completionError) {
-        console.error('Error completing video view:', completionError);
-        throw new Error(`Failed to complete video view: ${completionError.message}`);
+      if (transactionError) {
+        console.error('Error recording transaction:', transactionError);
+        // Don't throw error for transaction recording failure
       }
 
-      if (!completionResult) {
-        throw new Error('Failed to complete video view');
+      // Update video view count
+      const { error: videoUpdateError } = await supabase
+        .from('videos')
+        .update({ 
+          views_count: supabase.raw('views_count + 1'),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentVideo.id);
+
+      if (videoUpdateError) {
+        console.error('Error updating video view count:', videoUpdateError);
+        // Don't throw error for view count update failure
       }
 
-      console.log('Video view completed successfully');
+      console.log('Video completion processed successfully');
 
       // Silently refresh profile
       await refreshProfile();
