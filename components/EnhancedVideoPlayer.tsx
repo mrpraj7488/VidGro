@@ -66,7 +66,6 @@ export default function EnhancedVideoPlayer({
   const [stuckProgressCount, setStuckProgressCount] = useState(0);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [youtubeVideoId, setYoutubeVideoId] = useState<string | null>(null);
   
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
@@ -115,13 +114,13 @@ export default function EnhancedVideoPlayer({
     }
   ];
 
-  // Extract YouTube video ID from the stored value - moved to useEffect to avoid render-time state updates
-  const extractVideoIdFromUrl = useCallback((videoIdOrUrl: string): string | null => {
-    console.log(`[EnhancedPlayer] Processing video ID/URL: ${videoIdOrUrl}`);
+  // Extract YouTube video ID from the stored value
+  const extractVideoIdFromUrl = (videoIdOrUrl: string): string | null => {
+    addDebugInfo(`Processing video ID/URL: ${videoIdOrUrl}`);
     
     // If it's already a video ID (11 characters), return it directly
     if (/^[a-zA-Z0-9_-]{11}$/.test(videoIdOrUrl)) {
-      console.log(`[EnhancedPlayer] Already a video ID: ${videoIdOrUrl}`);
+      addDebugInfo(`Already a video ID: ${videoIdOrUrl}`);
       return videoIdOrUrl;
     }
     
@@ -138,25 +137,16 @@ export default function EnhancedVideoPlayer({
     for (const pattern of patterns) {
       const match = videoIdOrUrl.match(pattern);
       if (match && match[1]) {
-        console.log(`[EnhancedPlayer] Extracted video ID: ${match[1]} from pattern: ${pattern.source}`);
+        addDebugInfo(`Extracted video ID: ${match[1]} from pattern: ${pattern.source}`);
         return match[1];
       }
     }
     
-    console.log(`[EnhancedPlayer] Could not extract video ID from: ${videoIdOrUrl}`);
+    addDebugInfo(`Could not extract video ID from: ${videoIdOrUrl}`);
     return null;
-  }, []);
+  };
 
-  // Extract video ID in useEffect to avoid render-time state updates
-  useEffect(() => {
-    const extractedId = extractVideoIdFromUrl(youtubeUrl);
-    setYoutubeVideoId(extractedId);
-    if (extractedId) {
-      addDebugInfo(`Video ID extracted: ${extractedId}`);
-    } else {
-      addDebugInfo(`Could not extract video ID from: ${youtubeUrl}`);
-    }
-  }, [youtubeUrl, extractVideoIdFromUrl]);
+  const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
 
   // Enhanced HTML content with better error handling and multiple strategies
   const getCurrentEmbedUrl = () => {
@@ -809,6 +799,7 @@ export default function EnhancedVideoPlayer({
 
   // Show error if no video ID could be extracted
   if (!youtubeVideoId) {
+    addDebugInfo(`Could not extract video ID from: ${youtubeUrl}`);
     return (
       <View style={styles.container}>
         <View style={styles.errorContainer}>
