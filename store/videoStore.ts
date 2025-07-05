@@ -59,38 +59,46 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
+      console.log('User has watched videos:', watchedVideoIds.length);
       
-      // Build the query to exclude watched videos
+      // Get all active videos that are not owned by the user
       let query = supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id')
         .eq('status', 'active')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(QUEUE_SIZE);
+        .limit(QUEUE_SIZE * 2); // Get more to filter from
 
-      // If there are watched videos, exclude them
-      if (watchedVideoIds.length > 0) {
-        query = query.not('id', 'in', `(${watchedVideoIds.map(id => `'${id}'`).join(',')})`);
-      }
-
-      const { data: videos, error } = await query;
+      const { data: allVideos, error } = await query;
 
       if (error) {
         console.error('Error fetching video queue:', error);
         throw error;
       }
 
-      if (!videos || videos.length === 0) {
-        console.log('No videos available in queue, resetting...');
-        // Reset queue and try again with all videos
-        await get().resetQueue();
+      if (!allVideos || allVideos.length === 0) {
+        console.log('No videos available in database');
+        set({ 
+          videoQueue: [], 
+          currentVideoIndex: 0,
+          isLoading: false,
+          lastFetchTime: now 
+        });
         return;
       }
 
-      // Filter videos where views_count < target_views
-      const availableVideos = videos
-        .filter(video => video.views_count < video.target_views)
+      // Filter videos on the client side
+      const availableVideos = allVideos
+        .filter(video => {
+          // Check if video has remaining views
+          const hasRemainingViews = video.views_count < video.target_views;
+          // Check if user hasn't watched this video
+          const notWatched = !watchedVideoIds.includes(video.id);
+          
+          return hasRemainingViews && notWatched;
+        })
+        .slice(0, QUEUE_SIZE) // Limit to queue size
         .map(video => ({
           id: video.id,
           youtube_url: video.youtube_url,
@@ -100,8 +108,13 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         }));
 
       if (availableVideos.length === 0) {
-        console.log('No available videos with remaining views, resetting...');
-        await get().resetQueue();
+        console.log('No available videos with remaining views, will reset queue');
+        set({ 
+          videoQueue: [], 
+          currentVideoIndex: 0,
+          isLoading: false,
+          lastFetchTime: now 
+        });
         return;
       }
 
