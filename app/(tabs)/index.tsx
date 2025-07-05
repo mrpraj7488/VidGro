@@ -216,17 +216,30 @@ export default function ViewTab() {
 
       // Update video view count only for first-time views
       if (shouldUpdateVideoCount) {
-        const { error: videoUpdateError } = await supabase
+        // Get current views count first, then increment it
+        const { data: videoData, error: fetchError } = await supabase
           .from('videos')
-          .update({ 
-            views_count: supabase.raw('views_count + 1'),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentVideo.id);
+          .select('views_count')
+          .eq('id', currentVideo.id)
+          .single();
 
-        if (videoUpdateError) {
-          console.error('Error updating video view count:', videoUpdateError);
-          // Don't throw error for view count update failure
+        if (fetchError) {
+          console.error('Error fetching video data:', fetchError);
+        } else {
+          const newViewsCount = (videoData.views_count || 0) + 1;
+          
+          const { error: videoUpdateError } = await supabase
+            .from('videos')
+            .update({ 
+              views_count: newViewsCount,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', currentVideo.id);
+
+          if (videoUpdateError) {
+            console.error('Error updating video view count:', videoUpdateError);
+            // Don't throw error for view count update failure
+          }
         }
       }
 
