@@ -4,16 +4,16 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ScrollView,
   Platform,
   Dimensions,
+  ToastAndroid,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Menu, DollarSign, RefreshCw, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, ExternalLink } from 'lucide-react-native';
-import WebViewVideoPlayer from '@/components/WebViewVideoPlayer';
+import SeamlessVideoPlayer from '@/components/SeamlessVideoPlayer';
 import { useVideoStore } from '@/store/videoStore';
 import Animated, { 
   useSharedValue, 
@@ -32,12 +32,13 @@ export default function ViewTab() {
     moveToNextVideo, 
     fetchVideos, 
     isLoading: isLoadingQueue,
-    clearQueue 
+    clearQueue,
+    removeCurrentVideo,
+    resetQueue
   } = useVideoStore();
   
   const [showMenu, setShowMenu] = useState(false);
   const [videosWatched, setVideosWatched] = useState(0);
-  const [showAdNotification, setShowAdNotification] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<'healthy' | 'warning' | 'error'>('healthy');
@@ -46,6 +47,14 @@ export default function ViewTab() {
   const coinBounce = useSharedValue(1);
   const progressScale = useSharedValue(0);
   const currentVideo = getCurrentVideo();
+
+  const showToast = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      console.log('Toast:', message);
+    }
+  };
 
   useEffect(() => {
     if (user && profile) {
@@ -68,9 +77,23 @@ export default function ViewTab() {
       
       const video = getCurrentVideo();
       if (!video) {
-        setError('No videos available for viewing at the moment.');
-        setSystemStatus('warning');
-        setStatusMessage('No videos available');
+        // No videos available, reset queue and try again
+        console.log('No videos in queue, resetting...');
+        await resetQueue();
+        
+        // Try fetching again after reset
+        setTimeout(async () => {
+          await fetchVideos(user.id);
+          const newVideo = getCurrentVideo();
+          if (!newVideo) {
+            setError('No videos available for viewing at the moment.');
+            setSystemStatus('warning');
+            setStatusMessage('No videos available');
+          } else {
+            setSystemStatus('healthy');
+            setStatusMessage('Ready to watch');
+          }
+        }, 1000);
       } else {
         setSystemStatus('healthy');
         setStatusMessage('Ready to watch');
@@ -94,7 +117,7 @@ export default function ViewTab() {
     }
 
     try {
-      console.log('Completing video:', currentVideo.id);
+      console.log('Completing video silently:', currentVideo.id);
       setStatusMessage('Processing completion...');
 
       // Complete video view with user-set duration
@@ -116,9 +139,10 @@ export default function ViewTab() {
 
       console.log('Video view completed successfully');
 
+      // Silently refresh profile
       await refreshProfile();
 
-      // Animate coin bounce and progress
+      // Silent coin animation
       coinBounce.value = withSpring(1.3, { damping: 8 }, () => {
         coinBounce.value = withSpring(1);
       });
@@ -129,27 +153,15 @@ export default function ViewTab() {
 
       setVideosWatched(prev => prev + 1);
 
-      if ((videosWatched + 1) % 5 === 0) {
-        setShowAdNotification(true);
-        setTimeout(() => setShowAdNotification(false), 5000);
-      }
-
-      // Show success message
-      Alert.alert(
-        '🎉 Video Completed!',
-        `You earned ${currentVideo.coin_reward} coins!`,
-        [{ text: 'Continue', style: 'default' }]
-      );
-
-      // Move to next video
+      // Move to next video immediately without popup
       setTimeout(() => {
         moveToNextVideo();
         const nextVideo = getCurrentVideo();
         if (!nextVideo) {
-          // Queue exhausted, reload
+          // Queue exhausted, reload seamlessly
           loadVideoQueue();
         }
-      }, 2000);
+      }, 500);
 
     } catch (error: any) {
       console.error('Error completing video:', error);
@@ -160,25 +172,27 @@ export default function ViewTab() {
   };
 
   const handleVideoSkip = () => {
-    Alert.alert(
-      'Skip Video',
-      'You will not earn coins for this video. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Skip', 
-          style: 'destructive',
-          onPress: () => {
-            setStatusMessage('Skipping video...');
-            moveToNextVideo();
-            const nextVideo = getCurrentVideo();
-            if (!nextVideo) {
-              loadVideoQueue();
-            }
-          }
-        },
-      ]
-    );
+    // Silent skip without confirmation
+    setStatusMessage('Skipping video...');
+    moveToNextVideo();
+    const nextVideo = getCurrentVideo();
+    if (!nextVideo) {
+      loadVideoQueue();
+    }
+  };
+
+  const handleVideoUnplayable = async () => {
+    console.log('Video is unplayable, removing from queue...');
+    showToast('Video unavailable, skipping...');
+    
+    // Remove the unplayable video and move to next
+    await removeCurrentVideo();
+    
+    const nextVideo = getCurrentVideo();
+    if (!nextVideo) {
+      // No more videos, reload queue
+      loadVideoQueue();
+    }
   };
 
   const handleVideoError = (errorMessage: string) => {
@@ -187,36 +201,10 @@ export default function ViewTab() {
     setSystemStatus('error');
     setStatusMessage('Video playback error');
     
-    Alert.alert(
-      'Video Error',
-      'There was an issue playing this video. Would you like to try the next one?',
-      [
-        { 
-          text: 'Retry', 
-          onPress: () => {
-            setError(null);
-            setSystemStatus('healthy');
-            setStatusMessage('Retrying...');
-            clearQueue();
-            loadVideoQueue();
-          }
-        },
-        { 
-          text: 'Next Video', 
-          style: 'destructive',
-          onPress: () => {
-            setError(null);
-            setSystemStatus('healthy');
-            setStatusMessage('Loading next video...');
-            moveToNextVideo();
-            const nextVideo = getCurrentVideo();
-            if (!nextVideo) {
-              loadVideoQueue();
-            }
-          }
-        }
-      ]
-    );
+    // Auto-skip after 5 seconds
+    setTimeout(() => {
+      handleVideoUnplayable();
+    }, 5000);
   };
 
   const extractVideoId = (youtubeUrl: string): string | null => {
@@ -239,7 +227,7 @@ export default function ViewTab() {
       if (Platform.OS === 'web') {
         window.open(currentVideo.youtube_url, '_blank');
       } else {
-        Alert.alert('Open in YouTube', 'This would open the video in YouTube app');
+        showToast('Opening in YouTube...');
       }
     }
   };
@@ -285,7 +273,7 @@ export default function ViewTab() {
           colors={['#FF4757', '#FF6B8A']}
           style={styles.header}
         >
-          <Text style={styles.headerTitle}>Video Promoter</Text>
+          <Text style={styles.headerTitle}>VidGro</Text>
         </LinearGradient>
         <View style={styles.loadingContainer}>
           <RefreshCw color="#FF4757" size={32} />
@@ -309,7 +297,7 @@ export default function ViewTab() {
             <Menu color="white" size={20} />
           </TouchableOpacity>
           
-          <Text style={styles.headerTitle}>Video Promoter</Text>
+          <Text style={styles.headerTitle}>VidGro</Text>
           
           <View style={styles.coinDisplay}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
@@ -342,7 +330,7 @@ export default function ViewTab() {
             <Menu color="white" size={20} />
           </TouchableOpacity>
           
-          <Text style={styles.headerTitle}>Video Promoter</Text>
+          <Text style={styles.headerTitle}>VidGro</Text>
           
           <View style={styles.coinDisplay}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
@@ -388,7 +376,7 @@ export default function ViewTab() {
           <Menu color="white" size={20} />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Video Promoter</Text>
+        <Text style={styles.headerTitle}>VidGro</Text>
         
         <View style={styles.coinDisplay}>
           <Animated.View style={coinAnimatedStyle}>
@@ -405,16 +393,18 @@ export default function ViewTab() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* WebView Video Player */}
+        {/* Seamless Video Player */}
         {currentVideo && videoId && (
           <View style={styles.videoSection}>
-            <WebViewVideoPlayer
-              videoId={videoId}
+            <SeamlessVideoPlayer
+              videoId={currentVideo.id}
+              youtubeUrl={currentVideo.youtube_url}
               duration={currentVideo.duration_seconds}
               coinReward={currentVideo.coin_reward}
               onVideoComplete={handleVideoComplete}
               onVideoSkip={handleVideoSkip}
               onError={handleVideoError}
+              onVideoUnplayable={handleVideoUnplayable}
             />
           </View>
         )}
@@ -435,7 +425,7 @@ export default function ViewTab() {
                 onPress={openInYouTube}
               >
                 <ExternalLink color="#FF4757" size={16} />
-                <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
+                <Text style={styles.youtubeButtonText}>YouTube</Text>
               </TouchableOpacity>
             </View>
 
@@ -454,18 +444,9 @@ export default function ViewTab() {
               
               <Animated.View style={[styles.statItem, coinAnimatedStyle]}>
                 <Text style={styles.statNumber}>{currentVideo.coin_reward}</Text>
-                <Text style={styles.statLabel}>Coins will be added</Text>
+                <Text style={styles.statLabel}>Coins</Text>
               </Animated.View>
             </View>
-          </View>
-        )}
-
-        {/* Ad Notification */}
-        {showAdNotification && (
-          <View style={styles.adNotification}>
-            <Text style={styles.adNotificationText}>
-              You will see an Ad after watching 5 Videos. CONFIGURE?
-            </Text>
           </View>
         )}
 
@@ -473,7 +454,7 @@ export default function ViewTab() {
         <View style={styles.autoPlayCard}>
           <View style={styles.autoPlayInfo}>
             <View style={styles.autoPlayIcon}>
-              <Text style={styles.autoPlayIconText}>SR</Text>
+              <Text style={styles.autoPlayIconText}>AP</Text>
             </View>
             <Text style={styles.autoPlayText}>Auto Play</Text>
           </View>
@@ -483,11 +464,6 @@ export default function ViewTab() {
             </View>
           </View>
         </View>
-
-        {/* Skip Button */}
-        <TouchableOpacity style={styles.skipButton} onPress={handleVideoSkip}>
-          <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -742,50 +718,6 @@ const styles = StyleSheet.create({
         boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
       },
     }),
-  },
-  skipButton: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  skipButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    letterSpacing: 0.5,
-  },
-  adNotification: {
-    backgroundColor: '#FF4757',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  adNotificationText: {
-    color: 'white',
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,

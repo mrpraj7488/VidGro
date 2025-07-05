@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ToastAndroid,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +23,7 @@ interface VideoData {
   duration: number;
   thumbnail: string;
   valid: boolean;
+  embeddable: boolean;
   warning?: string;
 }
 
@@ -35,6 +37,14 @@ export default function PromoteTab() {
   const [fetchingVideo, setFetchingVideo] = useState(false);
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      console.log('Toast:', message);
+    }
+  };
 
   const fetchVideoData = async () => {
     if (!youtubeUrl.trim()) {
@@ -58,37 +68,49 @@ export default function PromoteTab() {
       });
       
       if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}: Failed to fetch video data`;
+        const errorData = await response.json().catch(() => ({}));
         
-        try {
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            const errorData = await response.json();
-            if (errorData.message) {
-              errorMessage = errorData.message;
-            }
-          }
-        } catch (parseError) {
-          console.error('Error parsing error response:', parseError);
+        // Handle embeddability error specifically
+        if (errorData.embeddable === false) {
+          Alert.alert(
+            'Video Not Embeddable',
+            'This video cannot be embedded. Please make it embeddable first or choose a different video.',
+            [{ text: 'OK' }]
+          );
+          setError('Video not embeddable');
+          return;
         }
         
-        throw new Error(errorMessage);
+        throw new Error(errorData.message || `HTTP ${response.status}: Failed to fetch video data`);
       }
       
       const data = await response.json();
       console.log('Video data received:', data);
 
-      if (data.valid) {
+      if (data.valid && data.embeddable) {
         setVideoData(data);
         setTitle(data.title || '');
-        // Don't auto-set duration - let user set it
         setError(null);
         
         if (data.warning) {
-          setError(`Warning: ${data.warning}`);
+          showToast(`Warning: ${data.warning}`);
         }
+        
+        showToast('Video validated successfully!');
       } else {
-        setError(data.message || 'Invalid YouTube video');
+        const errorMsg = data.embeddable === false 
+          ? 'Video not embeddable, make it embeddable first'
+          : data.message || 'Invalid YouTube video';
+        
+        if (data.embeddable === false) {
+          Alert.alert(
+            'Video Not Embeddable',
+            'This video cannot be embedded. Please make it embeddable first or choose a different video.',
+            [{ text: 'OK' }]
+          );
+        }
+        
+        setError(errorMsg);
         setVideoData(null);
       }
     } catch (error: any) {
@@ -174,6 +196,16 @@ export default function PromoteTab() {
       return;
     }
 
+    // Check if video is embeddable before proceeding
+    if (!videoData || !videoData.embeddable) {
+      Alert.alert(
+        'Video Not Embeddable',
+        'Please validate the video first and ensure it is embeddable.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -185,7 +217,7 @@ export default function PromoteTab() {
         duration: durationSeconds,
         targetViews: views,
         youtubeUrl,
-        actualVideoDuration: videoData?.duration
+        embeddable: videoData.embeddable
       });
 
       // Use the database function to deduct coins safely
@@ -208,13 +240,13 @@ export default function PromoteTab() {
 
       console.log('Coins deducted successfully');
 
-      // Create video promotion with enhanced data
+      // Create video promotion with embeddability confirmation
       const videoInsertData = {
         user_id: user.id,
         youtube_url: youtubeUrl,
         title,
-        description: `User-set duration: ${durationSeconds}s${videoData?.duration ? ` (Actual: ${videoData.duration}s)` : ''}${videoData?.warning ? ` - Warning: ${videoData.warning}` : ''}`,
-        duration_seconds: durationSeconds, // Use user-set duration, not actual video duration
+        description: `User-set duration: ${durationSeconds}s${videoData?.duration ? ` (Actual: ${videoData.duration}s)` : ''} - Embeddable: ${videoData.embeddable}${videoData?.warning ? ` - Warning: ${videoData.warning}` : ''}`,
+        duration_seconds: durationSeconds,
         coin_cost: totalCost,
         coin_reward: rewardPerView,
         target_views: views,
@@ -240,11 +272,11 @@ export default function PromoteTab() {
       // Refresh profile to get updated coin balance
       await refreshProfile();
 
-      Alert.alert(
-        'Success!', 
-        `Your video has been added to the promotion queue. ${totalCost} coins have been deducted from your account.`,
-        [{ text: 'OK', onPress: () => resetForm() }]
-      );
+      // Show success toast instead of alert
+      showToast(`Video promoted successfully! ${totalCost} coins deducted.`);
+      
+      // Reset form
+      resetForm();
 
     } catch (error: any) {
       console.error('Error promoting video:', error);
@@ -320,19 +352,19 @@ export default function PromoteTab() {
                 </TouchableOpacity>
               </View>
               {fetchingVideo && (
-                <Text style={styles.helperText}>Fetching video information...</Text>
+                <Text style={styles.helperText}>Validating video embeddability...</Text>
               )}
               <Text style={styles.helperText}>
-                Paste a YouTube video URL to fetch title and duration
+                Paste a YouTube video URL to validate embeddability and fetch details
               </Text>
             </View>
 
             {/* Video Preview */}
-            {videoData && (
+            {videoData && videoData.embeddable && (
               <View style={styles.videoPreview}>
                 <View style={styles.videoPreviewHeader}>
                   <CheckCircle color="#2ECC71" size={20} />
-                  <Text style={styles.videoPreviewTitle}>Video Found</Text>
+                  <Text style={styles.videoPreviewTitle}>Video Validated & Embeddable</Text>
                 </View>
                 <View style={styles.videoPreviewContent}>
                   <Image 
@@ -348,7 +380,7 @@ export default function PromoteTab() {
                       Actual Duration: {formatTime(videoData.duration)}
                     </Text>
                     <Text style={styles.videoNote}>
-                      Set your preferred duration below (cannot exceed actual duration)
+                      ✅ Embeddable - Ready for promotion
                     </Text>
                     {videoData.warning && (
                       <Text style={styles.videoWarning}>
@@ -442,9 +474,9 @@ export default function PromoteTab() {
                     {profile?.coins || 0} coins
                   </Text>
                 </View>
-                {videoData && (
+                {videoData && videoData.embeddable && (
                   <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>Video validation:</Text>
+                    <Text style={styles.costLabel}>Embeddability:</Text>
                     <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Verified</Text>
                   </View>
                 )}
@@ -455,10 +487,10 @@ export default function PromoteTab() {
             <TouchableOpacity
               style={[
                 styles.promoteButton,
-                (loading || !youtubeUrl || !title || !userSetDuration || !targetViews || (profile?.coins || 0) < totalCost || validateDuration()) && styles.buttonDisabled
+                (loading || !youtubeUrl || !title || !userSetDuration || !targetViews || (profile?.coins || 0) < totalCost || validateDuration() || !videoData?.embeddable) && styles.buttonDisabled
               ]}
               onPress={handlePromoteVideo}
-              disabled={loading || !youtubeUrl || !title || !userSetDuration || !targetViews || (profile?.coins || 0) < totalCost || !!validateDuration()}
+              disabled={loading || !youtubeUrl || !title || !userSetDuration || !targetViews || (profile?.coins || 0) < totalCost || !!validateDuration() || !videoData?.embeddable}
             >
               <TrendingUp color="white" size={20} style={styles.buttonIcon} />
               <Text style={styles.promoteButtonText}>
@@ -470,7 +502,7 @@ export default function PromoteTab() {
             <View style={styles.instructionsCard}>
               <Text style={styles.instructionsTitle}>How it works:</Text>
               <Text style={styles.instructionsText}>
-                1. Enter a YouTube video URL and fetch its details{'\n'}
+                1. Enter a YouTube video URL and validate embeddability{'\n'}
                 2. Set your preferred viewing duration (up to actual video length){'\n'}
                 3. Choose how many views you want{'\n'}
                 4. Pay coins based on duration × views{'\n'}
@@ -606,18 +638,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#2ECC71',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: '#2ECC71',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.1,
         shadowRadius: 4,
       },
       android: {
-        elevation: 2,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 2px 4px rgba(46, 204, 113, 0.1)',
       },
     }),
   },
@@ -657,8 +691,8 @@ const styles = StyleSheet.create({
   },
   videoNote: {
     fontSize: 11,
-    color: '#999',
-    fontStyle: 'italic',
+    color: '#2ECC71',
+    fontWeight: '500',
     marginBottom: 4,
   },
   videoWarning: {

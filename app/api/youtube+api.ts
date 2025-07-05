@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     console.log('Processing YouTube video ID:', videoId);
 
     try {
-      // Enhanced YouTube API call with better error handling
+      // Enhanced YouTube API call with embeddability check
       const apiKey = 'AIzaSyBJ0Tu-2JFectz7e7ieMEJ7Pl8Yh0o8Kg8';
       const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&key=${apiKey}&part=snippet,contentDetails,status`;
       
@@ -32,7 +32,6 @@ export async function GET(request: Request) {
           'Accept': 'application/json',
           'User-Agent': 'VidGro-App/1.0',
         },
-        // Add timeout
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
       
@@ -59,10 +58,9 @@ export async function GET(request: Request) {
       const title = snippet.title || `Video ${videoId}`;
       const duration = parseDuration(contentDetails.duration || 'PT0S');
       
-      // Enhanced validation checks
+      // CRITICAL: Check embeddability first
       const isEmbeddable = status.embeddable !== false;
       const isPublic = status.privacyStatus === 'public';
-      const isListed = status.privacyStatus !== 'private';
       const uploadStatus = status.uploadStatus;
       
       console.log('Video validation:', {
@@ -70,25 +68,23 @@ export async function GET(request: Request) {
         duration,
         embeddable: isEmbeddable,
         public: isPublic,
-        listed: isListed,
         uploadStatus,
         privacyStatus: status.privacyStatus
       });
 
-      let warning = null;
-      
-      // Check for embedding restrictions
+      // REJECT if not embeddable
       if (!isEmbeddable) {
         return Response.json({ 
-          message: 'This video cannot be embedded or played in external players',
-          valid: false 
+          message: 'Video not embeddable, make it embeddable first',
+          valid: false,
+          embeddable: false
         }, { status: 400 });
       }
 
       // Check for privacy restrictions
-      if (!isListed) {
+      if (!isPublic) {
         return Response.json({ 
-          message: 'This video is private or unlisted and cannot be accessed',
+          message: 'Video is private or unlisted and cannot be accessed',
           valid: false 
         }, { status: 400 });
       }
@@ -101,11 +97,8 @@ export async function GET(request: Request) {
         }, { status: 400 });
       }
 
-      // Add warnings for potential issues
-      if (!isPublic) {
-        warning = 'Video may have restricted access';
-      }
-
+      let warning = null;
+      
       if (duration === 0) {
         warning = 'Could not determine video duration - may be a live stream';
       }
@@ -125,6 +118,7 @@ export async function GET(request: Request) {
         duration: duration,
         thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
         valid: true,
+        embeddable: true,
         warning: warning,
         metadata: {
           embeddable: isEmbeddable,
@@ -137,7 +131,6 @@ export async function GET(request: Request) {
     } catch (apiError: any) {
       console.error('YouTube API error:', apiError);
       
-      // Enhanced fallback with better error handling
       if (apiError.name === 'AbortError') {
         return Response.json({
           message: 'Request timeout - please try again',
@@ -153,21 +146,11 @@ export async function GET(request: Request) {
         }, { status: 429 });
       }
 
-      // Provide fallback data but mark as unverified
+      // For API errors, return invalid instead of fallback
       return Response.json({
-        id: videoId,
-        title: `Video ${videoId.substring(0, 8)}`,
-        duration: 120, // Default 2 minutes
-        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-        valid: true,
-        warning: 'Could not validate video details with YouTube API. Video may not play correctly or may have restrictions.',
-        metadata: {
-          embeddable: null,
-          public: null,
-          uploadStatus: 'unknown',
-          privacyStatus: 'unknown'
-        }
-      });
+        message: 'Could not validate video with YouTube API. Please try again.',
+        valid: false
+      }, { status: 500 });
     }
 
   } catch (error: any) {
