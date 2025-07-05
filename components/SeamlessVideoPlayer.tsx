@@ -156,7 +156,7 @@ export default function SeamlessVideoPlayer({
           document.getElementById('loading').style.display = 'none';
           document.getElementById('error').style.display = 'block';
           document.getElementById('error').textContent = 'Failed to load YouTube API';
-          window.ReactNativeWebView.postMessage(JSON.stringify({
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_ERROR',
             error: 'API_LOAD_FAILED',
             message: 'Failed to load YouTube iframe API'
@@ -210,7 +210,7 @@ export default function SeamlessVideoPlayer({
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
             document.getElementById('error').textContent = 'Failed to create player: ' + error.message;
-            window.ReactNativeWebView.postMessage(JSON.stringify({
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'PLAYER_ERROR',
               error: 'PLAYER_CREATION_FAILED',
               message: 'Failed to create YouTube player: ' + error.message
@@ -223,7 +223,7 @@ export default function SeamlessVideoPlayer({
           document.getElementById('loading').style.display = 'none';
           isPlayerReady = true;
           
-          window.ReactNativeWebView.postMessage(JSON.stringify({
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_READY',
             videoId: '${youtubeVideoId}'
           }));
@@ -235,7 +235,7 @@ export default function SeamlessVideoPlayer({
             
             if (!videoData || !videoData.title || videoData.title === '') {
               console.warn('Video may not be available or private');
-              window.ReactNativeWebView.postMessage(JSON.stringify({
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'PLAYER_WARNING',
                 message: 'Video may not be available or private'
               }));
@@ -252,7 +252,7 @@ export default function SeamlessVideoPlayer({
                 player.playVideo();
               } catch (error) {
                 console.error('Error starting playback:', error);
-                window.ReactNativeWebView.postMessage(JSON.stringify({
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'PLAYER_ERROR',
                   error: 'PLAYBACK_START_FAILED',
                   message: 'Failed to start video playback'
@@ -272,12 +272,12 @@ export default function SeamlessVideoPlayer({
                   hasCompleted = true;
                   player.pauseVideo();
                   console.log('Video completed at', currentTime, 'seconds');
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                  window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'VIDEO_COMPLETED',
                     currentTime: currentTime
                   }));
                 } else if (currentTime < maxDuration) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                  window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'PROGRESS_UPDATE',
                     currentTime: currentTime,
                     progress: (currentTime / maxDuration) * 100
@@ -287,7 +287,7 @@ export default function SeamlessVideoPlayer({
                 console.error('Error getting current time:', error);
                 errorCount++;
                 if (errorCount > maxErrors) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                  window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'PLAYER_ERROR',
                     error: 'PROGRESS_ERROR',
                     message: 'Failed to track video progress'
@@ -311,7 +311,7 @@ export default function SeamlessVideoPlayer({
           
           console.log('Player state changed to:', stateNames[state] || state);
           
-          window.ReactNativeWebView.postMessage(JSON.stringify({
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'STATE_CHANGE',
             state: state,
             stateName: stateNames[state] || 'UNKNOWN'
@@ -320,7 +320,7 @@ export default function SeamlessVideoPlayer({
           // Handle video ended before user-set duration
           if (state === 0 && currentTime < maxDuration) {
             console.log('Video ended early at', currentTime, 'seconds');
-            window.ReactNativeWebView.postMessage(JSON.stringify({
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_ENDED_EARLY',
               currentTime: currentTime
             }));
@@ -376,7 +376,7 @@ export default function SeamlessVideoPlayer({
                 });
               } catch (retryError) {
                 console.error('Retry failed:', retryError);
-                window.ReactNativeWebView.postMessage(JSON.stringify({
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'PLAYER_ERROR',
                   error: event.data,
                   message: errorMessage + ' (Retry failed)'
@@ -387,7 +387,7 @@ export default function SeamlessVideoPlayer({
             return;
           }
           
-          window.ReactNativeWebView.postMessage(JSON.stringify({
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_ERROR',
             error: event.data,
             message: errorMessage
@@ -420,7 +420,7 @@ export default function SeamlessVideoPlayer({
         // Handle page errors
         window.onerror = function(msg, url, lineNo, columnNo, error) {
           console.error('Page error:', msg, 'at', url, ':', lineNo);
-          window.ReactNativeWebView.postMessage(JSON.stringify({
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_ERROR',
             error: 'PAGE_ERROR',
             message: 'Page error: ' + msg
@@ -686,7 +686,7 @@ export default function SeamlessVideoPlayer({
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
           mixedContentMode="compatibility"
-          originWhitelist={['http://*', 'https://*']}
+          originWhitelist={['*']}
           allowsFullscreenVideo={false}
           allowsProtectedMedia={false}
           dataDetectorTypes="none"
