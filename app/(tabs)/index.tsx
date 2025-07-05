@@ -62,8 +62,16 @@ export default function ViewTab() {
     }
   }, [user, profile]);
 
+  // Auto-reload when queue is empty
+  useEffect(() => {
+    if (user && !currentVideo && !loading && !isLoadingQueue) {
+      console.log('No current video, auto-reloading queue...');
+      loadVideoQueue();
+    }
+  }, [currentVideo, user, loading, isLoadingQueue]);
+
   const loadVideoQueue = async () => {
-    if (!user || isLoadingQueue) return;
+    if (!user || isLoadingQueue || loading) return;
 
     try {
       setLoading(true);
@@ -77,23 +85,23 @@ export default function ViewTab() {
       
       const video = getCurrentVideo();
       if (!video) {
-        // No videos available, reset queue and try again
-        console.log('No videos in queue, resetting...');
-        await resetQueue();
+        // No videos available, try reset
+        console.log('No videos in queue, attempting reset...');
+        setStatusMessage('Refreshing video queue...');
         
-        // Try fetching again after reset
-        setTimeout(async () => {
-          await fetchVideos(user.id);
-          const newVideo = getCurrentVideo();
-          if (!newVideo) {
-            setError('No videos available for viewing at the moment.');
-            setSystemStatus('warning');
-            setStatusMessage('No videos available');
-          } else {
-            setSystemStatus('healthy');
-            setStatusMessage('Ready to watch');
-          }
-        }, 1000);
+        await resetQueue(user.id);
+        
+        // Check again after reset
+        const newVideo = getCurrentVideo();
+        if (!newVideo) {
+          setError('No videos available for viewing at the moment.');
+          setSystemStatus('warning');
+          setStatusMessage('No videos available');
+        } else {
+          setSystemStatus('healthy');
+          setStatusMessage('Ready to watch');
+          console.log('Video loaded after reset:', newVideo);
+        }
       } else {
         setSystemStatus('healthy');
         setStatusMessage('Ready to watch');
@@ -156,11 +164,15 @@ export default function ViewTab() {
       // Move to next video immediately without popup
       setTimeout(() => {
         moveToNextVideo();
-        const nextVideo = getCurrentVideo();
-        if (!nextVideo) {
-          // Queue exhausted, reload seamlessly
-          loadVideoQueue();
-        }
+        
+        // Check if we need to reload queue
+        setTimeout(() => {
+          const nextVideo = getCurrentVideo();
+          if (!nextVideo) {
+            console.log('No next video, triggering reload...');
+            loadVideoQueue();
+          }
+        }, 100);
       }, 500);
 
     } catch (error: any) {
@@ -175,10 +187,15 @@ export default function ViewTab() {
     // Silent skip without confirmation
     setStatusMessage('Skipping video...');
     moveToNextVideo();
-    const nextVideo = getCurrentVideo();
-    if (!nextVideo) {
-      loadVideoQueue();
-    }
+    
+    // Check if we need to reload queue
+    setTimeout(() => {
+      const nextVideo = getCurrentVideo();
+      if (!nextVideo) {
+        console.log('No next video after skip, triggering reload...');
+        loadVideoQueue();
+      }
+    }, 100);
   };
 
   const handleVideoUnplayable = async () => {
@@ -188,11 +205,14 @@ export default function ViewTab() {
     // Remove the unplayable video and move to next
     await removeCurrentVideo();
     
-    const nextVideo = getCurrentVideo();
-    if (!nextVideo) {
-      // No more videos, reload queue
-      loadVideoQueue();
-    }
+    // Check if we need to reload queue
+    setTimeout(() => {
+      const nextVideo = getCurrentVideo();
+      if (!nextVideo) {
+        console.log('No next video after removal, triggering reload...');
+        loadVideoQueue();
+      }
+    }, 100);
   };
 
   const handleVideoError = (errorMessage: string) => {
