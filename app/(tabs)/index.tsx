@@ -34,8 +34,7 @@ export default function ViewTab() {
     isLoading: isLoadingQueue,
     clearQueue,
     removeCurrentVideo,
-    resetQueue,
-    markVideoAsUnplayable
+    resetQueue
   } = useVideoStore();
   
   const [showMenu, setShowMenu] = useState(false);
@@ -313,38 +312,22 @@ export default function ViewTab() {
   };
 
   const handleVideoUnplayable = async () => {
-    if (!currentVideo) return;
-    
-    console.log('🚨 Video is unplayable, removing from queue and database...');
-    setStatusMessage('Removing unplayable video...');
+    console.log('🚨 Video is unplayable, removing from queue...');
     showToast('Removed unplayable video');
     
-    try {
-      // Mark video as unplayable in database and remove from queue
-      await markVideoAsUnplayable(currentVideo.youtube_url, 'NOT_EMBEDDABLE');
-      
-      // Add delay to allow database changes to propagate before reloading
-      setTimeout(() => {
-        const nextVideo = getCurrentVideo();
-        if (!nextVideo) {
-          console.log('🔄 No next video after removal, triggering reload...');
-          loadVideoQueue();
-        } else {
-          console.log('✅ Next video ready after removal:', nextVideo.youtube_url);
-        }
-      }, 500); // 500ms delay to allow database propagation
-      
-    } catch (error) {
-      console.error('❌ Error handling unplayable video:', error);
-      // Fallback: just move to next video
-      moveToNextVideo();
-      setTimeout(() => {
-        const nextVideo = getCurrentVideo();
-        if (!nextVideo) {
-          loadVideoQueue();
-        }
-      }, 100);
-    }
+    // Remove the unplayable video and move to next
+    await removeCurrentVideo();
+    
+    // Check if we need to reload queue
+    setTimeout(() => {
+      const nextVideo = getCurrentVideo();
+      if (!nextVideo) {
+        console.log('🔄 No next video after removal, triggering reload...');
+        loadVideoQueue();
+      } else {
+        console.log('✅ Next video ready after removal:', nextVideo.youtube_url);
+      }
+    }, 100);
   };
 
   const handleVideoError = (errorMessage: string) => {
@@ -355,7 +338,7 @@ export default function ViewTab() {
     
     // Auto-skip after 5 seconds
     setTimeout(() => {
-      handleVideoSkip();
+      handleVideoUnplayable();
     }, 5000);
   };
 
