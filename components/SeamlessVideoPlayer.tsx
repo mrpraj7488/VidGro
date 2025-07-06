@@ -57,12 +57,15 @@ export default function SeamlessVideoPlayer({
   const [isMarkedInactive, setIsMarkedInactive] = useState(false);
   const [skipReason, setSkipReason] = useState<string>('');
   const [autoPlayStarted, setAutoPlayStarted] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
   const webviewRef = useRef<WebView>(null);
   const { handleVideoError, addToBlacklist } = useVideoStore();
-  const errorTimeoutDuration = 3000; // 3 seconds timeout
+  const errorTimeoutDuration = 5000; // 5 seconds timeout
+  const maxRetries = 2;
 
   const showToast = (message: string) => {
     if (Platform.OS === 'android') {
@@ -140,7 +143,7 @@ export default function SeamlessVideoPlayer({
     }
   }, [isMarkedInactive, addToBlacklist]);
 
-  // Create optimized HTML content with instant auto-play
+  // Create optimized HTML content with enhanced error handling and retry logic
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -167,11 +170,21 @@ export default function SeamlessVideoPlayer({
           color: white;
           text-align: center;
           padding: 20px;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          z-index: 1000;
         }
         .error {
           color: #ff4757;
           text-align: center;
           padding: 20px;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          z-index: 1000;
         }
       </style>
     </head>
@@ -181,7 +194,7 @@ export default function SeamlessVideoPlayer({
       <div id="error" class="error" style="display: none;"></div>
       
       <script>
-        console.log('Initializing instant video player for video ID: ${youtubeVideoId}');
+        console.log('Initializing enhanced video player for video ID: ${youtubeVideoId}');
         
         var player;
         var isPlayerReady = false;
@@ -190,57 +203,247 @@ export default function SeamlessVideoPlayer({
         var hasCompleted = false;
         var autoPlayStarted = false;
         var progressCheckInterval;
+        var loadingTimeoutId;
+        var retryAttempt = ${retryCount};
+        var maxRetries = ${maxRetries};
+        var hasTimedOut = false;
+        var isLiveVideo = false;
+        var hasError = false;
 
-        // Create iframe directly for instant loading
-        function createInstantPlayer() {
-          const iframe = document.createElement('iframe');
-          iframe.id = 'youtube-iframe';
-          iframe.src = 'https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&controls=0&modestbranding=1&showinfo=0&rel=0&fs=0&disablekb=1&iv_load_policy=3&enablejsapi=1&origin=' + encodeURIComponent(window.location.origin);
-          iframe.style.width = '100%';
-          iframe.style.height = '100%';
-          iframe.style.border = 'none';
-          iframe.allow = 'autoplay; encrypted-media';
-          iframe.allowFullscreen = false;
-          
-          iframe.onload = function() {
-            console.log('Iframe loaded, starting instant playback');
-            document.getElementById('loading').style.display = 'none';
-            isPlayerReady = true;
-            autoPlayStarted = true;
-            
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'PLAYER_READY',
-              videoId: '${youtubeVideoId}',
-              autoPlay: true
-            }));
-            
-            // Start progress tracking immediately
-            startProgressTracking();
-            
-            // Simulate playing state
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'STATE_CHANGE',
-              state: 1,
-              stateName: 'PLAYING'
-            }));
-          };
-          
-          iframe.onerror = function() {
-            console.error('Iframe failed to load - video likely not embeddable');
+        // Set loading timeout (5 seconds)
+        loadingTimeoutId = setTimeout(function() {
+          if (!isPlayerReady && !hasTimedOut && !hasError) {
+            hasTimedOut = true;
+            console.log('Loading timeout reached after 5 seconds');
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
-            document.getElementById('error').textContent = 'Video not embeddable';
+            document.getElementById('error').textContent = 'Video unavailable, skipping...';
             
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_UNPLAYABLE',
-              error: 'IFRAME_LOAD_FAILED',
-              message: 'Video iframe failed to load - not embeddable',
-              errorType: 'NOT_EMBEDDABLE',
+              error: 'LOADING_TIMEOUT',
+              message: 'Video failed to load within 5 seconds',
+              errorType: 'TIMEOUT',
               isEmbeddingError: true
             }));
+          }
+        }, 5000);
+
+        // Load YouTube IFrame API with enhanced error handling
+        function loadYouTubeAPI() {
+          var tag = document.createElement('script');
+          tag.src = "https://www.youtube.com/iframe_api";
+          tag.onerror = function() {
+            console.error('Failed to load YouTube IFrame API - possible HTTP 502');
+            clearTimeout(loadingTimeoutId);
+            hasError = true;
+            
+            if (retryAttempt < maxRetries) {
+              console.log('HTTP 502, retrying... (' + (retryAttempt + 1) + '/' + maxRetries + ')');
+              document.getElementById('error').style.display = 'block';
+              document.getElementById('error').textContent = 'HTTP 502, retrying...';
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'RETRY_NEEDED',
+                error: 'HTTP_502',
+                message: 'HTTP 502 error, retrying...',
+                retryAttempt: retryAttempt + 1
+              }));
+            } else {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('error').style.display = 'block';
+              document.getElementById('error').textContent = 'Video unavailable, skipping...';
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'VIDEO_UNPLAYABLE',
+                error: 'API_LOAD_FAILED',
+                message: 'Failed to load YouTube API after retries',
+                errorType: 'API_ERROR',
+                isEmbeddingError: true
+              }));
+            }
           };
           
-          document.getElementById('player').appendChild(iframe);
+          var firstScriptTag = document.getElementsByTagName('script')[0];
+          firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+
+        // Initialize API loading
+        loadYouTubeAPI();
+
+        function onYouTubeIframeAPIReady() {
+          console.log('YouTube IFrame API ready');
+          
+          player = new YT.Player('player', {
+            height: '100%',
+            width: '100%',
+            videoId: '${youtubeVideoId}',
+            playerVars: {
+              'autoplay': 1,
+              'controls': 0,
+              'modestbranding': 1,
+              'showinfo': 0,
+              'rel': 0,
+              'fs': 0,
+              'disablekb': 1,
+              'iv_load_policy': 3,
+              'enablejsapi': 1,
+              'origin': window.location.origin
+            },
+            events: {
+              'onReady': onPlayerReady,
+              'onStateChange': onPlayerStateChange,
+              'onError': onPlayerError
+            }
+          });
+        }
+
+        function onPlayerReady(event) {
+          console.log('Player ready');
+          clearTimeout(loadingTimeoutId);
+          isPlayerReady = true;
+          document.getElementById('loading').style.display = 'none';
+          
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'PLAYER_READY',
+            videoId: '${youtubeVideoId}',
+            autoPlay: true
+          }));
+          
+          // Auto-start playback
+          setTimeout(function() {
+            if (player && player.playVideo) {
+              console.log('Starting auto-playback');
+              player.playVideo();
+            }
+          }, 1000);
+        }
+
+        function onPlayerStateChange(event) {
+          var state = event.data;
+          var stateNames = {
+            '-1': 'UNSTARTED',
+            '0': 'ENDED',
+            '1': 'PLAYING',
+            '2': 'PAUSED',
+            '3': 'BUFFERING',
+            '5': 'CUED'
+          };
+          
+          console.log('Player state changed to:', stateNames[state] || state);
+          
+          // Enhanced live video detection
+          if (state === 3) { // BUFFERING
+            setTimeout(function() {
+              if (player && player.getPlayerState && player.getPlayerState() === 3) {
+                // Check if it's a live video
+                try {
+                  var videoData = player.getVideoData();
+                  if (videoData && videoData.isLive) {
+                    isLiveVideo = true;
+                    console.log('Live video detected');
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error').textContent = 'Live videos not supported';
+                    
+                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'VIDEO_UNPLAYABLE',
+                      error: 'LIVE_VIDEO',
+                      message: 'Live videos are not supported',
+                      errorType: 'LIVE_VIDEO',
+                      isEmbeddingError: true
+                    }));
+                    return;
+                  }
+                } catch (e) {
+                  console.log('Could not check live status:', e);
+                }
+                
+                // If still buffering after 5 seconds and not live, might be unplayable
+                setTimeout(function() {
+                  if (player && player.getPlayerState && player.getPlayerState() === 3) {
+                    console.log('Video stuck in buffering state - likely unplayable');
+                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'VIDEO_UNPLAYABLE',
+                      error: 'STUCK_BUFFERING',
+                      message: 'Video stuck in buffering state',
+                      errorType: 'BUFFERING_ERROR',
+                      isEmbeddingError: true
+                    }));
+                  }
+                }, 5000);
+              }
+            }, 3000);
+          }
+          
+          if (state === 1) { // PLAYING
+            console.log('Video started playing successfully');
+            autoPlayStarted = true;
+            startProgressTracking();
+            
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'STATE_CHANGE',
+              state: state,
+              stateName: stateNames[state]
+            }));
+          } else if (state === 2) { // PAUSED
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'STATE_CHANGE',
+              state: state,
+              stateName: stateNames[state]
+            }));
+          } else if (state === 0) { // ENDED
+            console.log('Video ended naturally');
+            if (!hasCompleted) {
+              hasCompleted = true;
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'VIDEO_COMPLETED',
+                currentTime: maxDuration
+              }));
+            }
+          }
+        }
+
+        function onPlayerError(event) {
+          console.error('Player error:', event.data);
+          clearTimeout(loadingTimeoutId);
+          hasError = true;
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('error').style.display = 'block';
+          
+          var errorMessages = {
+            2: 'Invalid video ID',
+            5: 'HTML5 player error',
+            100: 'Video not found or private',
+            101: 'Video not allowed to be played in embedded players',
+            150: 'Video not allowed to be played in embedded players'
+          };
+          
+          var errorMessage = errorMessages[event.data] || 'Video playback error';
+          document.getElementById('error').textContent = errorMessage;
+          
+          // Check if we should retry for certain errors
+          if ((event.data === 5 || !event.data) && retryAttempt < maxRetries) {
+            console.log('Retrying due to error:', errorMessage);
+            setTimeout(function() {
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'RETRY_NEEDED',
+                error: event.data,
+                message: errorMessage,
+                retryAttempt: retryAttempt + 1
+              }));
+            }, 2000);
+          } else {
+            // Determine if it's an embedding error
+            var isEmbeddingError = event.data === 101 || event.data === 150 || event.data === 100;
+            
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'VIDEO_UNPLAYABLE',
+              error: event.data,
+              message: errorMessage,
+              errorType: isEmbeddingError ? 'NOT_EMBEDDABLE' : 'PLAYBACK_ERROR',
+              isEmbeddingError: isEmbeddingError
+            }));
+          }
         }
 
         function startProgressTracking() {
@@ -248,7 +451,7 @@ export default function SeamlessVideoPlayer({
             clearInterval(progressCheckInterval);
           }
           
-          console.log('Starting instant progress tracking');
+          console.log('Starting progress tracking');
           
           progressCheckInterval = setInterval(function() {
             if (isPlayerReady && !hasCompleted && autoPlayStarted) {
@@ -258,6 +461,9 @@ export default function SeamlessVideoPlayer({
               if (currentTime >= maxDuration && !hasCompleted) {
                 hasCompleted = true;
                 console.log('Video completed at', currentTime, 'seconds');
+                if (progressCheckInterval) {
+                  clearInterval(progressCheckInterval);
+                }
                 window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'VIDEO_COMPLETED',
                   currentTime: currentTime
@@ -273,30 +479,19 @@ export default function SeamlessVideoPlayer({
           }, 1000);
         }
 
-        // Start instant player creation
-        createInstantPlayer();
-
         // Expose control functions
         window.playVideo = function() {
-          if (isPlayerReady) {
+          if (isPlayerReady && player && player.playVideo) {
             autoPlayStarted = true;
             console.log('Manual play triggered');
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'STATE_CHANGE',
-              state: 1,
-              stateName: 'PLAYING'
-            }));
+            player.playVideo();
           }
         };
 
         window.pauseVideo = function() {
-          if (isPlayerReady) {
+          if (isPlayerReady && player && player.pauseVideo) {
             console.log('Manual pause triggered');
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'STATE_CHANGE',
-              state: 2,
-              stateName: 'PAUSED'
-            }));
+            player.pauseVideo();
           }
         };
 
@@ -316,6 +511,9 @@ export default function SeamlessVideoPlayer({
         window.addEventListener('beforeunload', function() {
           if (progressCheckInterval) {
             clearInterval(progressCheckInterval);
+          }
+          if (loadingTimeoutId) {
+            clearTimeout(loadingTimeoutId);
           }
         });
       </script>
@@ -351,6 +549,8 @@ export default function SeamlessVideoPlayer({
     setIsMarkedInactive(false);
     setSkipReason('');
     setAutoPlayStarted(false);
+    setRetryCount(0);
+    setLoadingTimeout(false);
     progressValue.value = 0;
   }, [videoId]);
 
@@ -375,7 +575,7 @@ export default function SeamlessVideoPlayer({
     console.log('🚨 Video error detected:', errorMessage, 'for video:', youtubeVideoId, 'type:', errorType, 'isEmbeddingError:', isEmbeddingError);
     
     // Critical errors that indicate unplayable videos
-    const criticalErrors = ['NOT_EMBEDDABLE', 'IFRAME_LOAD_FAILED', 'PAGE_ERROR'];
+    const criticalErrors = ['NOT_EMBEDDABLE', 'LOADING_TIMEOUT', 'API_LOAD_FAILED', 'LIVE_VIDEO', 'STUCK_BUFFERING', 'PAGE_ERROR'];
     const shouldMarkInactive = isEmbeddingError || criticalErrors.includes(errorType);
     
     if (youtubeVideoId && !isMarkedInactive && shouldMarkInactive) {
@@ -393,7 +593,7 @@ export default function SeamlessVideoPlayer({
     // Immediate skip for unplayable videos
     setTimeout(() => {
       if (shouldMarkInactive) {
-        showToast(`Removed unplayable video: ${youtubeVideoId}`);
+        showToast(`Video unavailable, skipping...`);
         onVideoUnplayable();
       } else {
         showToast('Video error, skipping...');
@@ -414,6 +614,7 @@ export default function SeamlessVideoPlayer({
           console.log('Player ready message received for video:', data.videoId || youtubeVideoId);
           setIsLoaded(true);
           setPlayerError(null);
+          setLoadingTimeout(false);
           if (data.autoPlay) {
             setAutoPlayStarted(true);
             setIsPlaying(true);
@@ -464,6 +665,25 @@ export default function SeamlessVideoPlayer({
           }
           break;
           
+        case 'RETRY_NEEDED':
+          if (retryCount < maxRetries) {
+            console.log(`Retrying video load (attempt ${data.retryAttempt})`);
+            showToast(`HTTP 502, retrying... (${data.retryAttempt}/${maxRetries})`);
+            setRetryCount(data.retryAttempt);
+            
+            // Retry after 2 seconds
+            setTimeout(() => {
+              // Force webview reload
+              if (webviewRef.current) {
+                webviewRef.current.reload();
+              }
+            }, 2000);
+          } else {
+            showToast('Video unavailable, skipping...');
+            handleVideoErrorInternal('Video failed to load after multiple attempts', 'MAX_RETRIES_REACHED', true);
+          }
+          break;
+          
         case 'VIDEO_UNPLAYABLE':
           console.log('Video unplayable received:', data.message, 'for video:', youtubeVideoId, 'errorType:', data.errorType, 'isEmbeddingError:', data.isEmbeddingError);
           handleVideoErrorInternal(data.message || 'Video unplayable', data.errorType || 'UNPLAYABLE', data.isEmbeddingError || false);
@@ -473,7 +693,7 @@ export default function SeamlessVideoPlayer({
       console.error('Error parsing WebView message:', error);
       handleVideoErrorInternal('Failed to parse video message', 'MESSAGE_PARSE_ERROR', false);
     }
-  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoErrorInternal, youtubeVideoId, autoPlayStarted]);
+  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoErrorInternal, youtubeVideoId, autoPlayStarted, retryCount, maxRetries]);
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -542,11 +762,14 @@ export default function SeamlessVideoPlayer({
     <View style={styles.container}>
       {/* WebView Video Player */}
       <View style={styles.playerContainer}>
-        {!isLoaded && (
+        {!isLoaded && !loadingTimeout && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.loadingText}>Loading video...</Text>
             <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
+            {retryCount > 0 && (
+              <Text style={styles.loadingSubtext}>Retry attempt: {retryCount}/{maxRetries}</Text>
+            )}
           </View>
         )}
         
@@ -580,10 +803,12 @@ export default function SeamlessVideoPlayer({
         </View>
         
         {/* Error Overlay */}
-        {playerError && (
+        {(playerError || loadingTimeout) && (
           <View style={styles.errorOverlay}>
             <AlertTriangle color="#FF4757" size={24} />
-            <Text style={styles.errorText}>Loading next video...</Text>
+            <Text style={styles.errorText}>
+              {loadingTimeout ? 'Video unavailable, skipping...' : 'Loading next video...'}
+            </Text>
             <Text style={styles.errorSubtext}>{playerError}</Text>
             {skipReason && (
               <Text style={styles.skipReasonText}>{skipReason}</Text>
@@ -622,7 +847,7 @@ export default function SeamlessVideoPlayer({
         {/* Auto-play Status */}
         <View style={styles.autoPlayStatus}>
           <Text style={styles.autoPlayText}>
-            {autoPlayStarted ? '▶️ Auto-playing' : '⏳ Loading...'}
+            {autoPlayStarted ? '▶️ Auto-playing' : loadingTimeout ? '❌ Failed to load' : '⏳ Loading...'}
           </Text>
         </View>
 
@@ -631,7 +856,7 @@ export default function SeamlessVideoPlayer({
           <TouchableOpacity 
             style={styles.controlButton}
             onPress={handlePlayPause}
-            disabled={!isLoaded || playerError !== null}
+            disabled={!isLoaded || playerError !== null || loadingTimeout}
           >
             {isPlaying ? (
               <Pause color="#FF4757" size={16} />
