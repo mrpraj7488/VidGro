@@ -16,16 +16,19 @@ interface VideoStore {
   lastFetchTime: number;
   cachedVideoIds: string[];
   isResetting: boolean;
+  errorCount: number;
   fetchVideos: (userId: string) => Promise<void>;
   getCurrentVideo: () => Video | null;
   moveToNextVideo: () => void;
   clearQueue: () => void;
   removeCurrentVideo: () => void;
   resetQueue: (userId: string) => Promise<void>;
+  handleVideoError: (videoId: string, errorType: string) => Promise<void>;
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const QUEUE_SIZE = 10;
+const MAX_ERROR_COUNT = 3;
 
 export const useVideoStore = create<VideoStore>((set, get) => ({
   videoQueue: [],
@@ -34,6 +37,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
   lastFetchTime: 0,
   cachedVideoIds: [],
   isResetting: false,
+  errorCount: 0,
 
   fetchVideos: async (userId: string) => {
     const now = Date.now();
@@ -49,7 +53,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       return;
     }
 
-    set({ isLoading: true });
+    set({ isLoading: true, errorCount: 0 });
 
     try {
       console.log('Fetching video queue for user:', userId);
@@ -68,11 +72,11 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
       console.log('User has watched videos:', watchedVideoIds.length);
       
-      // Get all active videos that are not owned by the user
+      // CRITICAL: Get only ACTIVE videos (isActive=true equivalent)
       let query = supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id')
-        .eq('status', 'active')
+        .eq('status', 'active') // Only active videos
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(QUEUE_SIZE * 3); // Get more to filter from
@@ -85,12 +89,13 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       if (!allVideos || allVideos.length === 0) {
-        console.log('No videos available in database');
+        console.log('No active videos available in database');
         set({ 
           videoQueue: [], 
           currentVideoIndex: 0,
           isLoading: false,
-          lastFetchTime: now 
+          lastFetchTime: now,
+          errorCount: 0
         });
         return;
       }
@@ -115,14 +120,14 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         }));
 
       if (availableVideos.length === 0) {
-        console.log('No available videos with remaining views, will reset queue');
+        console.log('No available active videos with remaining views, will reset queue');
         // Instead of setting empty queue, trigger reset
         set({ isLoading: false });
         await get().resetQueue(userId);
         return;
       }
 
-      console.log(`Fetched ${availableVideos.length} videos for queue`);
+      console.log(`Fetched ${availableVideos.length} active videos for queue`);
       console.log('Sample video data:', availableVideos[0]);
       
       // Cache video IDs for performance
@@ -133,12 +138,13 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         currentVideoIndex: 0,
         isLoading: false,
         lastFetchTime: now,
-        cachedVideoIds: videoIds
+        cachedVideoIds: videoIds,
+        errorCount: 0
       });
 
     } catch (error) {
       console.error('Error in fetchVideos:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, errorCount: 0 });
       throw error;
     }
   },
@@ -153,14 +159,15 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     const nextIndex = currentVideoIndex + 1;
     
     if (nextIndex < videoQueue.length) {
-      set({ currentVideoIndex: nextIndex });
+      set({ currentVideoIndex: nextIndex, errorCount: 0 });
     } else {
       // Queue exhausted, clear it to trigger reload
       console.log('Queue exhausted, clearing for reload...');
       set({ 
         videoQueue: [], 
         currentVideoIndex: 0,
-        lastFetchTime: 0 // Force refresh on next fetch
+        lastFetchTime: 0, // Force refresh on next fetch
+        errorCount: 0
       });
     }
   },
@@ -173,14 +180,21 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     
     console.log('Removing unplayable video from queue:', currentVideo.id);
     
-    // Remove from Supabase by marking as paused
+    // CRITICAL: Mark video as paused in Supabase (permanent exclusion)
     try {
-      await supabase
+      const { error } = await supabase
         .from('videos')
-        .update({ status: 'paused' })
+        .update({ 
+          status: 'paused',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', currentVideo.id);
       
-      console.log('Video marked as paused in Supabase:', currentVideo.id);
+      if (error) {
+        console.error('Error marking video as paused:', error);
+      } else {
+        console.log('✅ Video marked as paused in Supabase:', currentVideo.id);
+      }
     } catch (error) {
       console.error('Error updating video status:', error);
     }
@@ -193,15 +207,50 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       set({ 
         videoQueue: [], 
         currentVideoIndex: 0,
-        lastFetchTime: 0
+        lastFetchTime: 0,
+        errorCount: 0
       });
     } else {
       // Adjust index if needed
       const newIndex = currentVideoIndex >= newQueue.length ? 0 : currentVideoIndex;
       set({ 
         videoQueue: newQueue,
-        currentVideoIndex: newIndex
+        currentVideoIndex: newIndex,
+        errorCount: 0
       });
+    }
+  },
+
+  handleVideoError: async (videoId: string, errorType: string) => {
+    const { errorCount } = get();
+    const newErrorCount = errorCount + 1;
+    
+    console.log(`🚨 Video error for ${videoId}: ${errorType} (count: ${newErrorCount})`);
+    
+    // Log error with toast message
+    if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+      // Mobile environment
+      console.log(`Video unavailable, skipping... (${errorType})`);
+    } else {
+      // Web environment
+      console.log(`Video unavailable, skipping... (${errorType})`);
+    }
+    
+    // Remove problematic video immediately
+    await get().removeCurrentVideo();
+    
+    // If too many errors, reset the queue
+    if (newErrorCount >= MAX_ERROR_COUNT) {
+      console.log('Too many video errors, resetting queue...');
+      set({ errorCount: 0 });
+      // Clear queue to force fresh fetch
+      set({ 
+        videoQueue: [], 
+        currentVideoIndex: 0,
+        lastFetchTime: 0
+      });
+    } else {
+      set({ errorCount: newErrorCount });
     }
   },
 
@@ -214,16 +263,16 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       return;
     }
 
-    console.log('Resetting video queue for seamless looping...');
+    console.log('🔄 Resetting video queue for seamless looping...');
     
-    set({ isResetting: true });
+    set({ isResetting: true, errorCount: 0 });
 
     try {
-      // Strategy 1: Get all active videos and filter client-side
+      // CRITICAL: Only get ACTIVE videos (status = 'active')
       const { data: allVideos, error } = await supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views')
-        .eq('status', 'active')
+        .eq('status', 'active') // ONLY ACTIVE VIDEOS
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(QUEUE_SIZE * 2); // Get more videos to filter from
@@ -240,7 +289,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         );
 
         if (availableVideos.length > 0) {
-          console.log(`Found ${availableVideos.length} videos with remaining views for reset`);
+          console.log(`✅ Found ${availableVideos.length} active videos with remaining views for reset`);
           
           const videoQueue = availableVideos
             .slice(0, QUEUE_SIZE) // Limit to queue size
@@ -257,14 +306,16 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
             currentVideoIndex: 0,
             lastFetchTime: Date.now(),
             cachedVideoIds: videoQueue.map(v => v.id),
-            isResetting: false
+            isResetting: false,
+            errorCount: 0
           });
 
+          console.log('🎯 Queue reset complete with active videos only');
           return;
         }
 
         // If no videos with remaining views, use any active videos for seamless looping
-        console.log('No videos with remaining views, using any active videos for seamless looping...');
+        console.log('No active videos with remaining views, using any active videos for seamless looping...');
         
         const videoQueue = allVideos
           .slice(0, QUEUE_SIZE) // Limit to queue size
@@ -281,25 +332,28 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           currentVideoIndex: 0,
           lastFetchTime: Date.now(),
           cachedVideoIds: videoQueue.map(v => v.id),
-          isResetting: false
+          isResetting: false,
+          errorCount: 0
         });
 
+        console.log('🎯 Queue reset complete with any active videos');
         return;
       }
 
-      // No videos available at all
-      console.log('No videos available for reset');
+      // No active videos available at all
+      console.log('❌ No active videos available for reset');
       set({
         videoQueue: [],
         currentVideoIndex: 0,
         lastFetchTime: Date.now(),
         cachedVideoIds: [],
-        isResetting: false
+        isResetting: false,
+        errorCount: 0
       });
 
     } catch (error) {
       console.error('Error in resetQueue:', error);
-      set({ isResetting: false });
+      set({ isResetting: false, errorCount: 0 });
     }
   },
 
@@ -309,7 +363,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       currentVideoIndex: 0,
       lastFetchTime: 0,
       cachedVideoIds: [],
-      isResetting: false
+      isResetting: false,
+      errorCount: 0
     });
   },
 }));

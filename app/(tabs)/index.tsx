@@ -77,35 +77,35 @@ export default function ViewTab() {
       setLoading(true);
       setError(null);
       setSystemStatus('healthy');
-      setStatusMessage('Loading videos...');
+      setStatusMessage('Loading active videos...');
       
-      console.log('Loading video queue for user:', user.id);
+      console.log('🔄 Loading video queue for user:', user.id);
       
       await fetchVideos(user.id);
       
       const video = getCurrentVideo();
       if (!video) {
         // No videos available, try reset
-        console.log('No videos in queue, attempting reset...');
-        setStatusMessage('Refreshing video queue...');
+        console.log('No active videos in queue, attempting reset...');
+        setStatusMessage('Refreshing active video queue...');
         
         await resetQueue(user.id);
         
         // Check again after reset
         const newVideo = getCurrentVideo();
         if (!newVideo) {
-          setError('No videos available for viewing at the moment.');
+          setError('No active videos available for viewing at the moment.');
           setSystemStatus('warning');
-          setStatusMessage('No videos available');
+          setStatusMessage('No active videos available');
         } else {
           setSystemStatus('healthy');
           setStatusMessage('Ready to watch');
-          console.log('Video loaded after reset:', newVideo);
+          console.log('✅ Active video loaded after reset:', newVideo);
         }
       } else {
         setSystemStatus('healthy');
         setStatusMessage('Ready to watch');
-        console.log('Current video loaded:', video);
+        console.log('✅ Current active video loaded:', video);
       }
       
     } catch (error: any) {
@@ -125,7 +125,7 @@ export default function ViewTab() {
     }
 
     try {
-      console.log('Completing video silently:', currentVideo.id);
+      console.log('🎯 Completing video silently:', currentVideo.id);
       setStatusMessage('Processing completion...');
 
       // Check if user has already watched this video
@@ -243,7 +243,7 @@ export default function ViewTab() {
         }
       }
 
-      console.log('Video completion processed successfully');
+      console.log('✅ Video completion processed successfully');
 
       // Silently refresh profile
       await refreshProfile();
@@ -271,7 +271,7 @@ export default function ViewTab() {
             loadVideoQueue();
           }
         }, 100);
-      }, 500);
+      }, 100); // Instant transition
 
     } catch (error: any) {
       console.error('Error completing video:', error);
@@ -297,7 +297,7 @@ export default function ViewTab() {
   };
 
   const handleVideoUnplayable = async () => {
-    console.log('Video is unplayable, removing from queue...');
+    console.log('🚨 Video is unplayable, removing from queue...');
     showToast('Video unavailable, skipping...');
     
     // Remove the unplayable video and move to next
@@ -427,8 +427,8 @@ export default function ViewTab() {
 
         <View style={styles.loadingContainer}>
           <RefreshCw color="#FF4757" size={32} />
-          <Text style={styles.loadingText}>Loading videos...</Text>
-          <Text style={styles.loadingSubtext}>Please wait...</Text>
+          <Text style={styles.loadingText}>Loading active videos...</Text>
+          <Text style={styles.loadingSubtext}>Filtering for embeddable content...</Text>
         </View>
       </View>
     );
