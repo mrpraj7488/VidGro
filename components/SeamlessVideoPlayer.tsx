@@ -67,6 +67,7 @@ export default function SeamlessVideoPlayer({
   const [skipReason, setSkipReason] = useState<string>('');
   const [playabilityConfirmed, setPlayabilityConfirmed] = useState(false);
   const [validationStage, setValidationStage] = useState<string>('Initializing...');
+  const [autoPlayStarted, setAutoPlayStarted] = useState(false);
   
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
@@ -76,8 +77,8 @@ export default function SeamlessVideoPlayer({
   const { handleVideoError, markVideoAsUnplayable, addToBlacklist } = useVideoStore();
   const maxRetries = 0; // No retries for faster skipping
   const errorTimeoutDuration = 3000; // Reduced to 3 seconds timeout
-  const maxStuckCount = 3; // Max times progress can be stuck before action
-  const validationTimeoutDuration = 10000; // 10 seconds to validate playability
+  const maxStuckCount = 2; // Reduced stuck count for faster recovery
+  const validationTimeoutDuration = 8000; // Reduced validation timeout
 
   const showToast = (message: string) => {
     if (Platform.OS === 'android') {
@@ -162,7 +163,7 @@ export default function SeamlessVideoPlayer({
     }
   }, [isMarkedInactive, addToBlacklist]);
 
-  // Enhanced HTML content with better validation and error detection
+  // Enhanced HTML content with optimized validation and reduced buffering
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -250,12 +251,13 @@ export default function SeamlessVideoPlayer({
         var maxRetries = 0; // No retries for faster skipping
         var isBuffering = false;
         var stuckCount = 0;
-        var maxStuckCount = 3;
+        var maxStuckCount = 2; // Reduced for faster recovery
         var progressCheckInterval;
-        var autoPlayAttempted = false;
         var runtimeValidationDone = false;
         var playerValidated = false;
         var playabilityConfirmed = false;
+        var validationInProgress = false;
+        var autoPlayStarted = false;
 
         function onYouTubeIframeAPIReady() {
           console.log('YouTube API ready, creating player for video ID: ${youtubeVideoId}');
@@ -267,7 +269,7 @@ export default function SeamlessVideoPlayer({
               width: '100%',
               videoId: '${youtubeVideoId}',
               playerVars: {
-                'autoplay': 0, // Don't autoplay initially
+                'autoplay': 0, // Don't autoplay initially to reduce buffering
                 'controls': 0,
                 'modestbranding': 1,
                 'rel': 0,
@@ -315,21 +317,22 @@ export default function SeamlessVideoPlayer({
             videoId: '${youtubeVideoId}'
           }));
           
-          // Start validation process with delay
+          // Start optimized validation process with shorter delay
           setTimeout(function() {
-            performRuntimeValidation();
-          }, 1000); // Give player more time to initialize
+            performOptimizedValidation();
+          }, 500); // Reduced delay
           
           // Start enhanced progress tracking
           startProgressTracking();
         }
 
-        // Enhanced runtime validation function
-        function performRuntimeValidation() {
-          if (runtimeValidationDone) return;
+        // Optimized validation function with minimal buffering
+        function performOptimizedValidation() {
+          if (runtimeValidationDone || validationInProgress) return;
+          validationInProgress = true;
           runtimeValidationDone = true;
           
-          console.log('Performing runtime validation for video: ${youtubeVideoId}');
+          console.log('Performing optimized validation for video: ${youtubeVideoId}');
           updateValidationStage('Validating video...');
           
           try {
@@ -365,17 +368,21 @@ export default function SeamlessVideoPlayer({
               message: 'Video is playable'
             }));
             
-            // Test playback capability with a small delay
+            // Optimized playback test - minimal buffering approach
             setTimeout(function() {
               try {
                 updateValidationStage('Testing playback...');
-                // Try to play the video to confirm it's truly playable
+                
+                // Quick playback test with immediate pause to minimize buffering
                 player.playVideo();
                 
-                // Check state after play attempt
+                // Very short test duration to reduce buffering
                 setTimeout(function() {
                   var currentState = player.getPlayerState();
-                  console.log('Player state after play attempt:', currentState);
+                  console.log('Player state after quick play test:', currentState);
+                  
+                  // Immediately pause to stop buffering
+                  player.pauseVideo();
                   
                   if (currentState === 1 || currentState === 3) { // Playing or buffering
                     playabilityConfirmed = true;
@@ -387,9 +394,6 @@ export default function SeamlessVideoPlayer({
                       videoId: '${youtubeVideoId}',
                       message: 'Video playability confirmed'
                     }));
-                    
-                    // Pause it back since this was just a test
-                    player.pauseVideo();
                   } else if (currentState === -1) {
                     console.error('Video failed to start - likely embedding issue');
                     updateValidationStage('❌ Video failed to start');
@@ -401,7 +405,9 @@ export default function SeamlessVideoPlayer({
                       isEmbeddingError: true
                     }));
                   }
-                }, 2000); // Wait 2 seconds for play attempt
+                  
+                  validationInProgress = false;
+                }, 800); // Very short test - 0.8 seconds
                 
               } catch (error) {
                 console.error('Error in playback test:', error);
@@ -413,11 +419,12 @@ export default function SeamlessVideoPlayer({
                   errorType: 'VALIDATION_ERROR',
                   isEmbeddingError: false
                 }));
+                validationInProgress = false;
               }
-            }, 1000); // Wait 1 second before testing playback
+            }, 300); // Reduced delay before testing
             
           } catch (error) {
-            console.error('Error in performRuntimeValidation:', error);
+            console.error('Error in performOptimizedValidation:', error);
             updateValidationStage('❌ Validation exception');
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_UNPLAYABLE',
@@ -426,6 +433,7 @@ export default function SeamlessVideoPlayer({
               errorType: 'VALIDATION_EXCEPTION',
               isEmbeddingError: false
             }));
+            validationInProgress = false;
           }
         }
 
@@ -441,16 +449,17 @@ export default function SeamlessVideoPlayer({
               try {
                 var newTime = player.getCurrentTime();
                 
-                // Check if progress is stuck
+                // Optimized stuck progress detection
                 if (Math.abs(newTime - lastReportedTime) < 0.1 && newTime > 0) {
                   stuckCount++;
                   console.log('Progress stuck at', newTime, 'count:', stuckCount);
                   
                   if (stuckCount >= maxStuckCount) {
-                    console.log('Progress stuck too long, attempting to resume playback');
+                    console.log('Progress stuck, attempting gentle resume');
                     try {
-                      // Try to resume playback
-                      if (player.getPlayerState() !== 1) { // Not playing
+                      // Gentle resume - only if not already playing
+                      var currentState = player.getPlayerState();
+                      if (currentState !== 1) { // Not playing
                         player.playVideo();
                       }
                       // Reset stuck count after intervention
@@ -517,10 +526,13 @@ export default function SeamlessVideoPlayer({
           
           console.log('Player state changed to:', stateNames[state] || state);
           
-          // Handle buffering state
+          // Handle buffering state with reduced logging
           if (state === 3) { // BUFFERING
             isBuffering = true;
-            console.log('Video buffering...');
+            // Only log buffering if it's not during validation
+            if (!validationInProgress) {
+              console.log('Video buffering...');
+            }
           } else {
             isBuffering = false;
           }
@@ -578,6 +590,7 @@ export default function SeamlessVideoPlayer({
             console.log('Playing video');
             try {
               player.playVideo();
+              autoPlayStarted = true;
             } catch (error) {
               console.error('Error playing video:', error);
             }
@@ -689,6 +702,7 @@ export default function SeamlessVideoPlayer({
     setSkipReason('');
     setPlayabilityConfirmed(false);
     setValidationStage('Initializing...');
+    setAutoPlayStarted(false);
     progressValue.value = 0;
     
     if (progressIntervalRef.current) {
@@ -796,7 +810,7 @@ export default function SeamlessVideoPlayer({
             setErrorTimeout(null);
           }
           
-          // Start validation timeout - longer timeout for better detection
+          // Start validation timeout - shorter timeout for better UX
           const timeout = setTimeout(() => {
             if (!playerValidated && !playabilityConfirmed) {
               console.log('⏰ Player validation timeout, assuming playable (no errors detected)');
@@ -834,6 +848,7 @@ export default function SeamlessVideoPlayer({
             setIsBuffering(false);
             if (!hasStarted) {
               setHasStarted(true);
+              setAutoPlayStarted(true);
             }
             // Clear error timeout when video starts playing
             if (errorTimeout) {
@@ -844,15 +859,18 @@ export default function SeamlessVideoPlayer({
             setIsPlaying(false);
             setIsBuffering(false);
           } else if (data.state === 3) { // BUFFERING
-            setIsBuffering(true);
-            console.log('Video buffering...');
+            // Only show buffering if user has started watching (not during validation)
+            if (autoPlayStarted) {
+              setIsBuffering(true);
+              console.log('Video buffering...');
+            }
           }
           break;
           
         case 'PROGRESS_UPDATE':
           const newTime = data.currentTime;
           
-          // Check for stuck progress
+          // Optimized stuck progress detection
           if (Math.abs(newTime - lastProgressTime) < 0.1 && newTime > 0) {
             setStuckProgressCount(prev => {
               const newCount = prev + 1;
@@ -927,7 +945,7 @@ export default function SeamlessVideoPlayer({
       console.error('Error parsing WebView message:', error);
       handleVideoErrorInternal('Failed to parse video message', 'MESSAGE_PARSE_ERROR', false);
     }
-  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoErrorInternal, errorTimeout, youtubeVideoId, lastProgressTime, maxStuckCount, playVideo, validationTimeoutDuration, playerValidated, playabilityConfirmed]);
+  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoErrorInternal, errorTimeout, youtubeVideoId, lastProgressTime, maxStuckCount, playVideo, validationTimeoutDuration, playerValidated, playabilityConfirmed, autoPlayStarted]);
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -996,7 +1014,7 @@ export default function SeamlessVideoPlayer({
           setTimeout(() => {
             console.log('⏰ Skip playability check timeout, assuming playable');
             resolve(true); // Default to playable on timeout
-          }, 2000);
+          }, 1500); // Reduced timeout
         });
 
         const isPlayable = await playabilityPromise;
@@ -1137,8 +1155,8 @@ export default function SeamlessVideoPlayer({
           </View>
         )}
 
-        {/* Buffering Overlay */}
-        {isBuffering && isLoaded && (
+        {/* Optimized Buffering Overlay - only show during actual playback */}
+        {isBuffering && isLoaded && autoPlayStarted && (
           <View style={styles.bufferingOverlay}>
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.bufferingText}>Buffering...</Text>
