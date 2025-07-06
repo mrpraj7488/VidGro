@@ -14,8 +14,6 @@ import {
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Play, Pause, SkipForward, Award, Clock, TriangleAlert as AlertTriangle } from 'lucide-react-native';
-import { useVideoStore } from '@/store/videoStore';
-import { supabase } from '@/lib/supabase';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -60,7 +58,6 @@ export default function SeamlessVideoPlayer({
   const [lastProgressTime, setLastProgressTime] = useState(0);
   const [stuckProgressCount, setStuckProgressCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [isMarkedInactive, setIsMarkedInactive] = useState(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [playerValidated, setPlayerValidated] = useState(false);
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -71,11 +68,10 @@ export default function SeamlessVideoPlayer({
   const webviewRef = useRef<WebView>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const stuckCheckRef = useRef<NodeJS.Timeout | null>(null);
-  const { handleVideoError, markVideoAsUnplayable } = useVideoStore();
   const maxRetries = 0; // No retries for faster skipping
-  const errorTimeoutDuration = 5000; // 5 seconds timeout
+  const errorTimeoutDuration = 3000; // Reduced to 3 seconds timeout
   const maxStuckCount = 3; // Max times progress can be stuck before action
-  const validationTimeoutDuration = 5000; // 5 seconds to validate playability
+  const validationTimeoutDuration = 3000; // Reduced to 3 seconds to validate playability
 
   const showToast = (message: string) => {
     if (Platform.OS === 'android') {
@@ -124,93 +120,6 @@ export default function SeamlessVideoPlayer({
   };
 
   const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
-
-  // Mark video as inactive in Supabase (only for unplayable videos)
-  const markVideoInactive = async (videoId: string, reason: string, isUnplayable: boolean = true) => {
-    if (isMarkedInactive) return; // Prevent duplicate calls
-    
-    try {
-      setIsMarkedInactive(true);
-      console.log(`🚨 ${isUnplayable ? 'Marking' : 'NOT marking'} video ${videoId} as inactive due to: ${reason}`);
-      
-      if (isUnplayable) {
-        const { error } = await supabase
-          .from('videos')
-          .update({ 
-            status: 'paused',
-            updated_at: new Date().toISOString()
-          })
-          .eq('youtube_url', videoId); // youtube_url field contains the video ID
-        
-        if (error) {
-          console.error('Error marking video as inactive:', error);
-        } else {
-          console.log(`✅ Video ${videoId} marked as inactive in Supabase`);
-          showToast(`Removed unplayable video: ${videoId}`);
-        }
-      } else {
-        console.log(`✅ Video ${videoId} is playable, skipping without removal`);
-        showToast('Skipped playable video');
-      }
-    } catch (error) {
-      console.error('Error in markVideoInactive:', error);
-    }
-  };
-
-  // Check if video is playable by injecting JavaScript to get player state
-  const checkVideoPlayability = useCallback(async (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if (!webviewRef.current) {
-        resolve(false);
-        return;
-      }
-
-      console.log('🔍 Checking video playability for:', youtubeVideoId);
-      
-      // Inject JavaScript to check player state
-      const checkScript = `
-        (function() {
-          try {
-            if (window.player && window.player.getPlayerState && isPlayerReady) {
-              const state = window.player.getPlayerState();
-              const videoData = window.player.getVideoData();
-              
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'PLAYABILITY_CHECK',
-                playerState: state,
-                hasVideoData: !!videoData && !!videoData.title,
-                videoId: '${youtubeVideoId}'
-              }));
-            } else {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'PLAYABILITY_CHECK',
-                playerState: -2, // Player not ready
-                hasVideoData: false,
-                videoId: '${youtubeVideoId}'
-              }));
-            }
-          } catch (error) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'PLAYABILITY_CHECK',
-              playerState: -3, // Error state
-              hasVideoData: false,
-              error: error.message,
-              videoId: '${youtubeVideoId}'
-            }));
-          }
-        })();
-        true;
-      `;
-
-      webviewRef.current.injectJavaScript(checkScript);
-      
-      // Set a timeout to resolve as unplayable if no response
-      setTimeout(() => {
-        console.log('⏰ Playability check timeout, assuming unplayable');
-        resolve(false);
-      }, 3000);
-    });
-  }, [youtubeVideoId]);
 
   // Enhanced HTML content with runtime validation and immediate error detection
   const htmlContent = `
@@ -687,7 +596,6 @@ export default function SeamlessVideoPlayer({
     setLastProgressTime(0);
     setStuckProgressCount(0);
     setIsRetrying(false);
-    setIsMarkedInactive(false);
     setIsPlayerReady(false);
     setPlayerValidated(false);
     setSkipReason('');
@@ -731,7 +639,7 @@ export default function SeamlessVideoPlayer({
     injectJavaScript('window.pauseVideo && window.pauseVideo(); true;');
   }, [injectJavaScript]);
 
-  const handleVideoErrorInternal = useCallback(async (errorMessage: string, errorType: string, isEmbeddingError: boolean = false) => {
+  const handleVideoErrorInternal = useCallback((errorMessage: string, errorType: string, isEmbeddingError: boolean = false) => {
     // Prevent infinite re-renders by checking if already retrying
     if (isRetrying) {
       return;
@@ -744,36 +652,30 @@ export default function SeamlessVideoPlayer({
       clearTimeout(errorTimeout);
     }
 
-    // Only mark as inactive if it's an embedding error (101, 150) or other unplayable errors
-    const shouldMarkInactive = isEmbeddingError || ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED'].includes(errorType);
+    // Determine if this is an unplayable video that should be removed
+    const shouldMarkUnplayable = isEmbeddingError || ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED'].includes(errorType);
     
-    if (youtubeVideoId && !isMarkedInactive && shouldMarkInactive) {
-      await markVideoInactive(youtubeVideoId, errorType, true);
-      setSkipReason(`Removed unplayable video: ${youtubeVideoId} (${errorType})`);
+    if (shouldMarkUnplayable) {
+      setSkipReason(`Removing unplayable video: ${youtubeVideoId} (${errorType})`);
     } else {
-      setSkipReason(`Video error: ${errorType} (not marking inactive)`);
+      setSkipReason(`Video error: ${errorType}`);
     }
 
-    // Use video store error handling for queue management
-    if (shouldMarkInactive) {
-      await handleVideoError(videoId, errorType);
-    }
-
-    // Set a timeout to skip video if error persists
+    // Set a timeout to call the appropriate callback
     const timeout = setTimeout(() => {
-      if (shouldMarkInactive) {
-        showToast(`Removed unplayable video: ${youtubeVideoId}`);
+      if (shouldMarkUnplayable) {
+        console.log('🗑️ Calling onVideoUnplayable for:', youtubeVideoId);
         onVideoUnplayable();
       } else {
-        showToast('Video error, skipping...');
-        onVideoSkip();
+        console.log('⚠️ Calling onError for:', youtubeVideoId);
+        reportErrorToParent(errorMessage);
       }
     }, errorTimeoutDuration);
 
     setErrorTimeout(timeout);
     setPlayerError(errorMessage);
     setIsRetrying(true);
-  }, [isRetrying, errorTimeout, onVideoUnplayable, onVideoSkip, youtubeVideoId, errorTimeoutDuration, handleVideoError, videoId, isMarkedInactive]);
+  }, [isRetrying, errorTimeout, onVideoUnplayable, reportErrorToParent, youtubeVideoId, errorTimeoutDuration]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
@@ -1043,10 +945,7 @@ export default function SeamlessVideoPlayer({
         onVideoSkip();
       } else {
         console.log('❌ Video confirmed unplayable during skip, removing');
-        setSkipReason(`Removed unplayable video: ${youtubeVideoId}`);
-        if (youtubeVideoId && !isMarkedInactive) {
-          await markVideoInactive(youtubeVideoId, 'MANUAL_SKIP_UNPLAYABLE', true);
-        }
+        setSkipReason(`Removing unplayable video: ${youtubeVideoId}`);
         pauseVideo();
         onVideoUnplayable();
       }
@@ -1059,7 +958,7 @@ export default function SeamlessVideoPlayer({
       pauseVideo();
       onVideoSkip();
     }
-  }, [isPlayerReady, playerValidated, youtubeVideoId, pauseVideo, onVideoSkip, onVideoUnplayable, isMarkedInactive, handleWebViewMessage]);
+  }, [isPlayerReady, playerValidated, youtubeVideoId, pauseVideo, onVideoSkip, onVideoUnplayable, handleWebViewMessage]);
 
   const handleWebViewLoad = useCallback(() => {
     console.log('WebView loaded for video:', youtubeVideoId);
