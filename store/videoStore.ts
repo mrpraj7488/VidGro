@@ -27,10 +27,11 @@ interface VideoStore {
   handleVideoError: (youtubeVideoId: string, errorType: string) => Promise<void>;
   markVideoAsUnplayable: (youtubeVideoId: string, reason: string) => Promise<void>;
   addToBlacklist: (videoId: string) => void;
+  clearCaches: () => void; // New method for cleanup
 }
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache as requested
-const QUEUE_SIZE = 10; // Top 10 video IDs as requested
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+const QUEUE_SIZE = 10; // Top 10 video IDs
 const MAX_ERROR_COUNT = 3; // Reduced for faster queue management
 
 export const useVideoStore = create<VideoStore>((set, get) => ({
@@ -49,6 +50,19 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     newBlacklist.add(videoId);
     console.log(`🚫 Added ${videoId} to local blacklist`);
     set({ blacklistedVideoIds: newBlacklist });
+  },
+
+  clearCaches: () => {
+    console.log('🧹 Clearing video store caches...');
+    set({
+      videoQueue: [],
+      currentVideoIndex: 0,
+      lastFetchTime: 0,
+      cachedVideoIds: [],
+      isResetting: false,
+      errorCount: 0,
+      blacklistedVideoIds: new Set<string>(),
+    });
   },
 
   fetchVideos: async (userId: string) => {
@@ -84,7 +98,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
       console.log('📊 User has watched videos:', watchedVideoIds.length);
       
-      // Get only ACTIVE videos with fresh query (top 10 as requested)
+      // Get only ACTIVE videos with fresh query (top 10)
       let query = supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id, status, updated_at')
@@ -134,7 +148,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           
           return isAvailable;
         })
-        .slice(0, QUEUE_SIZE) // Limit to top 10 as requested
+        .slice(0, QUEUE_SIZE) // Limit to top 10
         .map(video => ({
           id: video.id,
           youtube_url: video.youtube_url, // This is now the video ID

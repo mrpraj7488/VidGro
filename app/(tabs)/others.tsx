@@ -12,7 +12,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
-import { DollarSign, Crown, Gift, CircleStop as StopCircle, Star, Menu, User, Share2, FileText, Shield, Globe, Settings, MessageCircle, LogOut, Trash2 } from 'lucide-react-native';
+import { DollarSign, Crown, Gift, CircleStop as StopCircle, Star, Menu, User, Share2, FileText, Shield, Globe, Settings, MessageCircle, LogOut, Trash2, RefreshCw } from 'lucide-react-native';
+import CleanupManager from '@/components/CleanupManager';
 
 interface MenuOption {
   icon: React.ReactNode;
@@ -24,6 +25,7 @@ interface MenuOption {
 export default function OthersTab() {
   const { user, profile, signOut } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showCleanup, setShowCleanup] = useState(false);
 
   const handleBuyCoins = () => {
     Alert.alert('Buy Coins', 'This would open the coin purchase screen');
@@ -84,6 +86,11 @@ export default function OthersTab() {
     );
   };
 
+  const handleCleanup = () => {
+    setShowCleanup(true);
+    setShowMenu(false);
+  };
+
   const menuOptions: MenuOption[] = [
     {
       icon: <Share2 color="#FF4757" size={20} />,
@@ -109,6 +116,11 @@ export default function OthersTab() {
       icon: <Settings color="#FF4757" size={20} />,
       title: 'Configure Ads',
       onPress: () => Alert.alert('Configure Ads', 'Ad configuration options'),
+    },
+    {
+      icon: <RefreshCw color="#FF4757" size={20} />,
+      title: 'App Cleanup',
+      onPress: handleCleanup,
     },
     {
       icon: <MessageCircle color="#FF4757" size={20} />,
@@ -273,6 +285,34 @@ export default function OthersTab() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Cleanup Manager Modal */}
+      <Modal
+        visible={showCleanup}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCleanup(false)}
+      >
+        <View style={styles.cleanupModalOverlay}>
+          <View style={styles.cleanupModal}>
+            <View style={styles.cleanupHeader}>
+              <Text style={styles.cleanupTitle}>App Cleanup</Text>
+              <TouchableOpacity
+                onPress={() => setShowCleanup(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <CleanupManager
+              onCleanupComplete={() => {
+                setShowCleanup(false);
+                Alert.alert('Success', 'App cleanup completed successfully!');
+              }}
+            />
           </View>
         </View>
       </Modal>
@@ -442,5 +482,46 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     marginLeft: 16,
+  },
+  cleanupModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  cleanupModal: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '90%',
+    overflow: 'hidden',
+  },
+  cleanupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  cleanupTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: 'bold',
   },
 });
