@@ -8,7 +8,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Trash2, RefreshCw, Info, CheckCircle, AlertTriangle } from 'lucide-react-native';
+import { Trash2, RefreshCw, Info, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { CacheManager, DevCleanup } from '@/utils/cleanup';
 
 interface CleanupManagerProps {
