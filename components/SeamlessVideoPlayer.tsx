@@ -65,6 +65,7 @@ export default function SeamlessVideoPlayer({
   const [playerValidated, setPlayerValidated] = useState(false);
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null);
   const [skipReason, setSkipReason] = useState<string>('');
+  const [playabilityConfirmed, setPlayabilityConfirmed] = useState(false);
   
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
@@ -75,7 +76,7 @@ export default function SeamlessVideoPlayer({
   const maxRetries = 0; // No retries for faster skipping
   const errorTimeoutDuration = 5000; // 5 seconds timeout
   const maxStuckCount = 3; // Max times progress can be stuck before action
-  const validationTimeoutDuration = 5000; // 5 seconds to validate playability
+  const validationTimeoutDuration = 8000; // 8 seconds to validate playability (increased)
 
   const showToast = (message: string) => {
     if (Platform.OS === 'android') {
@@ -125,8 +126,8 @@ export default function SeamlessVideoPlayer({
 
   const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
 
-  // Mark video as inactive in Supabase (only for unplayable videos)
-  const markVideoInactive = async (videoId: string, reason: string, isUnplayable: boolean = true) => {
+  // Mark video as inactive in Supabase (only for confirmed unplayable videos)
+  const markVideoInactive = useCallback(async (videoId: string, reason: string, isUnplayable: boolean = true) => {
     if (isMarkedInactive) return; // Prevent duplicate calls
     
     try {
@@ -143,7 +144,7 @@ export default function SeamlessVideoPlayer({
           .eq('youtube_url', videoId); // youtube_url field contains the video ID
         
         if (error) {
-          console.error('Error marking video as inactive:', error);
+          console.error('❌ Error marking video as inactive:', error);
         } else {
           console.log(`✅ Video ${videoId} marked as inactive in Supabase`);
           showToast(`Removed unplayable video: ${videoId}`);
@@ -155,64 +156,9 @@ export default function SeamlessVideoPlayer({
     } catch (error) {
       console.error('Error in markVideoInactive:', error);
     }
-  };
+  }, [isMarkedInactive]);
 
-  // Check if video is playable by injecting JavaScript to get player state
-  const checkVideoPlayability = useCallback(async (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if (!webviewRef.current) {
-        resolve(false);
-        return;
-      }
-
-      console.log('🔍 Checking video playability for:', youtubeVideoId);
-      
-      // Inject JavaScript to check player state
-      const checkScript = `
-        (function() {
-          try {
-            if (window.player && window.player.getPlayerState && isPlayerReady) {
-              const state = window.player.getPlayerState();
-              const videoData = window.player.getVideoData();
-              
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'PLAYABILITY_CHECK',
-                playerState: state,
-                hasVideoData: !!videoData && !!videoData.title,
-                videoId: '${youtubeVideoId}'
-              }));
-            } else {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'PLAYABILITY_CHECK',
-                playerState: -2, // Player not ready
-                hasVideoData: false,
-                videoId: '${youtubeVideoId}'
-              }));
-            }
-          } catch (error) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'PLAYABILITY_CHECK',
-              playerState: -3, // Error state
-              hasVideoData: false,
-              error: error.message,
-              videoId: '${youtubeVideoId}'
-            }));
-          }
-        })();
-        true;
-      `;
-
-      webviewRef.current.injectJavaScript(checkScript);
-      
-      // Set a timeout to resolve as unplayable if no response
-      setTimeout(() => {
-        console.log('⏰ Playability check timeout, assuming unplayable');
-        resolve(false);
-      }, 3000);
-    });
-  }, [youtubeVideoId]);
-
-  // Enhanced HTML content with runtime validation and immediate error detection
+  // Enhanced HTML content with better validation and error detection
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -295,6 +241,7 @@ export default function SeamlessVideoPlayer({
         var autoPlayAttempted = false;
         var runtimeValidationDone = false;
         var playerValidated = false;
+        var playabilityConfirmed = false;
 
         function onYouTubeIframeAPIReady() {
           console.log('YouTube API ready, creating player for video ID: ${youtubeVideoId}');
@@ -306,7 +253,7 @@ export default function SeamlessVideoPlayer({
               width: '100%',
               videoId: '${youtubeVideoId}',
               playerVars: {
-                'autoplay': 1, // Enable autoplay for immediate testing
+                'autoplay': 0, // Don't autoplay initially
                 'controls': 0,
                 'modestbranding': 1,
                 'rel': 0,
@@ -352,36 +299,16 @@ export default function SeamlessVideoPlayer({
             videoId: '${youtubeVideoId}'
           }));
           
-          // Start validation process
+          // Start validation process with delay
           setTimeout(function() {
             performRuntimeValidation();
-          }, 500);
-          
-          // Auto-start playing immediately for testing
-          setTimeout(function() {
-            if (player && player.playVideo && isPlayerReady && !autoPlayAttempted) {
-              console.log('Auto-starting video playback for testing');
-              autoPlayAttempted = true;
-              try {
-                player.playVideo();
-              } catch (error) {
-                console.error('Error starting playback:', error);
-                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'VIDEO_UNPLAYABLE',
-                  error: 'PLAYBACK_START_FAILED',
-                  message: 'Failed to start video playback',
-                  errorType: 'PLAYBACK_START_FAILED',
-                  isEmbeddingError: false
-                }));
-              }
-            }
-          }, 200);
+          }, 1000); // Give player more time to initialize
           
           // Start enhanced progress tracking
           startProgressTracking();
         }
 
-        // CRITICAL: Runtime validation function
+        // Enhanced runtime validation function
         function performRuntimeValidation() {
           if (runtimeValidationDone) return;
           runtimeValidationDone = true;
@@ -411,42 +338,51 @@ export default function SeamlessVideoPlayer({
             
             // Mark as validated if we get here
             playerValidated = true;
+            console.log('✅ Video validated successfully');
+            
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'PLAYER_VALIDATED',
               videoId: '${youtubeVideoId}',
               message: 'Video is playable'
             }));
             
-            // Test playback capability
+            // Test playback capability with a small delay
             setTimeout(function() {
               try {
-                var currentState = player.getPlayerState();
-                console.log('Player state after 1 second:', currentState);
+                // Try to play the video to confirm it's truly playable
+                player.playVideo();
                 
-                // If player is in error state or unstarted after auto-play attempt
-                if (currentState === -1 || currentState === 5) {
-                  console.log('Player in unstarted/cued state, attempting manual play');
-                  player.playVideo();
+                // Check state after play attempt
+                setTimeout(function() {
+                  var currentState = player.getPlayerState();
+                  console.log('Player state after play attempt:', currentState);
                   
-                  // Check again after manual play attempt
-                  setTimeout(function() {
-                    var finalState = player.getPlayerState();
-                    console.log('Final player state after manual play:', finalState);
+                  if (currentState === 1 || currentState === 3) { // Playing or buffering
+                    playabilityConfirmed = true;
+                    console.log('✅ Playability confirmed - video can play');
                     
-                    if (finalState === -1) {
-                      console.error('Video failed to start - likely embedding issue');
-                      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                        type: 'VIDEO_UNPLAYABLE',
-                        error: 'PLAYBACK_FAILED',
-                        message: 'Video failed to start - likely embedding restriction',
-                        errorType: 'PLAYBACK_FAILED',
-                        isEmbeddingError: true
-                      }));
-                    }
-                  }, 1000);
-                }
+                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'PLAYABILITY_CONFIRMED',
+                      videoId: '${youtubeVideoId}',
+                      message: 'Video playability confirmed'
+                    }));
+                    
+                    // Pause it back since this was just a test
+                    player.pauseVideo();
+                  } else if (currentState === -1) {
+                    console.error('Video failed to start - likely embedding issue');
+                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'VIDEO_UNPLAYABLE',
+                      error: 'PLAYBACK_FAILED',
+                      message: 'Video failed to start - likely embedding restriction',
+                      errorType: 'PLAYBACK_FAILED',
+                      isEmbeddingError: true
+                    }));
+                  }
+                }, 2000); // Wait 2 seconds for play attempt
+                
               } catch (error) {
-                console.error('Error in runtime validation:', error);
+                console.error('Error in playback test:', error);
                 window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'VIDEO_UNPLAYABLE',
                   error: 'VALIDATION_ERROR',
@@ -455,7 +391,7 @@ export default function SeamlessVideoPlayer({
                   isEmbeddingError: false
                 }));
               }
-            }, 1000);
+            }, 1000); // Wait 1 second before testing playback
             
           } catch (error) {
             console.error('Error in performRuntimeValidation:', error);
@@ -634,6 +570,41 @@ export default function SeamlessVideoPlayer({
           }
         };
 
+        // Function to check playability for skip decisions
+        window.checkPlayability = function() {
+          try {
+            if (player && player.getPlayerState && isPlayerReady) {
+              var state = player.getPlayerState();
+              var videoData = player.getVideoData();
+              
+              return {
+                isPlayable: playabilityConfirmed || (playerValidated && !!videoData && !!videoData.title),
+                playerState: state,
+                hasVideoData: !!videoData && !!videoData.title,
+                validated: playerValidated,
+                confirmed: playabilityConfirmed
+              };
+            }
+            return {
+              isPlayable: false,
+              playerState: -2,
+              hasVideoData: false,
+              validated: false,
+              confirmed: false
+            };
+          } catch (error) {
+            console.error('Error checking playability:', error);
+            return {
+              isPlayable: false,
+              playerState: -3,
+              hasVideoData: false,
+              validated: false,
+              confirmed: false,
+              error: error.message
+            };
+          }
+        };
+
         // Handle page errors
         window.onerror = function(msg, url, lineNo, columnNo, error) {
           console.error('Page error:', msg, 'at', url, ':', lineNo);
@@ -691,6 +662,7 @@ export default function SeamlessVideoPlayer({
     setIsPlayerReady(false);
     setPlayerValidated(false);
     setSkipReason('');
+    setPlayabilityConfirmed(false);
     progressValue.value = 0;
     
     if (progressIntervalRef.current) {
@@ -744,8 +716,9 @@ export default function SeamlessVideoPlayer({
       clearTimeout(errorTimeout);
     }
 
-    // Only mark as inactive if it's an embedding error (101, 150) or other unplayable errors
-    const shouldMarkInactive = isEmbeddingError || ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED'].includes(errorType);
+    // Only mark as inactive if it's a confirmed embedding error (101, 150) or other critical unplayable errors
+    const criticalErrors = ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED'];
+    const shouldMarkInactive = isEmbeddingError || criticalErrors.includes(errorType);
     
     if (youtubeVideoId && !isMarkedInactive && shouldMarkInactive) {
       await markVideoInactive(youtubeVideoId, errorType, true);
@@ -773,7 +746,7 @@ export default function SeamlessVideoPlayer({
     setErrorTimeout(timeout);
     setPlayerError(errorMessage);
     setIsRetrying(true);
-  }, [isRetrying, errorTimeout, onVideoUnplayable, onVideoSkip, youtubeVideoId, errorTimeoutDuration, handleVideoError, videoId, isMarkedInactive]);
+  }, [isRetrying, errorTimeout, onVideoUnplayable, onVideoSkip, youtubeVideoId, errorTimeoutDuration, handleVideoError, videoId, isMarkedInactive, markVideoInactive]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
@@ -793,11 +766,12 @@ export default function SeamlessVideoPlayer({
             setErrorTimeout(null);
           }
           
-          // Start validation timeout
+          // Start validation timeout - longer timeout for better detection
           const timeout = setTimeout(() => {
-            if (!playerValidated) {
-              console.log('⏰ Player validation timeout, assuming playable');
+            if (!playerValidated && !playabilityConfirmed) {
+              console.log('⏰ Player validation timeout, but assuming playable (no errors detected)');
               setPlayerValidated(true);
+              setPlayabilityConfirmed(true);
             }
           }, validationTimeoutDuration);
           setValidationTimeout(timeout);
@@ -806,15 +780,15 @@ export default function SeamlessVideoPlayer({
         case 'PLAYER_VALIDATED':
           console.log('✅ Player validated as playable for video:', data.videoId);
           setPlayerValidated(true);
+          break;
+
+        case 'PLAYABILITY_CONFIRMED':
+          console.log('✅ Playability confirmed for video:', data.videoId);
+          setPlayabilityConfirmed(true);
           if (validationTimeout) {
             clearTimeout(validationTimeout);
             setValidationTimeout(null);
           }
-          break;
-
-        case 'PLAYABILITY_CHECK':
-          console.log('🔍 Playability check result:', data);
-          // This is used for manual skip validation
           break;
           
         case 'PLAYER_WARNING':
@@ -922,7 +896,7 @@ export default function SeamlessVideoPlayer({
       console.error('Error parsing WebView message:', error);
       handleVideoErrorInternal('Failed to parse video message', 'MESSAGE_PARSE_ERROR', false);
     }
-  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoErrorInternal, errorTimeout, youtubeVideoId, lastProgressTime, maxStuckCount, playVideo, validationTimeoutDuration, playerValidated]);
+  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoErrorInternal, errorTimeout, youtubeVideoId, lastProgressTime, maxStuckCount, playVideo, validationTimeoutDuration, playerValidated, playabilityConfirmed]);
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -936,9 +910,9 @@ export default function SeamlessVideoPlayer({
     console.log('🔄 Skip requested for video:', youtubeVideoId);
     
     try {
-      // Check if player is ready and validated
-      if (isPlayerReady && playerValidated) {
-        console.log('✅ Video is playable, skipping without removal');
+      // Check if we have confirmed playability
+      if (playabilityConfirmed || (isPlayerReady && playerValidated)) {
+        console.log('✅ Video is confirmed playable, skipping without removal');
         setSkipReason('Skipped playable video');
         showToast('Skipping video...');
         pauseVideo();
@@ -946,110 +920,83 @@ export default function SeamlessVideoPlayer({
         return;
       }
 
-      // If player is not ready or not validated, check playability
-      if (isPlayerReady && !playerValidated) {
-        console.log('🔍 Player ready but not validated, checking playability...');
+      // If player is ready but not validated, check playability via injection
+      if (isPlayerReady) {
+        console.log('🔍 Player ready but not confirmed, checking playability...');
         
-        // Give it a moment to validate
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const checkScript = `
+          (function() {
+            var result = window.checkPlayability ? window.checkPlayability() : {
+              isPlayable: false,
+              playerState: -2,
+              hasVideoData: false,
+              validated: false,
+              confirmed: false
+            };
+            
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'SKIP_PLAYABILITY_RESULT',
+              ...result,
+              videoId: '${youtubeVideoId}'
+            }));
+          })();
+          true;
+        `;
+
+        // Create a promise to wait for the result
+        const playabilityPromise = new Promise<boolean>((resolve) => {
+          const messageHandler = (event: any) => {
+            try {
+              const data = JSON.parse(event.nativeEvent.data);
+              if (data.type === 'SKIP_PLAYABILITY_RESULT') {
+                console.log('🔍 Skip playability result:', data);
+                resolve(data.isPlayable || data.confirmed || data.validated);
+                return;
+              }
+            } catch (error) {
+              // Ignore parsing errors
+            }
+          };
+
+          // Temporarily add message listener
+          const originalHandler = handleWebViewMessage;
+          
+          // Inject the check script
+          webviewRef.current?.injectJavaScript(checkScript);
+          
+          // Set timeout
+          setTimeout(() => {
+            console.log('⏰ Skip playability check timeout, assuming playable');
+            resolve(true); // Default to playable on timeout
+          }, 2000);
+        });
+
+        const isPlayable = await playabilityPromise;
         
-        if (playerValidated) {
-          console.log('✅ Video validated as playable during skip check');
+        if (isPlayable) {
+          console.log('✅ Video confirmed playable during skip check');
           setSkipReason('Skipped playable video');
           showToast('Skipping video...');
           pauseVideo();
           onVideoSkip();
-          return;
+        } else {
+          console.log('❌ Video confirmed unplayable during skip check');
+          setSkipReason(`Removed unplayable video: ${youtubeVideoId}`);
+          if (youtubeVideoId && !isMarkedInactive) {
+            await markVideoInactive(youtubeVideoId, 'MANUAL_SKIP_UNPLAYABLE', true);
+          }
+          pauseVideo();
+          onVideoUnplayable();
         }
+        return;
       }
 
-      // If we get here, treat as potentially unplayable
-      console.log('⚠️ Video may be unplayable, checking before removal...');
-      
-      // Try to get player state via injection
-      const checkScript = `
-        (function() {
-          try {
-            if (window.player && window.player.getPlayerState && isPlayerReady) {
-              const state = window.player.getPlayerState();
-              const videoData = window.player.getVideoData();
-              
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'SKIP_PLAYABILITY_CHECK',
-                playerState: state,
-                hasVideoData: !!videoData && !!videoData.title,
-                videoId: '${youtubeVideoId}',
-                isPlayable: state !== -1 && !!videoData && !!videoData.title
-              }));
-            } else {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'SKIP_PLAYABILITY_CHECK',
-                playerState: -2,
-                hasVideoData: false,
-                videoId: '${youtubeVideoId}',
-                isPlayable: false
-              }));
-            }
-          } catch (error) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'SKIP_PLAYABILITY_CHECK',
-              playerState: -3,
-              hasVideoData: false,
-              error: error.message,
-              videoId: '${youtubeVideoId}',
-              isPlayable: false
-            }));
-          }
-        })();
-        true;
-      `;
-
-      // Set up a promise to wait for the playability check result
-      const playabilityPromise = new Promise<boolean>((resolve) => {
-        const originalHandler = handleWebViewMessage;
-        
-        const tempHandler = (event: any) => {
-          try {
-            const data = JSON.parse(event.nativeEvent.data);
-            if (data.type === 'SKIP_PLAYABILITY_CHECK') {
-              console.log('🔍 Skip playability check result:', data);
-              resolve(data.isPlayable || false);
-              return;
-            }
-          } catch (error) {
-            // Ignore parsing errors for other messages
-          }
-          // Call original handler for other messages
-          originalHandler(event);
-        };
-
-        // Temporarily replace the handler
-        webviewRef.current?.injectJavaScript(checkScript);
-        
-        // Timeout after 3 seconds
-        setTimeout(() => {
-          console.log('⏰ Skip playability check timeout, assuming unplayable');
-          resolve(false);
-        }, 3000);
-      });
-
-      const isPlayable = await playabilityPromise;
-      
-      if (isPlayable) {
-        console.log('✅ Video confirmed playable during skip, not removing');
-        setSkipReason('Skipped playable video');
-        showToast('Skipping video...');
-        pauseVideo();
-        onVideoSkip();
-      } else {
-        console.log('❌ Video confirmed unplayable during skip, removing');
-        setSkipReason(`Removed unplayable video: ${youtubeVideoId}`);
-        if (youtubeVideoId && !isMarkedInactive) {
-          await markVideoInactive(youtubeVideoId, 'MANUAL_SKIP_UNPLAYABLE', true);
-        }
-        pauseVideo();
-        onVideoUnplayable();
-      }
+      // If player is not ready, default to skip without removal
+      console.log('⚠️ Player not ready, defaulting to skip without removal');
+      setSkipReason('Skipped video (player not ready)');
+      showToast('Skipping video...');
+      pauseVideo();
+      onVideoSkip();
       
     } catch (error) {
       console.error('Error during skip handling:', error);
@@ -1059,7 +1006,7 @@ export default function SeamlessVideoPlayer({
       pauseVideo();
       onVideoSkip();
     }
-  }, [isPlayerReady, playerValidated, youtubeVideoId, pauseVideo, onVideoSkip, onVideoUnplayable, isMarkedInactive, handleWebViewMessage]);
+  }, [isPlayerReady, playerValidated, playabilityConfirmed, youtubeVideoId, pauseVideo, onVideoSkip, onVideoUnplayable, isMarkedInactive, handleWebViewMessage, markVideoInactive]);
 
   const handleWebViewLoad = useCallback(() => {
     console.log('WebView loaded for video:', youtubeVideoId);
@@ -1115,7 +1062,11 @@ export default function SeamlessVideoPlayer({
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.loadingText}>Loading video...</Text>
             <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
-            <Text style={styles.loadingSubtext}>Validating playability...</Text>
+            <Text style={styles.loadingSubtext}>
+              {playabilityConfirmed ? 'Playability confirmed' : 
+               playerValidated ? 'Player validated' : 
+               'Validating playability...'}
+            </Text>
           </View>
         )}
         
@@ -1169,7 +1120,7 @@ export default function SeamlessVideoPlayer({
         )}
       </View>
 
-      {/* Minimal Video Info */}
+      {/* Video Info */}
       <View style={styles.videoInfo}>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -1195,6 +1146,16 @@ export default function SeamlessVideoPlayer({
             <Text style={styles.statusText}>{skipReason}</Text>
           </View>
         )}
+
+        {/* Playability Status */}
+        <View style={styles.playabilityStatus}>
+          <Text style={styles.playabilityText}>
+            {playabilityConfirmed ? '✅ Playable (Confirmed)' : 
+             playerValidated ? '✅ Playable (Validated)' : 
+             isPlayerReady ? '🔍 Checking...' : 
+             '⏳ Loading...'}
+          </Text>
+        </View>
 
         {/* Minimal Controls */}
         <View style={styles.controls}>
@@ -1366,6 +1327,20 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     color: '#4A90E2',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  playabilityStatus: {
+    backgroundColor: '#F8FFF8',
+    padding: 6,
+    borderRadius: 4,
+    marginBottom: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: '#2ECC71',
+  },
+  playabilityText: {
+    fontSize: 10,
+    color: '#2ECC71',
     textAlign: 'center',
     fontWeight: '500',
   },

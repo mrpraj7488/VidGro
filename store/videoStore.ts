@@ -29,7 +29,7 @@ interface VideoStore {
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const QUEUE_SIZE = 10;
-const MAX_ERROR_COUNT = 3;
+const MAX_ERROR_COUNT = 5; // Increased to prevent premature queue resets
 
 export const useVideoStore = create<VideoStore>((set, get) => ({
   videoQueue: [],
@@ -66,12 +66,12 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         .eq('viewer_id', userId);
 
       if (watchedError) {
-        console.error('Error fetching watched videos:', watchedError);
+        console.error('❌ Error fetching watched videos:', watchedError);
         throw watchedError;
       }
 
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
-      console.log('User has watched videos:', watchedVideoIds.length);
+      console.log('📊 User has watched videos:', watchedVideoIds.length);
       
       // CRITICAL: Get only ACTIVE videos (status='active')
       let query = supabase
@@ -85,7 +85,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       const { data: allVideos, error } = await query;
 
       if (error) {
-        console.error('Error fetching video queue:', error);
+        console.error('❌ Error fetching video queue:', error);
         throw error;
       }
 
@@ -148,7 +148,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       });
 
     } catch (error) {
-      console.error('Error in fetchVideos:', error);
+      console.error('❌ Error in fetchVideos:', error);
       set({ isLoading: false, errorCount: 0 });
       throw error;
     }
@@ -237,7 +237,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       await get().removeCurrentVideo();
       
     } catch (error) {
-      console.error('Error in markVideoAsUnplayable:', error);
+      console.error('❌ Error in markVideoAsUnplayable:', error);
       throw error;
     }
   },
@@ -248,10 +248,10 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     
     console.log(`🚨 Video error for ${videoId}: ${errorType} (count: ${newErrorCount})`);
     
-    // Only mark as unplayable for specific error types
-    const unplayableErrors = ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED', 'VALIDATION_ERROR'];
+    // Only mark as unplayable for specific critical error types
+    const criticalUnplayableErrors = ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED'];
     
-    if (unplayableErrors.includes(errorType)) {
+    if (criticalUnplayableErrors.includes(errorType)) {
       console.log(`🗑️ Error type ${errorType} indicates unplayable video, marking as such`);
       await get().markVideoAsUnplayable(videoId, errorType);
     } else {
@@ -259,9 +259,9 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       await get().removeCurrentVideo();
     }
     
-    // If too many errors, reset the queue
-    if (newErrorCount >= MAX_ERROR_COUNT) {
-      console.log('🔄 Too many video errors, resetting queue...');
+    // Only reset queue if we have too many critical errors
+    if (newErrorCount >= MAX_ERROR_COUNT && criticalUnplayableErrors.includes(errorType)) {
+      console.log('🔄 Too many critical video errors, resetting queue...');
       set({ errorCount: 0 });
       // Clear queue to force fresh fetch
       set({ 
