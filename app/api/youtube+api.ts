@@ -21,8 +21,17 @@ export async function GET(request: Request) {
     console.log('Processing YouTube video ID:', videoId);
 
     try {
-      // Enhanced YouTube API call with embeddability check
-      const apiKey = 'AIzaSyBJ0Tu-2JFectz7e7ieMEJ7Pl8Yh0o8Kg8';
+      // Use environment variable for YouTube API key
+      const apiKey = process.env.EXPO_PUBLIC_YOUTUBE_API_KEY;
+      
+      if (!apiKey) {
+        console.error('YouTube API key not found in environment variables');
+        return Response.json({
+          message: 'YouTube API key not configured. Please set EXPO_PUBLIC_YOUTUBE_API_KEY in your environment.',
+          valid: false
+        }, { status: 500 });
+      }
+
       const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&key=${apiKey}&part=snippet,contentDetails,status`;
       
       console.log('Making YouTube API request...');
