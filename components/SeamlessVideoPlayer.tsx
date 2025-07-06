@@ -67,12 +67,17 @@ export default function SeamlessVideoPlayer({
   const [skipReason, setSkipReason] = useState<string>('');
   const [playabilityConfirmed, setPlayabilityConfirmed] = useState(false);
   const [validationStage, setValidationStage] = useState<string>('Initializing...');
+  const [bufferingProgress, setBufferingProgress] = useState(0);
+  const [videoQuality, setVideoQuality] = useState<string>('auto');
+  const [preloadComplete, setPreloadComplete] = useState(false);
   
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
+  const bufferingOpacity = useSharedValue(0);
   const webviewRef = useRef<WebView>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const stuckCheckRef = useRef<NodeJS.Timeout | null>(null);
+  const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { handleVideoError, markVideoAsUnplayable, addToBlacklist } = useVideoStore();
   const maxRetries = 0; // No retries for faster skipping
   const errorTimeoutDuration = 3000; // Reduced to 3 seconds timeout
@@ -162,7 +167,7 @@ export default function SeamlessVideoPlayer({
     }
   }, [isMarkedInactive, addToBlacklist]);
 
-  // Enhanced HTML content with better validation and error detection
+  // Enhanced HTML content with better buffering optimization
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -195,15 +200,63 @@ export default function SeamlessVideoPlayer({
           text-align: center;
           padding: 20px;
         }
+        .buffering-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          color: white;
+          z-index: 100;
+          transition: opacity 0.3s ease;
+        }
+        .buffering-spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid rgba(255, 255, 255, 0.3);
+          border-top: 3px solid #ff4757;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin-bottom: 10px;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .buffering-progress {
+          width: 200px;
+          height: 4px;
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 2px;
+          overflow: hidden;
+          margin-top: 10px;
+        }
+        .buffering-progress-fill {
+          height: 100%;
+          background: #ff4757;
+          transition: width 0.3s ease;
+        }
       </style>
     </head>
     <body>
       <div id="player"></div>
-      <div id="loading" class="loading">Loading YouTube player...</div>
+      <div id="loading" class="loading">Loading optimized video player...</div>
       <div id="error" class="error" style="display: none;"></div>
+      <div id="buffering-overlay" class="buffering-overlay" style="display: none;">
+        <div class="buffering-spinner"></div>
+        <div>Buffering video...</div>
+        <div class="buffering-progress">
+          <div id="buffering-progress-fill" class="buffering-progress-fill" style="width: 0%;"></div>
+        </div>
+      </div>
       
       <script>
-        console.log('Initializing YouTube player for video ID: ${youtubeVideoId}');
+        console.log('Initializing optimized YouTube player for video ID: ${youtubeVideoId}');
         
         function updateValidationStage(stage) {
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -212,14 +265,36 @@ export default function SeamlessVideoPlayer({
           }));
         }
         
-        updateValidationStage('Loading YouTube API...');
+        function updateBufferingProgress(progress) {
+          const progressFill = document.getElementById('buffering-progress-fill');
+          if (progressFill) {
+            progressFill.style.width = progress + '%';
+          }
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'BUFFERING_PROGRESS',
+            progress: progress
+          }));
+        }
+        
+        function showBufferingOverlay(show) {
+          const overlay = document.getElementById('buffering-overlay');
+          if (overlay) {
+            overlay.style.display = show ? 'flex' : 'none';
+          }
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'BUFFERING_STATE',
+            isBuffering: show
+          }));
+        }
+        
+        updateValidationStage('Loading optimized YouTube API...');
         
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         tag.async = true;
         tag.onload = function() {
           console.log('YouTube API script loaded successfully');
-          updateValidationStage('YouTube API loaded');
+          updateValidationStage('YouTube API loaded - optimizing...');
         };
         tag.onerror = function() {
           console.error('Failed to load YouTube iframe API');
@@ -256,10 +331,13 @@ export default function SeamlessVideoPlayer({
         var runtimeValidationDone = false;
         var playerValidated = false;
         var playabilityConfirmed = false;
+        var bufferingTimeout;
+        var preloadStarted = false;
+        var qualityLevels = [];
 
         function onYouTubeIframeAPIReady() {
-          console.log('YouTube API ready, creating player for video ID: ${youtubeVideoId}');
-          updateValidationStage('Creating player...');
+          console.log('YouTube API ready, creating optimized player for video ID: ${youtubeVideoId}');
+          updateValidationStage('Creating optimized player...');
           
           try {
             player = new YT.Player('player', {
@@ -267,7 +345,7 @@ export default function SeamlessVideoPlayer({
               width: '100%',
               videoId: '${youtubeVideoId}',
               playerVars: {
-                'autoplay': 0, // Don't autoplay initially
+                'autoplay': 0, // Don't autoplay initially for better buffering
                 'controls': 0,
                 'modestbranding': 1,
                 'rel': 0,
@@ -280,12 +358,17 @@ export default function SeamlessVideoPlayer({
                 'cc_load_policy': 0,
                 'start': 0,
                 'mute': 0,
-                'loop': 0
+                'loop': 0,
+                'quality': 'small', // Start with lower quality for faster loading
+                'vq': 'small',
+                'hd': 0
               },
               events: {
                 'onReady': onPlayerReady,
                 'onStateChange': onPlayerStateChange,
-                'onError': onPlayerError
+                'onError': onPlayerError,
+                'onPlaybackQualityChange': onPlaybackQualityChange,
+                'onPlaybackRateChange': onPlaybackRateChange
               }
             });
           } catch (error) {
@@ -306,22 +389,83 @@ export default function SeamlessVideoPlayer({
 
         function onPlayerReady(event) {
           console.log('Player ready for video ID: ${youtubeVideoId}');
-          updateValidationStage('Player ready');
+          updateValidationStage('Player ready - optimizing buffering...');
           document.getElementById('loading').style.display = 'none';
           isPlayerReady = true;
           
+          // Get available quality levels
+          try {
+            qualityLevels = player.getAvailableQualityLevels();
+            console.log('Available quality levels:', qualityLevels);
+            
+            // Set optimal quality for faster loading
+            if (qualityLevels.includes('small')) {
+              player.setPlaybackQuality('small');
+              updateValidationStage('Quality set to small for faster loading');
+            } else if (qualityLevels.includes('medium')) {
+              player.setPlaybackQuality('medium');
+              updateValidationStage('Quality set to medium');
+            }
+          } catch (error) {
+            console.log('Could not set quality:', error);
+          }
+          
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_READY',
-            videoId: '${youtubeVideoId}'
+            videoId: '${youtubeVideoId}',
+            qualityLevels: qualityLevels
           }));
           
-          // Start validation process with delay
+          // Start preloading and validation process with delay
           setTimeout(function() {
+            startPreloading();
             performRuntimeValidation();
-          }, 1000); // Give player more time to initialize
+          }, 500); // Reduced delay for faster startup
           
           // Start enhanced progress tracking
           startProgressTracking();
+        }
+
+        function startPreloading() {
+          if (preloadStarted) return;
+          preloadStarted = true;
+          
+          updateValidationStage('Preloading video data...');
+          
+          try {
+            // Preload video by seeking to start and pausing
+            player.seekTo(0, true);
+            
+            // Monitor preloading progress
+            var preloadCheck = setInterval(function() {
+              try {
+                var buffered = player.getVideoLoadedFraction();
+                updateBufferingProgress(buffered * 100);
+                
+                if (buffered > 0.1) { // 10% buffered is enough to start
+                  clearInterval(preloadCheck);
+                  updateValidationStage('✅ Preloading complete');
+                  window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'PRELOAD_COMPLETE',
+                    bufferedFraction: buffered
+                  }));
+                }
+              } catch (error) {
+                console.log('Preload check error:', error);
+                clearInterval(preloadCheck);
+              }
+            }, 200);
+            
+            // Timeout preloading after 3 seconds
+            setTimeout(function() {
+              clearInterval(preloadCheck);
+              updateValidationStage('Preloading timeout - ready to play');
+            }, 3000);
+            
+          } catch (error) {
+            console.log('Preloading error:', error);
+            updateValidationStage('Preloading failed - ready to play');
+          }
         }
 
         // Enhanced runtime validation function
@@ -401,7 +545,7 @@ export default function SeamlessVideoPlayer({
                       isEmbeddingError: true
                     }));
                   }
-                }, 2000); // Wait 2 seconds for play attempt
+                }, 1500); // Reduced wait time
                 
               } catch (error) {
                 console.error('Error in playback test:', error);
@@ -414,7 +558,7 @@ export default function SeamlessVideoPlayer({
                   isEmbeddingError: false
                 }));
               }
-            }, 1000); // Wait 1 second before testing playback
+            }, 500); // Reduced delay
             
           } catch (error) {
             console.error('Error in performRuntimeValidation:', error);
@@ -440,6 +584,10 @@ export default function SeamlessVideoPlayer({
             if (player && player.getCurrentTime && isPlayerReady && !hasCompleted) {
               try {
                 var newTime = player.getCurrentTime();
+                var bufferedFraction = player.getVideoLoadedFraction();
+                
+                // Update buffering progress
+                updateBufferingProgress(bufferedFraction * 100);
                 
                 // Check if progress is stuck
                 if (Math.abs(newTime - lastReportedTime) < 0.1 && newTime > 0) {
@@ -484,7 +632,8 @@ export default function SeamlessVideoPlayer({
                   window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'PROGRESS_UPDATE',
                     currentTime: currentTime,
-                    progress: (currentTime / maxDuration) * 100
+                    progress: (currentTime / maxDuration) * 100,
+                    bufferedFraction: bufferedFraction
                   }));
                 }
               } catch (error) {
@@ -501,7 +650,7 @@ export default function SeamlessVideoPlayer({
                 }
               }
             }
-          }, 1000);
+          }, 500); // More frequent updates for smoother progress
         }
 
         function onPlayerStateChange(event) {
@@ -517,12 +666,47 @@ export default function SeamlessVideoPlayer({
           
           console.log('Player state changed to:', stateNames[state] || state);
           
-          // Handle buffering state
+          // Handle buffering state with visual feedback
           if (state === 3) { // BUFFERING
             isBuffering = true;
+            showBufferingOverlay(true);
             console.log('Video buffering...');
+            
+            // Clear any existing buffering timeout
+            if (bufferingTimeout) {
+              clearTimeout(bufferingTimeout);
+            }
+            
+            // Hide buffering overlay after 5 seconds if still buffering
+            bufferingTimeout = setTimeout(function() {
+              if (isBuffering) {
+                showBufferingOverlay(false);
+                console.log('Buffering timeout - hiding overlay');
+              }
+            }, 5000);
+            
           } else {
             isBuffering = false;
+            showBufferingOverlay(false);
+            if (bufferingTimeout) {
+              clearTimeout(bufferingTimeout);
+              bufferingTimeout = null;
+            }
+          }
+          
+          // Handle playing state
+          if (state === 1) { // PLAYING
+            // Upgrade quality after video starts playing smoothly
+            setTimeout(function() {
+              try {
+                if (qualityLevels.includes('medium')) {
+                  player.setPlaybackQuality('medium');
+                  console.log('Upgraded to medium quality');
+                }
+              } catch (error) {
+                console.log('Could not upgrade quality:', error);
+              }
+            }, 2000);
           }
           
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -540,6 +724,18 @@ export default function SeamlessVideoPlayer({
               currentTime: currentTime
             }));
           }
+        }
+
+        function onPlaybackQualityChange(event) {
+          console.log('Quality changed to:', event.data);
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'QUALITY_CHANGE',
+            quality: event.data
+          }));
+        }
+
+        function onPlaybackRateChange(event) {
+          console.log('Playback rate changed to:', event.data);
         }
 
         function onPlayerError(event) {
@@ -647,6 +843,9 @@ export default function SeamlessVideoPlayer({
           if (progressCheckInterval) {
             clearInterval(progressCheckInterval);
           }
+          if (bufferingTimeout) {
+            clearTimeout(bufferingTimeout);
+          }
         });
       </script>
     </body>
@@ -689,7 +888,11 @@ export default function SeamlessVideoPlayer({
     setSkipReason('');
     setPlayabilityConfirmed(false);
     setValidationStage('Initializing...');
+    setBufferingProgress(0);
+    setVideoQuality('auto');
+    setPreloadComplete(false);
     progressValue.value = 0;
+    bufferingOpacity.value = 0;
     
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -699,6 +902,11 @@ export default function SeamlessVideoPlayer({
     if (stuckCheckRef.current) {
       clearTimeout(stuckCheckRef.current);
       stuckCheckRef.current = null;
+    }
+
+    if (preloadTimeoutRef.current) {
+      clearTimeout(preloadTimeoutRef.current);
+      preloadTimeoutRef.current = null;
     }
 
     if (errorTimeout) {
@@ -783,6 +991,29 @@ export default function SeamlessVideoPlayer({
         case 'VALIDATION_STAGE':
           setValidationStage(data.stage);
           break;
+
+        case 'BUFFERING_PROGRESS':
+          setBufferingProgress(data.progress);
+          break;
+
+        case 'BUFFERING_STATE':
+          setIsBuffering(data.isBuffering);
+          if (data.isBuffering) {
+            bufferingOpacity.value = withTiming(1, { duration: 300 });
+          } else {
+            bufferingOpacity.value = withTiming(0, { duration: 300 });
+          }
+          break;
+
+        case 'PRELOAD_COMPLETE':
+          setPreloadComplete(true);
+          console.log('Video preloading complete, buffered:', data.bufferedFraction);
+          break;
+
+        case 'QUALITY_CHANGE':
+          setVideoQuality(data.quality);
+          console.log('Video quality changed to:', data.quality);
+          break;
           
         case 'PLAYER_READY':
           console.log('Player ready message received for video:', data.videoId || youtubeVideoId);
@@ -851,6 +1082,11 @@ export default function SeamlessVideoPlayer({
           
         case 'PROGRESS_UPDATE':
           const newTime = data.currentTime;
+          
+          // Update buffering progress if available
+          if (data.bufferedFraction !== undefined) {
+            setBufferingProgress(data.bufferedFraction * 100);
+          }
           
           // Check for stuck progress
           if (Math.abs(newTime - lastProgressTime) < 0.1 && newTime > 0) {
@@ -1060,6 +1296,10 @@ export default function SeamlessVideoPlayer({
     transform: [{ scale: coinBounce.value }],
   }));
 
+  const bufferingAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: bufferingOpacity.value,
+  }));
+
   const progressPercentage = Math.round((currentTime / duration) * 100);
   const remainingTime = Math.max(0, duration - currentTime);
 
@@ -1088,11 +1328,26 @@ export default function SeamlessVideoPlayer({
         {!isLoaded && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#FF4757" />
-            <Text style={styles.loadingText}>Loading video...</Text>
+            <Text style={styles.loadingText}>Loading optimized player...</Text>
             <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
             <Text style={styles.loadingSubtext}>
               {validationStage}
             </Text>
+            {bufferingProgress > 0 && (
+              <View style={styles.bufferingProgressContainer}>
+                <View style={styles.bufferingProgressBar}>
+                  <View 
+                    style={[
+                      styles.bufferingProgressFill, 
+                      { width: `${bufferingProgress}%` }
+                    ]} 
+                  />
+                </View>
+                <Text style={styles.bufferingProgressText}>
+                  {Math.round(bufferingProgress)}% buffered
+                </Text>
+              </View>
+            )}
           </View>
         )}
         
@@ -1116,6 +1371,8 @@ export default function SeamlessVideoPlayer({
           allowsFullscreenVideo={false}
           allowsProtectedMedia={false}
           dataDetectorTypes={['none']}
+          cacheEnabled={true}
+          incognito={false}
         />
         
         {/* Progress Bar Overlay */}
@@ -1124,6 +1381,27 @@ export default function SeamlessVideoPlayer({
             <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
           </View>
         </View>
+        
+        {/* Enhanced Buffering Overlay */}
+        <Animated.View style={[styles.bufferingOverlay, bufferingAnimatedStyle]}>
+          <ActivityIndicator size="large" color="#FF4757" />
+          <Text style={styles.bufferingText}>Buffering...</Text>
+          {bufferingProgress > 0 && (
+            <View style={styles.bufferingProgressContainer}>
+              <View style={styles.bufferingProgressBar}>
+                <View 
+                  style={[
+                    styles.bufferingProgressFill, 
+                    { width: `${bufferingProgress}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.bufferingProgressText}>
+                {Math.round(bufferingProgress)}%
+              </Text>
+            </View>
+          )}
+        </Animated.View>
         
         {/* Error Overlay */}
         {playerError && (
@@ -1134,14 +1412,6 @@ export default function SeamlessVideoPlayer({
             {skipReason && (
               <Text style={styles.skipReasonText}>{skipReason}</Text>
             )}
-          </View>
-        )}
-
-        {/* Buffering Overlay */}
-        {isBuffering && isLoaded && (
-          <View style={styles.bufferingOverlay}>
-            <ActivityIndicator size="large" color="#FF4757" />
-            <Text style={styles.bufferingText}>Buffering...</Text>
           </View>
         )}
       </View>
@@ -1173,7 +1443,7 @@ export default function SeamlessVideoPlayer({
           </View>
         )}
 
-        {/* Playability Status */}
+        {/* Enhanced Playability Status */}
         <View style={styles.playabilityStatus}>
           <Text style={styles.playabilityText}>
             {playabilityConfirmed ? '✅ Playable (Confirmed)' : 
@@ -1182,6 +1452,12 @@ export default function SeamlessVideoPlayer({
              '⏳ Loading...'}
           </Text>
           <Text style={styles.validationStageText}>{validationStage}</Text>
+          {preloadComplete && (
+            <Text style={styles.preloadText}>🚀 Preloaded</Text>
+          )}
+          {videoQuality !== 'auto' && (
+            <Text style={styles.qualityText}>📺 Quality: {videoQuality}</Text>
+          )}
         </View>
 
         {/* Minimal Controls */}
@@ -1248,6 +1524,28 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
+  bufferingProgressContainer: {
+    width: '80%',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  bufferingProgressBar: {
+    width: '100%',
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  bufferingProgressFill: {
+    height: '100%',
+    backgroundColor: '#FF4757',
+    borderRadius: 2,
+  },
+  bufferingProgressText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 10,
+    marginTop: 4,
+  },
   progressOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -1264,6 +1562,23 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#FF4757',
   },
+  bufferingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    zIndex: 15,
+  },
+  bufferingText: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
   errorOverlay: {
     position: 'absolute',
     top: 0,
@@ -1274,23 +1589,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     zIndex: 20,
-  },
-  bufferingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    zIndex: 15,
-  },
-  bufferingText: {
-    color: 'white',
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: 'center',
   },
   errorContainer: {
     flex: 1,
@@ -1377,6 +1675,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 2,
     fontStyle: 'italic',
+  },
+  preloadText: {
+    fontSize: 9,
+    color: '#4A90E2',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  qualityText: {
+    fontSize: 9,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 2,
   },
   controls: {
     flexDirection: 'row',
