@@ -24,8 +24,8 @@ interface VideoStore {
   clearQueue: () => void;
   removeCurrentVideo: () => void;
   resetQueue: (userId: string) => Promise<void>;
-  handleVideoError: (videoId: string, errorType: string) => Promise<void>;
-  markVideoAsUnplayable: (videoId: string, reason: string) => Promise<void>;
+  handleVideoError: (youtubeVideoId: string, errorType: string) => Promise<void>;
+  markVideoAsUnplayable: (youtubeVideoId: string, reason: string) => Promise<void>;
   addToBlacklist: (videoId: string) => void;
 }
 
@@ -241,12 +241,12 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     }
   },
 
-  markVideoAsUnplayable: async (videoId: string, reason: string) => {
-    console.log(`🚨 Marking video ${videoId} as unplayable: ${reason}`);
+  markVideoAsUnplayable: async (youtubeVideoId: string, reason: string) => {
+    console.log(`🚨 Marking video ${youtubeVideoId} as unplayable: ${reason}`);
     
     try {
       // Add to local blacklist immediately
-      get().addToBlacklist(videoId);
+      get().addToBlacklist(youtubeVideoId);
       
       const { error } = await supabase
         .from('videos')
@@ -254,14 +254,14 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           status: 'paused',
           updated_at: new Date().toISOString()
         })
-        .eq('youtube_url', videoId); // youtube_url field contains the video ID
+        .eq('youtube_url', youtubeVideoId); // youtube_url field contains the video ID
       
       if (error) {
         console.error('❌ Error marking video as unplayable:', error);
         throw error;
       }
       
-      console.log(`✅ Video ${videoId} marked as unplayable in Supabase`);
+      console.log(`✅ Video ${youtubeVideoId} marked as unplayable in Supabase`);
       
       // Remove from current queue
       await get().removeCurrentVideo();
@@ -274,18 +274,18 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     }
   },
 
-  handleVideoError: async (videoId: string, errorType: string) => {
+  handleVideoError: async (youtubeVideoId: string, errorType: string) => {
     const { errorCount } = get();
     const newErrorCount = errorCount + 1;
     
-    console.log(`🚨 Video error for ${videoId}: ${errorType} (count: ${newErrorCount})`);
+    console.log(`🚨 Video error for ${youtubeVideoId}: ${errorType} (count: ${newErrorCount})`);
     
     // Only mark as unplayable for specific critical error types
     const criticalUnplayableErrors = ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED'];
     
     if (criticalUnplayableErrors.includes(errorType)) {
       console.log(`🗑️ Error type ${errorType} indicates unplayable video, marking as such`);
-      await get().markVideoAsUnplayable(videoId, errorType);
+      await get().markVideoAsUnplayable(youtubeVideoId, errorType);
     } else {
       console.log(`⚠️ Error type ${errorType} does not indicate unplayable video, just removing from queue`);
       await get().removeCurrentVideo();

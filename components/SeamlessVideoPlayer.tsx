@@ -128,16 +128,16 @@ export default function SeamlessVideoPlayer({
   const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
 
   // Mark video as inactive in Supabase (only for confirmed unplayable videos)
-  const markVideoInactive = useCallback(async (videoId: string, reason: string, isUnplayable: boolean = true) => {
+  const markVideoInactive = useCallback(async (youtubeVideoId: string, reason: string, isUnplayable: boolean = true) => {
     if (isMarkedInactive) return; // Prevent duplicate calls
     
     try {
       setIsMarkedInactive(true);
-      console.log(`🚨 ${isUnplayable ? 'Marking' : 'NOT marking'} video ${videoId} as inactive due to: ${reason}`);
+      console.log(`🚨 ${isUnplayable ? 'Marking' : 'NOT marking'} video ${youtubeVideoId} as inactive due to: ${reason}`);
       
       if (isUnplayable) {
         // Add to local blacklist immediately to prevent re-fetching
-        addToBlacklist(videoId);
+        addToBlacklist(youtubeVideoId);
         
         const { error } = await supabase
           .from('videos')
@@ -145,16 +145,16 @@ export default function SeamlessVideoPlayer({
             status: 'paused',
             updated_at: new Date().toISOString()
           })
-          .eq('youtube_url', videoId); // youtube_url field contains the video ID
+          .eq('youtube_url', youtubeVideoId); // youtube_url field contains the video ID
         
         if (error) {
           console.error('❌ Error marking video as inactive:', error);
         } else {
-          console.log(`✅ Video ${videoId} marked as inactive in Supabase`);
-          showToast(`Removed unplayable video: ${videoId}`);
+          console.log(`✅ Video ${youtubeVideoId} marked as inactive in Supabase`);
+          showToast(`Removed unplayable video: ${youtubeVideoId}`);
         }
       } else {
-        console.log(`✅ Video ${videoId} is playable, skipping without removal`);
+        console.log(`✅ Video ${youtubeVideoId} is playable, skipping without removal`);
         showToast('Skipped playable video');
       }
     } catch (error) {
@@ -753,9 +753,9 @@ export default function SeamlessVideoPlayer({
       setSkipReason(`Video error: ${errorType} (not marking inactive)`);
     }
 
-    // Use video store error handling for queue management
-    if (shouldMarkInactive) {
-      await handleVideoError(videoId, errorType);
+    // Use video store error handling for queue management - FIXED: Pass youtubeVideoId instead of videoId
+    if (shouldMarkInactive && youtubeVideoId) {
+      await handleVideoError(youtubeVideoId, errorType);
     }
 
     // Set a timeout to skip video if error persists
@@ -772,7 +772,7 @@ export default function SeamlessVideoPlayer({
     setErrorTimeout(timeout);
     setPlayerError(errorMessage);
     setIsRetrying(true);
-  }, [isRetrying, errorTimeout, onVideoUnplayable, onVideoSkip, youtubeVideoId, errorTimeoutDuration, handleVideoError, videoId, isMarkedInactive, markVideoInactive]);
+  }, [isRetrying, errorTimeout, onVideoUnplayable, onVideoSkip, youtubeVideoId, errorTimeoutDuration, handleVideoError, isMarkedInactive, markVideoInactive]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
