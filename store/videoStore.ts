@@ -28,8 +28,8 @@ interface VideoStore {
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const QUEUE_SIZE = 10;
-const MAX_ERROR_COUNT = 5; // Increased to prevent premature queue resets
+const QUEUE_SIZE = 15; // Increased queue size for better variety
+const MAX_ERROR_COUNT = 8; // Increased to prevent premature queue resets
 
 export const useVideoStore = create<VideoStore>((set, get) => ({
   videoQueue: [],
@@ -80,7 +80,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         .eq('status', 'active') // Only active videos
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(QUEUE_SIZE * 3); // Get more to filter from
+        .limit(QUEUE_SIZE * 4); // Get more to filter from
 
       const { data: allVideos, error } = await query;
 
@@ -101,7 +101,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         return;
       }
 
-      // Filter videos on the client side
+      // Filter videos on the client side with better logic
       const availableVideos = allVideos
         .filter(video => {
           // Check if video has remaining views
@@ -295,7 +295,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         .eq('status', 'active') // ONLY ACTIVE VIDEOS
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(QUEUE_SIZE * 2); // Get more videos to filter from
+        .limit(QUEUE_SIZE * 3); // Get more videos to filter from
 
       if (error) {
         console.error('❌ Error fetching videos for reset:', error);
