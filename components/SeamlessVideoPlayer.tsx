@@ -209,6 +209,7 @@ export default function SeamlessVideoPlayer({
         var hasTimedOut = false;
         var isLiveVideo = false;
         var hasError = false;
+        var initializationInProgress = false;
 
         // Set loading timeout (5 seconds)
         loadingTimeoutId = setTimeout(function() {
@@ -272,33 +273,59 @@ export default function SeamlessVideoPlayer({
         loadYouTubeAPI();
 
         function onYouTubeIframeAPIReady() {
+          if (initializationInProgress || hasError || hasTimedOut) {
+            return;
+          }
+          
+          initializationInProgress = true;
           console.log('YouTube IFrame API ready');
           
-          player = new YT.Player('player', {
-            height: '100%',
-            width: '100%',
-            videoId: '${youtubeVideoId}',
-            playerVars: {
-              'autoplay': 1,
-              'controls': 0,
-              'modestbranding': 1,
-              'showinfo': 0,
-              'rel': 0,
-              'fs': 0,
-              'disablekb': 1,
-              'iv_load_policy': 3,
-              'enablejsapi': 1,
-              'origin': window.location.origin
-            },
-            events: {
-              'onReady': onPlayerReady,
-              'onStateChange': onPlayerStateChange,
-              'onError': onPlayerError
-            }
-          });
+          try {
+            player = new YT.Player('player', {
+              height: '100%',
+              width: '100%',
+              videoId: '${youtubeVideoId}',
+              playerVars: {
+                'autoplay': 0,
+                'controls': 0,
+                'modestbranding': 1,
+                'showinfo': 0,
+                'rel': 0,
+                'fs': 0,
+                'disablekb': 1,
+                'iv_load_policy': 3,
+                'enablejsapi': 1,
+                'origin': window.location.origin
+              },
+              events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange,
+                'onError': onPlayerError
+              }
+            });
+          } catch (error) {
+            console.error('Error creating YouTube player:', error);
+            hasError = true;
+            clearTimeout(loadingTimeoutId);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = 'Failed to initialize player';
+            
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'VIDEO_UNPLAYABLE',
+              error: 'PLAYER_INIT_ERROR',
+              message: 'Failed to initialize YouTube player',
+              errorType: 'INIT_ERROR',
+              isEmbeddingError: true
+            }));
+          }
         }
 
         function onPlayerReady(event) {
+          if (hasError || hasTimedOut) {
+            return;
+          }
+          
           console.log('Player ready');
           clearTimeout(loadingTimeoutId);
           isPlayerReady = true;
@@ -310,16 +337,24 @@ export default function SeamlessVideoPlayer({
             autoPlay: true
           }));
           
-          // Auto-start playback
+          // Auto-start playback with delay to prevent stack overflow
           setTimeout(function() {
-            if (player && player.playVideo) {
-              console.log('Starting auto-playback');
-              player.playVideo();
+            if (player && player.playVideo && isPlayerReady && !hasError) {
+              try {
+                console.log('Starting auto-playback');
+                player.playVideo();
+              } catch (error) {
+                console.error('Error starting playback:', error);
+              }
             }
-          }, 1000);
+          }, 1500);
         }
 
         function onPlayerStateChange(event) {
+          if (hasError || hasTimedOut) {
+            return;
+          }
+          
           var state = event.data;
           var stateNames = {
             '-1': 'UNSTARTED',
@@ -481,23 +516,32 @@ export default function SeamlessVideoPlayer({
 
         // Expose control functions
         window.playVideo = function() {
-          if (isPlayerReady && player && player.playVideo) {
-            autoPlayStarted = true;
-            console.log('Manual play triggered');
-            player.playVideo();
+          if (isPlayerReady && player && player.playVideo && !hasError) {
+            try {
+              autoPlayStarted = true;
+              console.log('Manual play triggered');
+              player.playVideo();
+            } catch (error) {
+              console.error('Error in manual play:', error);
+            }
           }
         };
 
         window.pauseVideo = function() {
-          if (isPlayerReady && player && player.pauseVideo) {
-            console.log('Manual pause triggered');
-            player.pauseVideo();
+          if (isPlayerReady && player && player.pauseVideo && !hasError) {
+            try {
+              console.log('Manual pause triggered');
+              player.pauseVideo();
+            } catch (error) {
+              console.error('Error in manual pause:', error);
+            }
           }
         };
 
         // Handle page errors
         window.onerror = function(msg, url, lineNo, columnNo, error) {
           console.error('Page error:', msg);
+          hasError = true;
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'VIDEO_UNPLAYABLE',
             error: 'PAGE_ERROR',
@@ -505,6 +549,7 @@ export default function SeamlessVideoPlayer({
             errorType: 'PAGE_ERROR',
             isEmbeddingError: false
           }));
+          return true; // Prevent default error handling
         };
 
         // Cleanup on page unload
@@ -575,7 +620,7 @@ export default function SeamlessVideoPlayer({
     console.log('🚨 Video error detected:', errorMessage, 'for video:', youtubeVideoId, 'type:', errorType, 'isEmbeddingError:', isEmbeddingError);
     
     // Critical errors that indicate unplayable videos
-    const criticalErrors = ['NOT_EMBEDDABLE', 'LOADING_TIMEOUT', 'API_LOAD_FAILED', 'LIVE_VIDEO', 'STUCK_BUFFERING', 'PAGE_ERROR'];
+    const criticalErrors = ['NOT_EMBEDDABLE', 'LOADING_TIMEOUT', 'API_LOAD_FAILED', 'LIVE_VIDEO', 'STUCK_BUFFERING', 'PAGE_ERROR', 'INIT_ERROR'];
     const shouldMarkInactive = isEmbeddingError || criticalErrors.includes(errorType);
     
     if (youtubeVideoId && !isMarkedInactive && shouldMarkInactive) {

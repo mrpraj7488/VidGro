@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,8 +60,8 @@ export default function Index() {
     >
       <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
         <View style={styles.logo}>
-          <Animated.Text style={styles.logoText}>VidGro</Animated.Text>
-          <Animated.Text style={styles.tagline}>Watch & Earn</Animated.Text>
+          <Text style={styles.logoText}>VidGro</Text>
+          <Text style={styles.tagline}>Watch & Earn</Text>
         </View>
       </Animated.View>
     </LinearGradient>
@@ -90,7 +90,9 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: 'bold',
     color: 'white',
-    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.3)',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
   },
   tagline: {
     fontSize: 16,

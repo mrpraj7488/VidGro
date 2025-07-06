@@ -181,6 +181,8 @@ export default function PromoteTab() {
           var maxRetries = ${maxRetries};
           var hasTimedOut = false;
           var isLiveVideo = false;
+          var hasError = false;
+          var initializationInProgress = false;
           
           // Set loading timeout
           loadingTimeoutId = setTimeout(function() {
@@ -204,6 +206,7 @@ export default function PromoteTab() {
           tag.onerror = function() {
             console.error('Failed to load YouTube IFrame API');
             clearTimeout(loadingTimeoutId);
+            hasError = true;
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
             document.getElementById('error').textContent = 'Failed to load YouTube API';
@@ -218,53 +221,84 @@ export default function PromoteTab() {
           firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
           function onYouTubeIframeAPIReady() {
+            if (initializationInProgress || hasError || hasTimedOut) {
+              return;
+            }
+            
+            initializationInProgress = true;
             console.log('YouTube IFrame API ready');
             
-            player = new YT.Player('player', {
-              height: '100%',
-              width: '100%',
-              videoId: '${videoData?.id}',
-              playerVars: {
-                'autoplay': 1,
-                'controls': 0,
-                'modestbranding': 1,
-                'showinfo': 0,
-                'rel': 0,
-                'fs': 0,
-                'disablekb': 1,
-                'iv_load_policy': 3,
-                'enablejsapi': 1,
-                'origin': window.location.origin
-              },
-              events: {
-                'onReady': onPlayerReady,
-                'onStateChange': onPlayerStateChange,
-                'onError': onPlayerError
-              }
-            });
+            try {
+              player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                videoId: '${videoData?.id}',
+                playerVars: {
+                  'autoplay': 0,
+                  'controls': 0,
+                  'modestbranding': 1,
+                  'showinfo': 0,
+                  'rel': 0,
+                  'fs': 0,
+                  'disablekb': 1,
+                  'iv_load_policy': 3,
+                  'enablejsapi': 1,
+                  'origin': window.location.origin
+                },
+                events: {
+                  'onReady': onPlayerReady,
+                  'onStateChange': onPlayerStateChange,
+                  'onError': onPlayerError
+                }
+              });
+            } catch (error) {
+              console.error('Error creating YouTube player:', error);
+              hasError = true;
+              clearTimeout(loadingTimeoutId);
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('error').style.display = 'block';
+              document.getElementById('error').textContent = 'Failed to initialize player';
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAYER_INIT_ERROR',
+                message: 'Failed to initialize YouTube player'
+              }));
+            }
           }
 
           function onPlayerReady(event) {
+            if (hasError || hasTimedOut) {
+              return;
+            }
+            
             console.log('Player ready');
             clearTimeout(loadingTimeoutId);
             isPlayerReady = true;
             document.getElementById('loading').style.display = 'none';
             
-            // Auto-start playback test
-            setTimeout(function() {
-              if (player && player.playVideo) {
-                console.log('Starting auto-playback test');
-                player.playVideo();
-              }
-            }, 1000);
-            
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'PLAYER_READY',
               videoId: '${videoData?.id}'
             }));
+            
+            // Auto-start playback test with delay to prevent stack overflow
+            setTimeout(function() {
+              if (player && player.playVideo && isPlayerReady && !hasError) {
+                try {
+                  console.log('Starting auto-playback test');
+                  player.playVideo();
+                } catch (error) {
+                  console.error('Error starting playback:', error);
+                }
+              }
+            }, 1500);
           }
 
           function onPlayerStateChange(event) {
+            if (hasError || hasTimedOut) {
+              return;
+            }
+            
             var state = event.data;
             var stateNames = {
               '-1': 'UNSTARTED',
@@ -282,15 +316,19 @@ export default function PromoteTab() {
               setTimeout(function() {
                 if (player && player.getPlayerState && player.getPlayerState() === 3) {
                   // Still buffering after 3 seconds, might be live
-                  var videoData = player.getVideoData();
-                  if (videoData && videoData.isLive) {
-                    isLiveVideo = true;
-                    console.log('Live video detected');
-                    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                      type: 'LIVE_VIDEO_DETECTED',
-                      message: 'Live videos are not supported'
-                    }));
-                    return;
+                  try {
+                    var videoData = player.getVideoData();
+                    if (videoData && videoData.isLive) {
+                      isLiveVideo = true;
+                      console.log('Live video detected');
+                      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'LIVE_VIDEO_DETECTED',
+                        message: 'Live videos are not supported'
+                      }));
+                      return;
+                    }
+                  } catch (error) {
+                    console.log('Could not check live status:', error);
                   }
                 }
               }, 3000);
@@ -322,6 +360,7 @@ export default function PromoteTab() {
           function onPlayerError(event) {
             console.error('Player error:', event.data);
             clearTimeout(loadingTimeoutId);
+            hasError = true;
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
             
@@ -407,23 +446,33 @@ export default function PromoteTab() {
           
           // Manual control functions
           window.testPlayback = function() {
-            if (player && player.playVideo && isPlayerReady) {
-              console.log('Manual playback test triggered');
-              player.playVideo();
+            if (player && player.playVideo && isPlayerReady && !hasError) {
+              try {
+                console.log('Manual playback test triggered');
+                player.playVideo();
+              } catch (error) {
+                console.error('Error in manual playback:', error);
+              }
             }
           };
           
           window.detectTitle = function() {
-            detectTitle();
+            try {
+              detectTitle();
+            } catch (error) {
+              console.error('Error in manual title detection:', error);
+            }
           };
           
           // Handle page errors
           window.onerror = function(msg, url, lineNo, columnNo, error) {
             console.error('Page error:', msg);
+            hasError = true;
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'PAGE_ERROR',
               message: 'Page error: ' + msg
             }));
+            return true; // Prevent default error handling
           };
         </script>
       </body>
@@ -454,6 +503,7 @@ export default function PromoteTab() {
           break;
           
         case 'API_LOAD_ERROR':
+        case 'PLAYER_INIT_ERROR':
           setError('Failed to load YouTube API. Please check your internet connection.');
           break;
           
