@@ -43,6 +43,7 @@ export default function ViewTab() {
   const [loading, setLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<'healthy' | 'warning' | 'error'>('healthy');
   const [statusMessage, setStatusMessage] = useState<string>('');
+  const [queueState, setQueueState] = useState<string>('');
 
   const coinBounce = useSharedValue(1);
   const progressScale = useSharedValue(0);
@@ -65,10 +66,16 @@ export default function ViewTab() {
   // Auto-reload when queue is empty
   useEffect(() => {
     if (user && !currentVideo && !loading && !isLoadingQueue) {
-      console.log('No current video, auto-reloading queue...');
+      console.log('🔄 No current video, auto-reloading queue...');
       loadVideoQueue();
     }
   }, [currentVideo, user, loading, isLoadingQueue]);
+
+  // Update queue state display
+  useEffect(() => {
+    const { videoQueue, currentVideoIndex } = useVideoStore.getState();
+    setQueueState(`Queue: ${currentVideoIndex + 1}/${videoQueue.length}`);
+  }, [currentVideo]);
 
   const loadVideoQueue = async () => {
     if (!user || isLoadingQueue || loading) return;
@@ -86,7 +93,7 @@ export default function ViewTab() {
       const video = getCurrentVideo();
       if (!video) {
         // No videos available, try reset
-        console.log('No active videos in queue, attempting reset...');
+        console.log('⚠️ No active videos in queue, attempting reset...');
         setStatusMessage('Refreshing active video queue...');
         
         await resetQueue(user.id);
@@ -100,16 +107,16 @@ export default function ViewTab() {
         } else {
           setSystemStatus('healthy');
           setStatusMessage('Ready to watch');
-          console.log('✅ Active video loaded after reset:', newVideo);
+          console.log('✅ Active video loaded after reset:', newVideo.youtube_url);
         }
       } else {
         setSystemStatus('healthy');
         setStatusMessage('Ready to watch');
-        console.log('✅ Current active video loaded:', video);
+        console.log('✅ Current active video loaded:', video.youtube_url);
       }
       
     } catch (error: any) {
-      console.error('Error loading video queue:', error);
+      console.error('❌ Error loading video queue:', error);
       setError(error.message || 'Failed to load videos. Please try again.');
       setSystemStatus('error');
       setStatusMessage('Failed to load videos');
@@ -120,12 +127,12 @@ export default function ViewTab() {
 
   const handleVideoComplete = async () => {
     if (!currentVideo || !user || !profile) {
-      console.error('Missing required data for completing video');
+      console.error('❌ Missing required data for completing video');
       return;
     }
 
     try {
-      console.log('🎯 Completing video silently:', currentVideo.id);
+      console.log('🎯 Completing video silently:', currentVideo.youtube_url);
       setStatusMessage('Processing completion...');
 
       // Check if user has already watched this video
@@ -141,7 +148,7 @@ export default function ViewTab() {
 
       if (existingView) {
         // User has watched this video before (looping scenario)
-        console.log('User has watched this video before, updating existing view...');
+        console.log('🔄 User has watched this video before, updating existing view...');
         
         // Update the existing view record
         const { error: updateError } = await supabase
@@ -155,16 +162,16 @@ export default function ViewTab() {
           .eq('id', existingView.id);
 
         if (updateError) {
-          console.error('Error updating existing video view:', updateError);
+          console.error('❌ Error updating existing video view:', updateError);
           throw new Error(`Failed to update video view: ${updateError.message}`);
         }
 
         // Don't update video view count for repeat views
         shouldUpdateVideoCount = false;
-        console.log('Existing video view updated successfully');
+        console.log('✅ Existing video view updated successfully');
       } else {
         // First time watching this video
-        console.log('First time watching this video, creating new view...');
+        console.log('🆕 First time watching this video, creating new view...');
         
         const { error: viewError } = await supabase
           .from('video_views')
@@ -177,11 +184,11 @@ export default function ViewTab() {
           });
 
         if (viewError) {
-          console.error('Error creating video view:', viewError);
+          console.error('❌ Error creating video view:', viewError);
           throw new Error(`Failed to record video view: ${viewError.message}`);
         }
 
-        console.log('New video view recorded successfully');
+        console.log('✅ New video view recorded successfully');
       }
 
       // Always update user coins (both for new and repeat views)
@@ -194,7 +201,7 @@ export default function ViewTab() {
         .eq('id', user.id);
 
       if (coinError) {
-        console.error('Error updating coins:', coinError);
+        console.error('❌ Error updating coins:', coinError);
         throw new Error(`Failed to update coins: ${coinError.message}`);
       }
 
@@ -210,7 +217,7 @@ export default function ViewTab() {
         });
 
       if (transactionError) {
-        console.error('Error recording transaction:', transactionError);
+        console.error('⚠️ Error recording transaction:', transactionError);
         // Don't throw error for transaction recording failure
       }
 
@@ -224,7 +231,7 @@ export default function ViewTab() {
           .single();
 
         if (fetchError) {
-          console.error('Error fetching video data:', fetchError);
+          console.error('⚠️ Error fetching video data:', fetchError);
         } else {
           const newViewsCount = (videoData.views_count || 0) + 1;
           
@@ -237,7 +244,7 @@ export default function ViewTab() {
             .eq('id', currentVideo.id);
 
           if (videoUpdateError) {
-            console.error('Error updating video view count:', videoUpdateError);
+            console.error('⚠️ Error updating video view count:', videoUpdateError);
             // Don't throw error for view count update failure
           }
         }
@@ -261,20 +268,23 @@ export default function ViewTab() {
 
       // Move to next video immediately without popup
       setTimeout(() => {
+        console.log('🔄 Moving to next video after completion...');
         moveToNextVideo();
         
         // Check if we need to reload queue
         setTimeout(() => {
           const nextVideo = getCurrentVideo();
           if (!nextVideo) {
-            console.log('No next video, triggering reload...');
+            console.log('🔄 No next video, triggering reload...');
             loadVideoQueue();
+          } else {
+            console.log('✅ Next video ready:', nextVideo.youtube_url);
           }
         }, 100);
       }, 100); // Instant transition
 
     } catch (error: any) {
-      console.error('Error completing video:', error);
+      console.error('❌ Error completing video:', error);
       setError(error.message || 'Failed to complete video. Please try again.');
       setSystemStatus('error');
       setStatusMessage('Failed to complete video');
@@ -282,23 +292,28 @@ export default function ViewTab() {
   };
 
   const handleVideoSkip = () => {
-    // Silent skip without confirmation
+    // Silent skip without confirmation - for playable videos only
+    console.log('⏭️ Skipping playable video (user choice)');
     setStatusMessage('Skipping video...');
+    showToast('Skipped playable video');
+    
     moveToNextVideo();
     
     // Check if we need to reload queue
     setTimeout(() => {
       const nextVideo = getCurrentVideo();
       if (!nextVideo) {
-        console.log('No next video after skip, triggering reload...');
+        console.log('🔄 No next video after skip, triggering reload...');
         loadVideoQueue();
+      } else {
+        console.log('✅ Next video ready after skip:', nextVideo.youtube_url);
       }
     }, 100);
   };
 
   const handleVideoUnplayable = async () => {
     console.log('🚨 Video is unplayable, removing from queue...');
-    showToast('Video unavailable, skipping...');
+    showToast('Removed unplayable video');
     
     // Remove the unplayable video and move to next
     await removeCurrentVideo();
@@ -307,14 +322,16 @@ export default function ViewTab() {
     setTimeout(() => {
       const nextVideo = getCurrentVideo();
       if (!nextVideo) {
-        console.log('No next video after removal, triggering reload...');
+        console.log('🔄 No next video after removal, triggering reload...');
         loadVideoQueue();
+      } else {
+        console.log('✅ Next video ready after removal:', nextVideo.youtube_url);
       }
     }, 100);
   };
 
   const handleVideoError = (errorMessage: string) => {
-    console.error('Video error:', errorMessage);
+    console.error('❌ Video error:', errorMessage);
     setError(errorMessage);
     setSystemStatus('error');
     setStatusMessage('Video playback error');
@@ -343,7 +360,7 @@ export default function ViewTab() {
   const openInYouTube = () => {
     if (currentVideo) {
       if (Platform.OS === 'web') {
-        window.open(currentVideo.youtube_url, '_blank');
+        window.open(`https://www.youtube.com/watch?v=${currentVideo.youtube_url}`, '_blank');
       } else {
         showToast('Opening in YouTube...');
       }
@@ -429,6 +446,9 @@ export default function ViewTab() {
           <RefreshCw color="#FF4757" size={32} />
           <Text style={styles.loadingText}>Loading active videos...</Text>
           <Text style={styles.loadingSubtext}>Filtering for embeddable content...</Text>
+          {queueState && (
+            <Text style={styles.loadingSubtext}>{queueState}</Text>
+          )}
         </View>
       </View>
     );
@@ -550,6 +570,14 @@ export default function ViewTab() {
             <Text style={styles.videoTitle} numberOfLines={2}>
               {currentVideo.title}
             </Text>
+
+            {/* Queue State Display */}
+            {queueState && (
+              <View style={styles.queueStateContainer}>
+                <Text style={styles.queueStateText}>{queueState}</Text>
+                <Text style={styles.queueStateSubtext}>Video ID: {currentVideo.youtube_url}</Text>
+              </View>
+            )}
 
             {/* Stats Row */}
             <View style={styles.statsContainer}>
@@ -727,6 +755,25 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 22,
     marginBottom: 16,
+  },
+  queueStateContainer: {
+    backgroundColor: '#F0F8FF',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4A90E2',
+  },
+  queueStateText: {
+    fontSize: 12,
+    color: '#4A90E2',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  queueStateSubtext: {
+    fontSize: 10,
+    color: '#666',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   statsContainer: {
     flexDirection: 'row',
