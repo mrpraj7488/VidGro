@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,23 +9,26 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Image,
   ToastAndroid,
+  Dimensions,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Link, Type, Clock, DollarSign, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Link, Type, Clock, DollarSign, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause } from 'lucide-react-native';
+
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
 
 interface VideoData {
   id: string;
-  title: string;
-  duration: number;
+  embedUrl: string;
   thumbnail: string;
-  valid: boolean;
+  title?: string;
   embeddable: boolean;
   originalUrl: string;
-  warning?: string;
+  autoDetectedTitle?: string;
 }
 
 export default function PromoteTab() {
@@ -38,6 +41,13 @@ export default function PromoteTab() {
   const [fetchingVideo, setFetchingVideo] = useState(false);
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showIframe, setShowIframe] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [embedabilityTested, setEmbedabilityTested] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [testingPlayback, setTestingPlayback] = useState(false);
+  
+  const webviewRef = useRef<WebView>(null);
 
   const showToast = (message: string) => {
     if (Platform.OS === 'android') {
@@ -56,6 +66,8 @@ export default function PromoteTab() {
     setFetchingVideo(true);
     setError(null);
     setVideoData(null);
+    setShowIframe(false);
+    setEmbedabilityTested(false);
 
     try {
       console.log('Fetching video data for URL:', youtubeUrl);
@@ -70,60 +82,28 @@ export default function PromoteTab() {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        
-        // Handle embeddability error specifically
-        if (errorData.embeddable === false) {
-          Alert.alert(
-            'Video Not Embeddable',
-            'This video cannot be embedded. Please make it embeddable first or choose a different video.',
-            [{ text: 'OK' }]
-          );
-          setError('Video not embeddable');
-          return;
-        }
-        
         throw new Error(errorData.message || `HTTP ${response.status}: Failed to fetch video data`);
       }
       
       const data = await response.json();
       console.log('Video data received:', data);
 
-      if (data.valid && data.embeddable) {
-        // Create VideoData object with all required fields
+      if (data.valid && data.id) {
         const processedVideoData: VideoData = {
           id: data.id,
-          title: data.title,
-          duration: data.duration,
+          embedUrl: data.embedUrl,
           thumbnail: data.thumbnail,
-          valid: data.valid,
-          embeddable: data.embeddable,
+          embeddable: false, // Will be tested
           originalUrl: data.originalUrl || youtubeUrl,
-          warning: data.warning
         };
 
         setVideoData(processedVideoData);
-        setTitle(data.title || '');
         setError(null);
+        setShowIframe(true); // Auto-show iframe for testing
         
-        if (data.warning) {
-          showToast(`Warning: ${data.warning}`);
-        }
-        
-        showToast('Video validated successfully!');
+        showToast('Video ID extracted. Testing embedability...');
       } else {
-        const errorMsg = data.embeddable === false 
-          ? 'Video not embeddable, make it embeddable first'
-          : data.message || 'Invalid YouTube video';
-        
-        if (data.embeddable === false) {
-          Alert.alert(
-            'Video Not Embeddable',
-            'This video cannot be embedded. Please make it embeddable first or choose a different video.',
-            [{ text: 'OK' }]
-          );
-        }
-        
-        setError(errorMsg);
+        setError(data.message || 'Invalid YouTube video');
         setVideoData(null);
       }
     } catch (error: any) {
@@ -132,6 +112,237 @@ export default function PromoteTab() {
       setVideoData(null);
     } finally {
       setFetchingVideo(false);
+    }
+  };
+
+  const createIframeHTML = (embedUrl: string) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+          }
+          #player {
+            width: 100%;
+            height: 100%;
+            border: none;
+          }
+          .controls {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+          }
+          .control-btn {
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 0 4px;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+        </style>
+      </head>
+      <body>
+        <iframe 
+          id="player"
+          src="${embedUrl}?autoplay=1&controls=0&modestbranding=1&showinfo=0&rel=0&fs=0&disablekb=1&iv_load_policy=3&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}"
+          allow="autoplay; encrypted-media"
+          allowfullscreen="false"
+          onload="handleIframeLoad()"
+          onerror="handleIframeError()"
+        ></iframe>
+        
+        <div class="controls">
+          <button class="control-btn" onclick="testPlayback()">Test Play</button>
+          <button class="control-btn" onclick="detectTitle()">Get Title</button>
+        </div>
+
+        <script>
+          let player;
+          let isEmbeddable = false;
+          let autoDetectedTitle = '';
+          
+          function handleIframeLoad() {
+            console.log('Iframe loaded successfully');
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'IFRAME_LOADED',
+              success: true
+            }));
+            
+            // Auto-test playback after load
+            setTimeout(() => {
+              testPlayback();
+            }, 2000);
+          }
+          
+          function handleIframeError() {
+            console.log('Iframe failed to load');
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'IFRAME_ERROR',
+              success: false,
+              message: 'Failed to load video iframe'
+            }));
+          }
+          
+          function testPlayback() {
+            console.log('Testing video playback...');
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'TESTING_PLAYBACK',
+              message: 'Testing video playback...'
+            }));
+            
+            // Try to detect if video is playing by checking iframe content
+            const iframe = document.getElementById('player');
+            if (iframe) {
+              try {
+                // Check if iframe loaded without errors
+                isEmbeddable = true;
+                
+                // Auto-detect title from iframe
+                setTimeout(() => {
+                  detectTitle();
+                }, 1000);
+                
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'PLAYBACK_SUCCESS',
+                  embeddable: true,
+                  message: 'Video appears to be embeddable'
+                }));
+              } catch (error) {
+                console.error('Playback test failed:', error);
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'PLAYBACK_FAILED',
+                  embeddable: false,
+                  message: 'Video is not embeddable: ' + error.message
+                }));
+              }
+            }
+          }
+          
+          function detectTitle() {
+            try {
+              // Try multiple methods to get video title
+              let detectedTitle = '';
+              
+              // Method 1: Check document title
+              if (document.title && document.title !== 'YouTube') {
+                detectedTitle = document.title.replace(' - YouTube', '');
+              }
+              
+              // Method 2: Try to access iframe content (may be blocked by CORS)
+              const iframe = document.getElementById('player');
+              if (iframe && iframe.contentDocument) {
+                const iframeTitle = iframe.contentDocument.title;
+                if (iframeTitle && iframeTitle !== 'YouTube') {
+                  detectedTitle = iframeTitle.replace(' - YouTube', '');
+                }
+              }
+              
+              // Method 3: Generate a default title based on video ID
+              if (!detectedTitle) {
+                const urlParams = new URLSearchParams(iframe.src.split('?')[1]);
+                const videoId = iframe.src.match(/embed\/([^?]+)/)?.[1];
+                detectedTitle = \`Video \${videoId || 'Unknown'}\`;
+              }
+              
+              autoDetectedTitle = detectedTitle;
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'TITLE_DETECTED',
+                title: detectedTitle,
+                success: true
+              }));
+              
+            } catch (error) {
+              console.error('Title detection failed:', error);
+              // Fallback title
+              const videoId = '${videoData?.id || 'Unknown'}';
+              autoDetectedTitle = \`Video \${videoId}\`;
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'TITLE_DETECTED',
+                title: autoDetectedTitle,
+                success: false,
+                message: 'Used fallback title due to CORS restrictions'
+              }));
+            }
+          }
+          
+          // Auto-start testing when page loads
+          window.addEventListener('load', () => {
+            setTimeout(() => {
+              handleIframeLoad();
+            }, 1000);
+          });
+        </script>
+      </body>
+      </html>
+    `;
+  };
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('WebView message:', data);
+      
+      switch (data.type) {
+        case 'IFRAME_LOADED':
+          setIframeLoaded(true);
+          showToast('Video iframe loaded successfully');
+          break;
+          
+        case 'IFRAME_ERROR':
+          setError('Failed to load video iframe. Video may not be embeddable.');
+          setVideoData(prev => prev ? { ...prev, embeddable: false } : null);
+          break;
+          
+        case 'TESTING_PLAYBACK':
+          setTestingPlayback(true);
+          break;
+          
+        case 'PLAYBACK_SUCCESS':
+          setTestingPlayback(false);
+          setEmbedabilityTested(true);
+          setVideoData(prev => prev ? { ...prev, embeddable: true } : null);
+          showToast('✅ Video is embeddable!');
+          break;
+          
+        case 'PLAYBACK_FAILED':
+          setTestingPlayback(false);
+          setEmbedabilityTested(true);
+          setVideoData(prev => prev ? { ...prev, embeddable: false } : null);
+          Alert.alert(
+            'Video Not Embeddable',
+            'This video cannot be embedded. Please make it embeddable first or choose a different video.',
+            [{ text: 'OK' }]
+          );
+          break;
+          
+        case 'TITLE_DETECTED':
+          if (data.title) {
+            setVideoData(prev => prev ? { ...prev, autoDetectedTitle: data.title } : null);
+            if (!title) {
+              setTitle(data.title);
+            }
+            showToast(`Title detected: ${data.title}`);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error parsing WebView message:', error);
     }
   };
 
@@ -156,7 +367,6 @@ export default function PromoteTab() {
 
   const validateDuration = () => {
     const userDuration = parseInt(userSetDuration);
-    const videoDuration = videoData?.duration || 0;
     
     if (isNaN(userDuration) || userDuration < 10) {
       return 'Duration must be at least 10 seconds';
@@ -164,10 +374,6 @@ export default function PromoteTab() {
     
     if (userDuration > 600) {
       return 'Duration must be less than 600 seconds (10 minutes)';
-    }
-    
-    if (videoDuration > 0 && userDuration > videoDuration) {
-      return `Duration cannot exceed actual video length (${videoDuration} seconds)`;
     }
     
     return null;
@@ -209,11 +415,20 @@ export default function PromoteTab() {
       return;
     }
 
-    // Check if video is embeddable before proceeding
-    if (!videoData || !videoData.embeddable) {
+    // Check if video embedability was tested
+    if (!videoData || !embedabilityTested) {
+      Alert.alert(
+        'Test Embedability First',
+        'Please test the video embedability using the iframe preview before promoting.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (!videoData.embeddable) {
       Alert.alert(
         'Video Not Embeddable',
-        'Please validate the video first and ensure it is embeddable.',
+        'This video cannot be embedded. Please make it embeddable first or choose a different video.',
         [{ text: 'OK' }]
       );
       return;
@@ -229,7 +444,7 @@ export default function PromoteTab() {
         title,
         duration: durationSeconds,
         targetViews: views,
-        videoId: videoData.id, // Store only video ID
+        videoId: videoData.id,
         embeddable: videoData.embeddable
       });
 
@@ -253,12 +468,12 @@ export default function PromoteTab() {
 
       console.log('Coins deducted successfully');
 
-      // Create video promotion with only video ID (no URLs stored)
+      // Create video promotion with video ID and embed URL
       const videoInsertData = {
         user_id: user.id,
         youtube_url: videoData.id, // Store only the video ID
         title,
-        description: `Original URL: ${videoData.originalUrl} | User-set duration: ${durationSeconds}s${videoData?.duration ? ` (Actual: ${videoData.duration}s)` : ''} - Video ID: ${videoData.id}${videoData?.warning ? ` - Warning: ${videoData.warning}` : ''}`,
+        description: `Embed URL: ${videoData.embedUrl} | Original URL: ${videoData.originalUrl} | Auto-detected title: ${videoData.autoDetectedTitle || 'N/A'} | User-set duration: ${durationSeconds}s | Video ID: ${videoData.id}`,
         duration_seconds: durationSeconds,
         coin_cost: totalCost,
         coin_reward: rewardPerView,
@@ -285,7 +500,7 @@ export default function PromoteTab() {
       // Refresh profile to get updated coin balance
       await refreshProfile();
 
-      // Show success toast instead of alert
+      // Show success toast
       showToast(`Video promoted successfully! ${totalCost} coins deducted.`);
       
       // Reset form
@@ -306,12 +521,23 @@ export default function PromoteTab() {
     setTargetViews('');
     setVideoData(null);
     setError(null);
+    setShowIframe(false);
+    setIframeLoaded(false);
+    setEmbedabilityTested(false);
+    setIsPlaying(false);
+    setTestingPlayback(false);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const testPlaybackManually = () => {
+    if (webviewRef.current) {
+      webviewRef.current.injectJavaScript('testPlayback(); true;');
+    }
+  };
+
+  const detectTitleManually = () => {
+    if (webviewRef.current) {
+      webviewRef.current.injectJavaScript('detectTitle(); true;');
+    }
   };
 
   return (
@@ -365,54 +591,99 @@ export default function PromoteTab() {
                 </TouchableOpacity>
               </View>
               {fetchingVideo && (
-                <Text style={styles.helperText}>Validating video embeddability and extracting video ID...</Text>
+                <Text style={styles.helperText}>Extracting video ID and preparing embed URL...</Text>
               )}
               <Text style={styles.helperText}>
-                Supports both youtube.com/watch and youtu.be formats. Only video ID will be stored for optimal playback.
+                Supports both youtube.com/watch and youtu.be formats. Video embedability will be tested automatically.
               </Text>
             </View>
 
-            {/* Video Preview */}
-            {videoData && videoData.embeddable && (
-              <View style={styles.videoPreview}>
-                <View style={styles.videoPreviewHeader}>
-                  <CheckCircle color="#2ECC71" size={20} />
-                  <Text style={styles.videoPreviewTitle}>Video Validated & ID Extracted</Text>
-                </View>
-                <View style={styles.videoPreviewContent}>
-                  <Image 
-                    source={{ uri: videoData.thumbnail }} 
-                    style={styles.videoThumbnail}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.videoInfo}>
-                    <Text style={styles.videoTitle} numberOfLines={2}>
-                      {videoData.title}
+            {/* Iframe Preview */}
+            {videoData && (
+              <View style={styles.iframeSection}>
+                <TouchableOpacity
+                  style={styles.iframeToggle}
+                  onPress={() => setShowIframe(!showIframe)}
+                >
+                  <View style={styles.iframeToggleContent}>
+                    <Text style={styles.iframeToggleTitle}>
+                      Embedability Test {embedabilityTested && (videoData.embeddable ? '✅' : '❌')}
                     </Text>
-                    <Text style={styles.videoDuration}>
-                      Actual Duration: {formatTime(videoData.duration)}
-                    </Text>
-                    <Text style={styles.videoNote}>
-                      ✅ Embeddable - Ready for promotion
-                    </Text>
-                    <Text style={styles.urlConversion}>
-                      🆔 Video ID: {videoData.id}
-                    </Text>
-                    {videoData.warning && (
-                      <Text style={styles.videoWarning}>
-                        ⚠️ {videoData.warning}
-                      </Text>
+                    {showIframe ? <ChevronUp color="#666" size={20} /> : <ChevronDown color="#666" size={20} />}
+                  </View>
+                </TouchableOpacity>
+                
+                {showIframe && (
+                  <View style={styles.iframeContainer}>
+                    <View style={styles.iframeHeader}>
+                      <Text style={styles.iframeUrl}>Embed URL: {videoData.embedUrl}</Text>
+                      <View style={styles.iframeControls}>
+                        <TouchableOpacity
+                          style={styles.controlButton}
+                          onPress={testPlaybackManually}
+                          disabled={testingPlayback}
+                        >
+                          <Play color="#FF4757" size={16} />
+                          <Text style={styles.controlButtonText}>
+                            {testingPlayback ? 'Testing...' : 'Test Play'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.controlButton}
+                          onPress={detectTitleManually}
+                        >
+                          <Type color="#FF4757" size={16} />
+                          <Text style={styles.controlButtonText}>Get Title</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.webviewContainer}>
+                      <WebView
+                        ref={webviewRef}
+                        source={{ html: createIframeHTML(videoData.embedUrl) }}
+                        style={styles.webview}
+                        onMessage={handleWebViewMessage}
+                        javaScriptEnabled={true}
+                        domStorageEnabled={true}
+                        allowsInlineMediaPlayback={true}
+                        mediaPlaybackRequiresUserAction={false}
+                        mixedContentMode="compatibility"
+                        originWhitelist={['*']}
+                        allowsFullscreenVideo={false}
+                      />
+                      
+                      {!iframeLoaded && (
+                        <View style={styles.loadingOverlay}>
+                          <Text style={styles.loadingText}>Loading video preview...</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    {embedabilityTested && (
+                      <View style={[
+                        styles.embedabilityResult,
+                        videoData.embeddable ? styles.embedabilitySuccess : styles.embedabilityError
+                      ]}>
+                        {videoData.embeddable ? (
+                          <>
+                            <CheckCircle color="#2ECC71" size={20} />
+                            <Text style={styles.embedabilityText}>
+                              ✅ Video is embeddable and ready for promotion!
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle color="#E74C3C" size={20} />
+                            <Text style={styles.embedabilityText}>
+                              ❌ Video is not embeddable. Please make it embeddable first.
+                            </Text>
+                          </>
+                        )}
+                      </View>
                     )}
                   </View>
-                </View>
-                <View style={styles.urlDetails}>
-                  <Text style={styles.urlLabel}>Original URL:</Text>
-                  <Text style={styles.urlText} numberOfLines={1}>{videoData.originalUrl}</Text>
-                  <Text style={styles.urlLabel}>Video ID (stored):</Text>
-                  <Text style={styles.urlText} numberOfLines={1}>{videoData.id}</Text>
-                  <Text style={styles.urlLabel}>Embed URL (generated):</Text>
-                  <Text style={styles.urlText} numberOfLines={1}>https://www.youtube.com/embed/{videoData.id}</Text>
-                </View>
+                )}
               </View>
             )}
 
@@ -429,6 +700,16 @@ export default function PromoteTab() {
                   maxLength={100}
                 />
               </View>
+              {videoData?.autoDetectedTitle && (
+                <TouchableOpacity
+                  style={styles.autoTitleButton}
+                  onPress={() => setTitle(videoData.autoDetectedTitle || '')}
+                >
+                  <Text style={styles.autoTitleText}>
+                    Use auto-detected: "{videoData.autoDetectedTitle}"
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* User-Set Duration */}
@@ -446,14 +727,8 @@ export default function PromoteTab() {
                 />
               </View>
               <Text style={styles.helperText}>
-                Minimum 10 seconds, Maximum 600 seconds
-                {videoData && ` (Video is ${videoData.duration}s long)`}
+                Minimum 10 seconds, Maximum 600 seconds (10 minutes)
               </Text>
-              {userSetDuration && videoData && parseInt(userSetDuration) > videoData.duration && (
-                <Text style={styles.errorHelperText}>
-                  ⚠️ Duration cannot exceed actual video length ({videoData.duration}s)
-                </Text>
-              )}
             </View>
 
             {/* Target Views */}
@@ -500,8 +775,8 @@ export default function PromoteTab() {
                 </View>
                 {videoData && videoData.embeddable && (
                   <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>Storage:</Text>
-                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Video ID only</Text>
+                    <Text style={styles.costLabel}>Embedability:</Text>
+                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Verified</Text>
                   </View>
                 )}
               </View>
@@ -524,14 +799,14 @@ export default function PromoteTab() {
 
             {/* Instructions */}
             <View style={styles.instructionsCard}>
-              <Text style={styles.instructionsTitle}>How video ID storage works:</Text>
+              <Text style={styles.instructionsTitle}>How iframe embedability testing works:</Text>
               <Text style={styles.instructionsText}>
                 1. Enter any YouTube URL format (youtube.com/watch or youtu.be){'\n'}
-                2. System validates embeddability and extracts video ID{'\n'}
-                3. Only the 11-character video ID is stored in database{'\n'}
-                4. Embed URLs are generated dynamically during playback{'\n'}
-                5. This ensures optimal performance and compatibility{'\n'}
-                6. Your video gets promoted to more viewers efficiently!
+                2. System extracts video ID and creates embed URL{'\n'}
+                3. Iframe automatically tests video embedability{'\n'}
+                4. Title is auto-detected using JavaScript injection{'\n'}
+                5. Only embeddable videos can be promoted{'\n'}
+                6. Your video gets promoted to viewers efficiently!
               </Text>
             </View>
           </View>
@@ -651,103 +926,126 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  errorHelperText: {
-    fontSize: 12,
-    color: '#FF4757',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  videoPreview: {
+  iframeSection: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
     marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#2ECC71',
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
-        shadowColor: '#2ECC71',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.05,
         shadowRadius: 4,
       },
       android: {
-        elevation: 3,
+        elevation: 2,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(46, 204, 113, 0.1)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
       },
     }),
   },
-  videoPreviewHeader: {
+  iframeToggle: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  iframeToggleContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
   },
-  videoPreviewTitle: {
+  iframeToggleTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2ECC71',
-    marginLeft: 8,
+    color: '#333',
   },
-  videoPreviewContent: {
-    flexDirection: 'row',
+  iframeContainer: {
+    padding: 16,
+  },
+  iframeHeader: {
     marginBottom: 12,
   },
-  videoThumbnail: {
-    width: 120,
-    height: 68,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  videoInfo: {
-    flex: 1,
-  },
-  videoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  videoDuration: {
+  iframeUrl: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  videoNote: {
-    fontSize: 11,
-    color: '#2ECC71',
-    fontWeight: '500',
-    marginBottom: 4,
+  iframeControls: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  urlConversion: {
-    fontSize: 11,
-    color: '#4A90E2',
-    fontWeight: '500',
-    marginBottom: 4,
+  controlButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
   },
-  videoWarning: {
-    fontSize: 11,
+  controlButtonText: {
+    fontSize: 12,
     color: '#FF4757',
     fontWeight: '500',
   },
-  urlDetails: {
-    backgroundColor: '#F8F9FA',
+  webviewContainer: {
+    height: isSmallScreen ? 180 : 220,
     borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  webview: {
+    flex: 1,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  embedabilityResult: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8,
+  },
+  embedabilitySuccess: {
+    backgroundColor: '#E8F5E8',
+  },
+  embedabilityError: {
+    backgroundColor: '#FFE5E5',
+  },
+  embedabilityText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  autoTitleButton: {
     marginTop: 8,
+    padding: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4A90E2',
   },
-  urlLabel: {
-    fontSize: 11,
-    color: '#666',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  urlText: {
-    fontSize: 10,
-    color: '#333',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    marginBottom: 8,
+  autoTitleText: {
+    fontSize: 12,
+    color: '#4A90E2',
+    fontWeight: '500',
   },
   costCard: {
     backgroundColor: 'white',

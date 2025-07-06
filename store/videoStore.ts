@@ -29,9 +29,9 @@ interface VideoStore {
   addToBlacklist: (videoId: string) => void;
 }
 
-const CACHE_DURATION = 3 * 60 * 1000; // Reduced to 3 minutes for faster updates
-const QUEUE_SIZE = 15; // Increased queue size for better variety
-const MAX_ERROR_COUNT = 8; // Increased to prevent premature queue resets
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache as requested
+const QUEUE_SIZE = 10; // Top 10 video IDs as requested
+const MAX_ERROR_COUNT = 5; // Reduced for faster queue management
 
 export const useVideoStore = create<VideoStore>((set, get) => ({
   videoQueue: [],
@@ -68,7 +68,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     set({ isLoading: true, errorCount: 0 });
 
     try {
-      console.log('🔄 Fetching video queue for user:', userId);
+      console.log('🔄 Fetching top 10 video queue for user:', userId);
       
       // First, get videos that the user has already watched
       const { data: watchedVideos, error: watchedError } = await supabase
@@ -84,14 +84,14 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
       console.log('📊 User has watched videos:', watchedVideoIds.length);
       
-      // CRITICAL: Get only ACTIVE videos (status='active') with a fresh query
+      // Get only ACTIVE videos with fresh query (top 10 as requested)
       let query = supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id, status, updated_at')
         .eq('status', 'active') // Only active videos
         .neq('user_id', userId)
         .order('updated_at', { ascending: false }) // Order by updated_at to get freshest data
-        .limit(QUEUE_SIZE * 4); // Get more to filter from
+        .limit(QUEUE_SIZE * 2); // Get more to filter from
 
       const { data: allVideos, error } = await query;
 
@@ -134,7 +134,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           
           return isAvailable;
         })
-        .slice(0, QUEUE_SIZE) // Limit to queue size
+        .slice(0, QUEUE_SIZE) // Limit to top 10 as requested
         .map(video => ({
           id: video.id,
           youtube_url: video.youtube_url, // This is now the video ID
@@ -151,7 +151,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         return;
       }
 
-      console.log(`✅ Fetched ${availableVideos.length} active videos for queue`);
+      console.log(`✅ Fetched top ${availableVideos.length} active videos for queue`);
       console.log('📊 Queue state after fetch:', {
         totalVideos: availableVideos.length,
         firstVideo: availableVideos[0]?.youtube_url,
@@ -194,7 +194,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       console.log(`✅ Moved to video index ${nextIndex}: ${videoQueue[nextIndex]?.youtube_url}`);
     } else {
       // Queue exhausted, clear it to trigger reload
-      console.log('📭 Queue exhausted, clearing for reload...');
+      console.log('📭 Queue exhausted, clearing for instant reload...');
       set({ 
         videoQueue: [], 
         currentVideoIndex: 0,
@@ -221,8 +221,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     console.log(`📊 Queue state after removal: ${newQueue.length} videos remaining`);
     
     if (newQueue.length === 0) {
-      // No more videos, clear queue to trigger reload
-      console.log('📭 No more videos after removal, clearing queue');
+      // No more videos, clear queue to trigger instant reload
+      console.log('📭 No more videos after removal, clearing queue for instant reload');
       set({ 
         videoQueue: [], 
         currentVideoIndex: 0,
@@ -263,7 +263,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       
       console.log(`✅ Video ${youtubeVideoId} marked as unplayable in Supabase`);
       
-      // Remove from current queue
+      // Remove from current queue instantly
       await get().removeCurrentVideo();
       
     } catch (error) {
@@ -281,7 +281,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     console.log(`🚨 Video error for ${youtubeVideoId}: ${errorType} (count: ${newErrorCount})`);
     
     // Only mark as unplayable for specific critical error types
-    const criticalUnplayableErrors = ['NOT_EMBEDDABLE', 'NO_VIDEO_DATA', 'PLAYBACK_FAILED'];
+    const criticalUnplayableErrors = ['NOT_EMBEDDABLE', 'IFRAME_LOAD_FAILED', 'PAGE_ERROR'];
     
     if (criticalUnplayableErrors.includes(errorType)) {
       console.log(`🗑️ Error type ${errorType} indicates unplayable video, marking as such`);
@@ -291,7 +291,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       await get().removeCurrentVideo();
     }
     
-    // Only reset queue if we have too many critical errors
+    // Reset queue if too many critical errors
     if (newErrorCount >= MAX_ERROR_COUNT && criticalUnplayableErrors.includes(errorType)) {
       console.log('🔄 Too many critical video errors, resetting queue...');
       set({ errorCount: 0 });
@@ -315,19 +315,19 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       return;
     }
 
-    console.log('🔄 Resetting video queue for seamless looping...');
+    console.log('🔄 Resetting video queue for instant looping...');
     
     set({ isResetting: true, errorCount: 0 });
 
     try {
-      // CRITICAL: Only get ACTIVE videos (status = 'active') with fresh data
+      // Get ONLY ACTIVE videos with fresh data (top 10)
       const { data: allVideos, error } = await supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, status, updated_at')
         .eq('status', 'active') // ONLY ACTIVE VIDEOS
         .neq('user_id', userId)
         .order('updated_at', { ascending: false }) // Get freshest data
-        .limit(QUEUE_SIZE * 3); // Get more videos to filter from
+        .limit(QUEUE_SIZE * 2); // Get more videos to filter from
 
       if (error) {
         console.error('❌ Error fetching videos for reset:', error);
@@ -348,7 +348,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           console.log(`✅ Found ${availableVideos.length} active videos with remaining views for reset`);
           
           const videoQueue = availableVideos
-            .slice(0, QUEUE_SIZE) // Limit to queue size
+            .slice(0, QUEUE_SIZE) // Limit to top 10
             .map(video => ({
               id: video.id,
               youtube_url: video.youtube_url, // This is now the video ID
@@ -382,7 +382,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         set({ blacklistedVideoIds: new Set<string>() });
         
         const videoQueue = allVideos
-          .slice(0, QUEUE_SIZE) // Limit to queue size
+          .slice(0, QUEUE_SIZE) // Limit to top 10
           .map(video => ({
             id: video.id,
             youtube_url: video.youtube_url, // This is now the video ID
