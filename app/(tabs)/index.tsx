@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, SkipForward, Award, Clock, Menu, Timer, Coins } from 'lucide-react-native';
+import { Play, Pause, SkipForward, Clock, Coins, ExternalLink, Menu } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
@@ -29,7 +29,7 @@ import Animated, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
-const videoHeight = isSmallScreen ? 180 : Math.min(screenHeight * 0.32, 260);
+const videoHeight = Math.min(screenHeight * 0.35, 280);
 
 interface Video {
   id: string;
@@ -64,6 +64,7 @@ export default function ViewTab() {
   const [isTabFocused, setIsTabFocused] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [isSkipping, setIsSkipping] = useState(false);
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -79,8 +80,8 @@ export default function ViewTab() {
   const currentVideo = getCurrentVideo();
   const targetDuration = 30; // 30 seconds to earn coins
   const coinReward = 3; // 3 coins per video
-  const maxRetries = 1; // Reduced retries for faster skipping
-  const loadingTimeoutDuration = 3000; // Reduced to 3 seconds
+  const maxRetries = 1;
+  const loadingTimeoutDuration = 3000;
 
   const showToast = (message: string) => {
     if (Platform.OS === 'android') {
@@ -607,6 +608,7 @@ export default function ViewTab() {
       setHasStarted(false);
       setRetryCount(0);
       setIsSkipping(false);
+      setShowCompletionMessage(false);
       progressValue.value = 0;
       
       // Clear all timeouts
@@ -650,6 +652,7 @@ export default function ViewTab() {
     setVideoCompleted(false);
     setCoinsEarned(false);
     setHasStarted(false);
+    setShowCompletionMessage(false);
     progressValue.value = 0;
     
     // Move to next video instantly
@@ -715,11 +718,13 @@ export default function ViewTab() {
           if (!videoCompleted) {
             setVideoCompleted(true);
             setIsPlaying(false);
+            setShowCompletionMessage(true);
             
-            // Seamless transition to next video
+            // Hide completion message and move to next video
             completionTimeoutRef.current = setTimeout(() => {
+              setShowCompletionMessage(false);
               handleInstantSkip('Video completed');
-            }, 800); // Brief delay to show completion
+            }, 1500); // Show completion message for 1.5 seconds
           }
           break;
           
@@ -768,6 +773,7 @@ export default function ViewTab() {
       }
 
       if (result) {
+        // Refresh profile to update coin count in UI
         await refreshProfile();
         
         // Subtle coin animation
@@ -782,6 +788,7 @@ export default function ViewTab() {
         });
         
         console.log(`Coins awarded: ${coins} for ${currentVideo.youtube_url}`);
+        showToast(`+${coins} coins earned!`);
       }
     } catch (error) {
       console.error('Error in awardCoins:', error);
@@ -849,7 +856,7 @@ export default function ViewTab() {
       <View style={styles.container}>
         <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
           <Menu color="white" size={24} />
-          <Text style={styles.headerTitle}>VidGrow</Text>
+          <Text style={styles.headerTitle}>VidGro</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             <Coins color="#FFD700" size={20} />
@@ -869,7 +876,7 @@ export default function ViewTab() {
       <View style={styles.container}>
         <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
           <Menu color="white" size={24} />
-          <Text style={styles.headerTitle}>VidGrow</Text>
+          <Text style={styles.headerTitle}>VidGro</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             <Coins color="#FFD700" size={20} />
@@ -886,10 +893,10 @@ export default function ViewTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header with adjusted padding */}
+      {/* Header with VidGro branding */}
       <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
         <Menu color="white" size={24} />
-        <Text style={styles.headerTitle}>VidGrow</Text>
+        <Text style={styles.headerTitle}>VidGro</Text>
         <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
           <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
           <Coins color="#FFD700" size={isSmallScreen ? 18 : 20} />
@@ -900,7 +907,7 @@ export default function ViewTab() {
         {/* Video Player Container */}
         <View style={styles.videoSection}>
           <View style={styles.videoContainer}>
-            {/* Loading State */}
+            {/* Loading State - Only show when not skipping */}
             {(!isVideoLoaded && !isSkipping) && (
               <View style={styles.videoLoadingContainer}>
                 <ActivityIndicator size="large" color="#FF4757" />
@@ -917,7 +924,7 @@ export default function ViewTab() {
               </View>
             )}
 
-            {/* WebView Player */}
+            {/* WebView Player - Only render when not skipping */}
             {youtubeVideoId && !isSkipping && (
               <WebView
                 ref={webviewRef}
@@ -952,6 +959,15 @@ export default function ViewTab() {
               </View>
             </View>
 
+            {/* Completion Message Overlay */}
+            {showCompletionMessage && (
+              <View style={styles.completionOverlay}>
+                <View style={styles.completionMessage}>
+                  <Coins color="#FFD700" size={32} />
+                  <Text style={styles.completionText}>Video completed! Moving to next...</Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Video Title */}
@@ -967,9 +983,9 @@ export default function ViewTab() {
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
               <View style={styles.statIconContainer}>
-                <Timer color="#FF4757" size={18} />
+                <Clock color="#FF4757" size={18} />
               </View>
-              <Text style={styles.statValue}>{Math.ceil(remainingTime)}s</Text>
+              <Text style={styles.statValue}>{Math.ceil(remainingTime)}</Text>
               <Text style={styles.statLabel}>Remaining</Text>
             </View>
             
@@ -987,6 +1003,10 @@ export default function ViewTab() {
         <View style={styles.controlsSection}>
           {/* Auto-play Toggle */}
           <View style={styles.topControls}>
+            <View style={styles.autoPlayContainer}>
+              <ExternalLink color="#666" size={16} />
+              <Text style={styles.autoPlayLabel}>YouTube</Text>
+            </View>
             <View style={styles.autoPlayContainer}>
               <Text style={styles.autoPlayLabel}>Auto Play</Text>
               <TouchableOpacity 
@@ -1024,7 +1044,7 @@ export default function ViewTab() {
 
             <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
               <SkipForward color="white" size={16} />
-              <Text style={styles.skipButtonText}>SKIP</Text>
+              <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
             </TouchableOpacity>
           </View>
 
@@ -1057,25 +1077,26 @@ const styles = StyleSheet.create({
     minHeight: Platform.OS === 'ios' ? 100 : 90,
   },
   headerTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
+    fontSize: isSmallScreen ? 18 : 20,
+    fontWeight: 'bold',
     color: 'white',
+    letterSpacing: 0.5,
   },
   coinDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: isSmallScreen ? 8 : 12,
+    paddingHorizontal: isSmallScreen ? 10 : 12,
     paddingVertical: isSmallScreen ? 6 : 8,
     borderRadius: 20,
-    minWidth: isSmallScreen ? 60 : 70,
+    minWidth: isSmallScreen ? 70 : 80,
     justifyContent: 'center',
   },
   coinCount: {
     color: '#FFD700',
     fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    marginRight: isSmallScreen ? 3 : 4,
+    fontWeight: 'bold',
+    marginRight: isSmallScreen ? 4 : 6,
   },
   scrollView: {
     flex: 1,
@@ -1107,22 +1128,22 @@ const styles = StyleSheet.create({
   },
   videoSection: {
     backgroundColor: 'white',
-    marginHorizontal: isSmallScreen ? 8 : 12,
-    marginTop: isSmallScreen ? 8 : 12,
-    borderRadius: 12,
+    marginHorizontal: isSmallScreen ? 12 : 16,
+    marginTop: isSmallScreen ? 12 : 16,
+    borderRadius: 16,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 3,
+        elevation: 4,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
@@ -1130,7 +1151,8 @@ const styles = StyleSheet.create({
     height: videoHeight,
     backgroundColor: '#000',
     position: 'relative',
-    borderRadius: 12,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     overflow: 'hidden',
   },
   videoLoadingContainer: {
@@ -1146,13 +1168,13 @@ const styles = StyleSheet.create({
   },
   videoLoadingText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 12,
     textAlign: 'center',
   },
   videoIdText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 10,
+    fontSize: 12,
     textAlign: 'center',
     marginTop: 6,
   },
@@ -1168,7 +1190,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 3,
+    height: 4,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 1000,
   },
@@ -1180,72 +1202,97 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4CAF50',
   },
+  completionOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    zIndex: 2000,
+  },
+  completionMessage: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 20,
+    borderRadius: 16,
+  },
+  completionText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    textAlign: 'center',
+  },
   titleContainer: {
-    padding: isSmallScreen ? 10 : 12,
+    padding: isSmallScreen ? 12 : 16,
   },
   videoTitle: {
-    fontSize: isSmallScreen ? 13 : 14,
+    fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '600',
     color: '#333',
-    lineHeight: 18,
+    lineHeight: 20,
   },
   statsSection: {
-    marginHorizontal: isSmallScreen ? 8 : 12,
-    marginTop: isSmallScreen ? 8 : 12,
+    marginHorizontal: isSmallScreen ? 12 : 16,
+    marginTop: isSmallScreen ? 12 : 16,
   },
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: isSmallScreen ? 6 : 8,
+    gap: isSmallScreen ? 8 : 12,
   },
   statCard: {
     flex: 1,
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: isSmallScreen ? 10 : 12,
+    borderRadius: 16,
+    padding: isSmallScreen ? 16 : 20,
     alignItems: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 2,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
   statIconContainer: {
-    width: isSmallScreen ? 28 : 32,
-    height: isSmallScreen ? 28 : 32,
-    borderRadius: isSmallScreen ? 14 : 16,
+    width: isSmallScreen ? 36 : 40,
+    height: isSmallScreen ? 36 : 40,
+    borderRadius: isSmallScreen ? 18 : 20,
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: isSmallScreen ? 4 : 6,
+    marginBottom: isSmallScreen ? 8 : 12,
   },
   statValue: {
-    fontSize: isSmallScreen ? 18 : 20,
+    fontSize: isSmallScreen ? 24 : 28,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: isSmallScreen ? 1 : 2,
+    marginBottom: isSmallScreen ? 2 : 4,
   },
   statLabel: {
-    fontSize: isSmallScreen ? 9 : 10,
+    fontSize: isSmallScreen ? 11 : 12,
     color: '#666',
     textAlign: 'center',
+    fontWeight: '500',
   },
   controlsSection: {
     backgroundColor: 'white',
-    marginHorizontal: isSmallScreen ? 8 : 12,
-    marginTop: isSmallScreen ? 8 : 12,
+    marginHorizontal: isSmallScreen ? 12 : 16,
+    marginTop: isSmallScreen ? 12 : 16,
     marginBottom: isSmallScreen ? 20 : 24,
-    borderRadius: 12,
-    padding: isSmallScreen ? 12 : 16,
+    borderRadius: 16,
+    padding: isSmallScreen ? 16 : 20,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1263,9 +1310,9 @@ const styles = StyleSheet.create({
   },
   topControls: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: isSmallScreen ? 12 : 16,
+    marginBottom: isSmallScreen ? 16 : 20,
   },
   autoPlayContainer: {
     flexDirection: 'row',
@@ -1273,7 +1320,7 @@ const styles = StyleSheet.create({
     gap: isSmallScreen ? 6 : 8,
   },
   autoPlayLabel: {
-    fontSize: isSmallScreen ? 11 : 12,
+    fontSize: isSmallScreen ? 12 : 14,
     color: '#333',
     fontWeight: '500',
   },
@@ -1317,27 +1364,27 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isSmallScreen ? 8 : 12,
+    gap: isSmallScreen ? 12 : 16,
   },
   playButton: {
-    width: isSmallScreen ? 44 : 48,
-    height: isSmallScreen ? 44 : 48,
-    borderRadius: isSmallScreen ? 22 : 24,
+    width: isSmallScreen ? 56 : 64,
+    height: isSmallScreen ? 56 : 64,
+    borderRadius: isSmallScreen ? 28 : 32,
     backgroundColor: '#FF4757',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#FF4757',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 4,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 3,
+        elevation: 4,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(255, 71, 87, 0.3)',
+        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
       },
     }),
   },
@@ -1350,27 +1397,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6B7280',
-    paddingVertical: isSmallScreen ? 10 : 12,
-    borderRadius: 8,
-    gap: isSmallScreen ? 4 : 6,
+    paddingVertical: isSmallScreen ? 16 : 18,
+    borderRadius: 12,
+    gap: isSmallScreen ? 6 : 8,
     ...Platform.select({
       ios: {
         shadowColor: '#6B7280',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
-        shadowRadius: 2,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 2,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 1px 2px rgba(107, 114, 128, 0.2)',
+        boxShadow: '0 2px 4px rgba(107, 114, 128, 0.2)',
       },
     }),
   },
   skipButtonText: {
     color: 'white',
-    fontSize: isSmallScreen ? 11 : 12,
+    fontSize: isSmallScreen ? 12 : 14,
     fontWeight: '600',
   },
   securityWarning: {
@@ -1379,7 +1426,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     padding: isSmallScreen ? 10 : 12,
-    marginTop: isSmallScreen ? 10 : 12,
+    marginTop: isSmallScreen ? 12 : 16,
   },
   securityWarningText: {
     color: '#856404',
