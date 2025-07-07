@@ -131,34 +131,6 @@ export class CacheManager {
 }
 
 /**
- * Asset optimization utilities
- */
-export class AssetOptimizer {
-  /**
-   * Get list of potentially unused assets
-   */
-  static getUnusedAssets(): string[] {
-    // List of assets that might be unused
-    return [
-      'assets/images/old-logo.png',
-      'assets/images/demo-video.mp4',
-      'assets/images/test-thumbnail.jpg',
-      'assets/sounds/notification.mp3',
-      'assets/fonts/old-font.ttf',
-    ];
-  }
-
-  /**
-   * Validate if assets are actually used in the codebase
-   */
-  static validateAssetUsage(assetPath: string): boolean {
-    // This would typically scan the codebase for references
-    // For now, return true to keep all assets safe
-    return true;
-  }
-}
-
-/**
  * Development utilities for cleanup
  */
 export class DevCleanup {
@@ -195,7 +167,6 @@ export class DevCleanup {
       await CacheManager.clearAppCaches();
       await this.clearDevCaches();
       
-      // Reset video store state would be handled by the store itself
       console.log('✅ App state reset complete');
       
     } catch (error) {

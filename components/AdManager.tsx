@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Gift } from 'lucide-react-native';
 
@@ -25,19 +25,6 @@ export default function AdManager({ onRewardEarned, onAdShown }: AdManagerProps)
         setAdAvailable(false);
         
         // Make ad available again after 30 seconds
-        setTimeout(() => setAdAvailable(true), 30000);
-      }, 3000);
-    } else {
-      // Mobile implementation would use expo-ads-admob
-      // For now, simulate the same behavior
-      setIsLoading(true);
-      onAdShown?.();
-      
-      setTimeout(() => {
-        const rewardCoins = Math.floor(Math.random() * (400 - 150 + 1)) + 150;
-        onRewardEarned?.(rewardCoins);
-        setIsLoading(false);
-        setAdAvailable(false);
         setTimeout(() => setAdAvailable(true), 30000);
       }, 3000);
     }
