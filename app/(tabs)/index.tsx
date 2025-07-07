@@ -83,14 +83,6 @@ export default function ViewTab() {
   const maxRetries = 1;
   const loadingTimeoutDuration = 3000;
 
-  const showToast = (message: string) => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(message, ToastAndroid.SHORT);
-    } else {
-      console.log('Toast:', message);
-    }
-  };
-
   // Extract YouTube video ID
   const extractVideoId = (url: string): string | null => {
     if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
@@ -113,7 +105,7 @@ export default function ViewTab() {
 
   const youtubeVideoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
 
-  // Create HTML content for YouTube iframe with instant error handling
+  // Create HTML content for YouTube iframe with seamless experience
   const createHtmlContent = (videoId: string) => `
     <!DOCTYPE html>
     <html>
@@ -195,7 +187,7 @@ export default function ViewTab() {
       </div>
       
       <script>
-        console.log('Initializing video player for: ${videoId}');
+        console.log('Initializing seamless video player for: ${videoId}');
         
         var player;
         var isPlayerReady = false;
@@ -213,12 +205,11 @@ export default function ViewTab() {
         var hasTimedOut = false;
         var hasError = false;
 
-        // Set aggressive loading timeout (3 seconds)
+        // Set loading timeout
         loadingTimeoutId = setTimeout(function() {
           if (!isPlayerReady && !hasTimedOut && !hasError) {
             hasTimedOut = true;
-            console.log('Loading timeout - skipping video instantly');
-            document.getElementById('loading').style.display = 'none';
+            console.log('Loading timeout - seamless skip');
             
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_UNPLAYABLE',
@@ -231,11 +222,11 @@ export default function ViewTab() {
           }
         }, 3000);
 
-        // Load YouTube IFrame API with instant error handling
+        // Load YouTube IFrame API
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         tag.onerror = function() {
-          console.error('Failed to load YouTube API - instant skip');
+          console.error('Failed to load YouTube API - seamless skip');
           if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
           hasError = true;
           
@@ -514,6 +505,12 @@ export default function ViewTab() {
           }
         };
 
+        // Update auto-skip setting
+        window.updateAutoSkip = function(enabled) {
+          autoSkipEnabled = enabled;
+          console.log('Auto-skip updated:', enabled);
+        };
+
         // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
           if (document.hidden) {
@@ -668,7 +665,7 @@ export default function ViewTab() {
     }, 100); // Minimal delay for smooth transition
   }, [isSkipping, moveToNextVideo, user, videoQueue.length, fetchVideos]);
 
-  // WebView message handler with instant skip logic
+  // WebView message handler with seamless experience
   const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -720,11 +717,11 @@ export default function ViewTab() {
             setIsPlaying(false);
             setShowCompletionMessage(true);
             
-            // Hide completion message and move to next video
+            // Hide completion message and move to next video seamlessly
             completionTimeoutRef.current = setTimeout(() => {
               setShowCompletionMessage(false);
               handleInstantSkip('Video completed');
-            }, 1500); // Show completion message for 1.5 seconds
+            }, 1000); // Brief completion message
           }
           break;
           
@@ -773,10 +770,10 @@ export default function ViewTab() {
       }
 
       if (result) {
-        // Refresh profile to update coin count in UI
+        // Refresh profile to update coin count in UI immediately
         await refreshProfile();
         
-        // Subtle coin animation
+        // Subtle coin animation without popup
         coinBounce.value = withSpring(1.2, {
           damping: 15,
           stiffness: 150,
@@ -788,7 +785,6 @@ export default function ViewTab() {
         });
         
         console.log(`Coins awarded: ${coins} for ${currentVideo.youtube_url}`);
-        showToast(`+${coins} coins earned!`);
       }
     } catch (error) {
       console.error('Error in awardCoins:', error);
@@ -829,6 +825,7 @@ export default function ViewTab() {
     const newAutoPlay = !autoPlay;
     setAutoPlay(newAutoPlay);
     
+    // Update auto-skip setting in WebView without affecting current playback
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoPlay}); true;`);
     }
@@ -964,7 +961,7 @@ export default function ViewTab() {
               <View style={styles.completionOverlay}>
                 <View style={styles.completionMessage}>
                   <Coins color="#FFD700" size={32} />
-                  <Text style={styles.completionText}>Video completed! Moving to next...</Text>
+                  <Text style={styles.completionText}>+{coinReward} coins earned!</Text>
                 </View>
               </View>
             )}
@@ -1001,7 +998,7 @@ export default function ViewTab() {
 
         {/* Controls Section */}
         <View style={styles.controlsSection}>
-          {/* Auto-play Toggle */}
+          {/* Top Controls */}
           <View style={styles.topControls}>
             <View style={styles.autoPlayContainer}>
               <ExternalLink color="#666" size={16} />
@@ -1296,15 +1293,15 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 3,
+        elevation: 4,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
@@ -1425,7 +1422,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFEAA7',
     borderWidth: 1,
     borderRadius: 8,
-    padding: isSmallScreen ? 10 : 12,
+    padding: isSmallScreen ? 12 : 16,
     marginTop: isSmallScreen ? 12 : 16,
   },
   securityWarningText: {
