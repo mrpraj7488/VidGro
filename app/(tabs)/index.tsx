@@ -22,6 +22,7 @@ import Animated, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
+const isVerySmallScreen = screenWidth < 350;
 
 export default function ViewTab() {
   const { user, profile, refreshProfile } = useAuth();
@@ -301,15 +302,15 @@ export default function ViewTab() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Menu color="white" size={24} />
+          <Menu color="white" size={isVerySmallScreen ? 20 : 24} />
           <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Text style={styles.coinCount}>0</Text>
-            <DollarSign color="white" size={16} />
+            <DollarSign color="white" size={isVerySmallScreen ? 14 : 16} />
           </View>
         </View>
         <View style={styles.loadingContainer}>
-          <RefreshCw color="#FF4757" size={32} />
+          <RefreshCw color="#FF4757" size={isVerySmallScreen ? 28 : 32} />
           <Text style={styles.loadingText}>Loading your profile...</Text>
         </View>
       </View>
@@ -320,17 +321,17 @@ export default function ViewTab() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Menu color="white" size={24} />
+          <Menu color="white" size={isVerySmallScreen ? 20 : 24} />
           <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Animated.View style={coinAnimatedStyle}>
               <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             </Animated.View>
-            <DollarSign color="white" size={16} />
+            <DollarSign color="white" size={isVerySmallScreen ? 14 : 16} />
           </View>
         </View>
         <View style={styles.loadingContainer}>
-          <RefreshCw color="#FF4757" size={32} />
+          <RefreshCw color="#FF4757" size={isVerySmallScreen ? 28 : 32} />
           <Text style={styles.loadingText}>Loading videos...</Text>
         </View>
       </View>
@@ -341,17 +342,17 @@ export default function ViewTab() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Menu color="white" size={24} />
+          <Menu color="white" size={isVerySmallScreen ? 20 : 24} />
           <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Animated.View style={coinAnimatedStyle}>
               <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             </Animated.View>
-            <DollarSign color="white" size={16} />
+            <DollarSign color="white" size={isVerySmallScreen ? 14 : 16} />
           </View>
         </View>
         <View style={styles.errorContainer}>
-          <AlertTriangle color="#E74C3C" size={48} />
+          <AlertTriangle color="#E74C3C" size={isVerySmallScreen ? 40 : 48} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity 
             style={styles.retryButton} 
@@ -361,7 +362,7 @@ export default function ViewTab() {
               loadVideoQueue();
             }}
           >
-            <RefreshCw color="white" size={20} />
+            <RefreshCw color="white" size={isVerySmallScreen ? 16 : 20} />
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
@@ -373,19 +374,19 @@ export default function ViewTab() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#FF4757" />
       
-      {/* Clean Header */}
+      {/* Responsive Header */}
       <View style={styles.header}>
-        <Menu color="white" size={24} />
+        <Menu color="white" size={isVerySmallScreen ? 20 : 24} />
         <Text style={styles.headerTitle}>Video Promoter</Text>
         <View style={styles.coinDisplay}>
           <Animated.View style={coinAnimatedStyle}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
           </Animated.View>
-          <DollarSign color="white" size={16} />
+          <DollarSign color="white" size={isVerySmallScreen ? 14 : 16} />
         </View>
       </View>
 
-      {/* Clean Video Player Section - No Overlays */}
+      {/* Responsive Video Player Section */}
       {currentVideo && (
         <View style={styles.videoSection}>
           <CleanVideoPlayer
@@ -401,9 +402,9 @@ export default function ViewTab() {
         </View>
       )}
 
-      {/* Bottom Controls Section */}
+      {/* Responsive Bottom Controls Section */}
       <View style={styles.bottomSection}>
-        {/* Open on YouTube & Auto Play */}
+        {/* Controls Row */}
         <View style={styles.controlsRow}>
           <TouchableOpacity 
             style={styles.youtubeButton}
@@ -447,7 +448,7 @@ export default function ViewTab() {
   );
 }
 
-// Clean Video Player Component without overlays
+// Clean Video Player Component without overlays - Responsive
 function CleanVideoPlayer({ 
   videoId, 
   youtubeUrl, 
@@ -491,7 +492,7 @@ function CleanVideoPlayer({
   if (!youtubeVideoId) {
     return (
       <View style={styles.errorVideoContainer}>
-        <AlertTriangle color="#FF4757" size={32} />
+        <AlertTriangle color="#FF4757" size={isVerySmallScreen ? 28 : 32} />
         <Text style={styles.errorVideoText}>Invalid video format</Text>
       </View>
     );
@@ -533,11 +534,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#FF4757',
     paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+    paddingBottom: isVerySmallScreen ? 12 : 16,
+    paddingHorizontal: isVerySmallScreen ? 16 : 20,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: isVerySmallScreen ? 16 : 18,
     fontWeight: '600',
     color: 'white',
   },
@@ -545,19 +546,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: isVerySmallScreen ? 10 : 12,
+    paddingVertical: isVerySmallScreen ? 4 : 6,
     borderRadius: 20,
   },
   coinCount: {
     color: 'white',
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     fontWeight: '600',
     marginRight: 4,
   },
   videoSection: {
     backgroundColor: '#000',
-    height: isSmallScreen ? screenHeight * 0.45 : screenHeight * 0.5,
+    height: isVerySmallScreen 
+      ? screenHeight * 0.35 
+      : isSmallScreen 
+        ? screenHeight * 0.4 
+        : screenHeight * 0.45,
   },
   cleanVideoContainer: {
     flex: 1,
@@ -571,7 +576,7 @@ const styles = StyleSheet.create({
   },
   errorVideoText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     marginTop: 12,
   },
   mobileVideoPlaceholder: {
@@ -582,53 +587,53 @@ const styles = StyleSheet.create({
   },
   mobileVideoText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: isVerySmallScreen ? 16 : 18,
     fontWeight: '600',
   },
   mobileVideoSubtext: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
+    fontSize: isVerySmallScreen ? 10 : 12,
     marginTop: 8,
   },
   bottomSection: {
     flex: 1,
     backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: isVerySmallScreen ? 16 : 20,
+    paddingTop: isVerySmallScreen ? 16 : 20,
   },
   controlsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: isVerySmallScreen ? 20 : 30,
   },
   youtubeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: isVerySmallScreen ? 12 : 16,
+    paddingVertical: isVerySmallScreen ? 6 : 8,
     borderRadius: 20,
   },
   youtubeButtonText: {
-    fontSize: 14,
+    fontSize: isVerySmallScreen ? 12 : 14,
     color: '#666',
     fontWeight: '500',
   },
   autoPlayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: isVerySmallScreen ? 8 : 12,
   },
   autoPlayLabel: {
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     color: '#333',
     fontWeight: '500',
   },
   toggleSwitch: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
+    width: isVerySmallScreen ? 44 : 50,
+    height: isVerySmallScreen ? 26 : 30,
+    borderRadius: isVerySmallScreen ? 13 : 15,
     backgroundColor: '#E0E0E0',
     justifyContent: 'center',
     paddingHorizontal: 2,
@@ -637,9 +642,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF4757',
   },
   toggleThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: isVerySmallScreen ? 22 : 26,
+    height: isVerySmallScreen ? 22 : 26,
+    borderRadius: isVerySmallScreen ? 11 : 13,
     backgroundColor: 'white',
     alignSelf: 'flex-start',
     shadowColor: '#000',
@@ -654,32 +659,32 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 40,
+    marginBottom: isVerySmallScreen ? 30 : 40,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
   statNumber: {
-    fontSize: isSmallScreen ? 36 : 42,
+    fontSize: isVerySmallScreen ? 32 : isSmallScreen ? 36 : 42,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: isVerySmallScreen ? 6 : 8,
   },
   statLabel: {
-    fontSize: isSmallScreen ? 14 : 16,
+    fontSize: isVerySmallScreen ? 12 : isSmallScreen ? 14 : 16,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: isVerySmallScreen ? 16 : 20,
   },
   skipButton: {
     backgroundColor: 'white',
     borderWidth: 2,
     borderColor: '#E0E0E0',
     borderRadius: 25,
-    paddingVertical: 16,
+    paddingVertical: isVerySmallScreen ? 12 : 16,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: isVerySmallScreen ? 16 : 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -687,7 +692,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   skipButtonText: {
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     fontWeight: '600',
     color: '#666',
     letterSpacing: 1,
@@ -699,7 +704,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     color: '#666',
     textAlign: 'center',
     marginTop: 12,
@@ -712,19 +717,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     color: '#666',
     textAlign: 'center',
     marginBottom: 20,
     marginTop: 12,
-    lineHeight: 24,
+    lineHeight: isVerySmallScreen ? 20 : 24,
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FF4757',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: isVerySmallScreen ? 20 : 24,
+    paddingVertical: isVerySmallScreen ? 10 : 12,
     borderRadius: 25,
     gap: 8,
     shadowColor: '#FF4757',
@@ -735,7 +740,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     fontWeight: '600',
   },
 });
