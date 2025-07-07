@@ -67,7 +67,7 @@ export default function ViewTab() {
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Animation values
+  // Animation values - Initialize with proper default values
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
   const loadingRotation = useSharedValue(0);
@@ -239,7 +239,7 @@ export default function ViewTab() {
           
           if (state === 0 && autoPlayEnabled && !hasCompleted) { // ENDED
             hasCompleted = true;
-            console.log('Video ended, auto-skipping...');
+            console.log('Video ended naturally');
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_ENDED',
               autoSkip: true
@@ -732,10 +732,7 @@ export default function ViewTab() {
                   autoPlay && styles.autoPlayThumbActive,
                   {
                     transform: [{
-                      translateX: withSpring(autoPlay ? 20 : 0, {
-                        damping: 15,
-                        stiffness: 150,
-                      })
+                      translateX: autoPlay ? 20 : 0
                     }]
                   }
                 ]} 
