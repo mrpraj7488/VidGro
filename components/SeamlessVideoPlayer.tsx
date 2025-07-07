@@ -1,27 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Platform,
   ActivityIndicator,
-  AppState,
-  AppStateStatus,
   Dimensions,
-  ToastAndroid,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, SkipForward, Award, Clock, TriangleAlert as AlertTriangle } from 'lucide-react-native';
-import { useVideoStore } from '@/store/videoStore';
-import { supabase } from '@/lib/supabase';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming,
-  Easing
-} from 'react-native-reanimated';
+import { TriangleAlert as AlertTriangle } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -35,9 +22,16 @@ interface SeamlessVideoPlayerProps {
   onVideoSkip: () => void;
   onError: (error: string) => void;
   onVideoUnplayable: () => void;
+  autoPlay?: boolean;
+  onPlayerReady?: () => void;
+  onStateChange?: (state: number) => void;
 }
 
-export default function SeamlessVideoPlayer({
+export interface SeamlessVideoPlayerRef {
+  injectJavaScript: (script: string) => void;
+}
+
+const SeamlessVideoPlayer = forwardRef<SeamlessVideoPlayerRef, SeamlessVideoPlayerProps>(({
   videoId,
   youtubeUrl, // This is actually the video ID from database
   duration,
@@ -45,35 +39,29 @@ export default function SeamlessVideoPlayer({
   onVideoComplete,
   onVideoSkip,
   onError: reportErrorToParent,
-  onVideoUnplayable
-}: SeamlessVideoPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  onVideoUnplayable,
+  autoPlay = true,
+  onPlayerReady,
+  onStateChange
+}, ref) => {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
-  const [appState, setAppState] = useState(AppState.currentState);
-  const [isMarkedInactive, setIsMarkedInactive] = useState(false);
-  const [skipReason, setSkipReason] = useState<string>('');
-  const [autoPlayStarted, setAutoPlayStarted] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   
-  const progressValue = useSharedValue(0);
-  const coinBounce = useSharedValue(1);
   const webviewRef = useRef<WebView>(null);
-  const { handleVideoError, addToBlacklist } = useVideoStore();
-  const errorTimeoutDuration = 5000; // 5 seconds timeout
   const maxRetries = 2;
 
-  const showToast = (message: string) => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(message, ToastAndroid.SHORT);
-    } else {
-      console.log('Toast:', message);
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    injectJavaScript: (script: string) => {
+      try {
+        webviewRef.current?.injectJavaScript(script);
+      } catch (error) {
+        console.error('JavaScript injection failed:', error);
+      }
     }
-  };
+  }));
 
   // Extract YouTube video ID from the stored value (which is now just the video ID)
   const extractVideoIdFromUrl = (videoIdOrUrl: string): string | null => {
@@ -108,40 +96,6 @@ export default function SeamlessVideoPlayer({
   };
 
   const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
-
-  // Mark video as inactive in Supabase (only for confirmed unplayable videos)
-  const markVideoInactive = useCallback(async (youtubeVideoId: string, reason: string, isUnplayable: boolean = true) => {
-    if (isMarkedInactive) return;
-    
-    try {
-      setIsMarkedInactive(true);
-      console.log(`🚨 ${isUnplayable ? 'Marking' : 'NOT marking'} video ${youtubeVideoId} as inactive due to: ${reason}`);
-      
-      if (isUnplayable) {
-        addToBlacklist(youtubeVideoId);
-        
-        const { error } = await supabase
-          .from('videos')
-          .update({ 
-            status: 'paused',
-            updated_at: new Date().toISOString()
-          })
-          .eq('youtube_url', youtubeVideoId);
-        
-        if (error) {
-          console.error('❌ Error marking video as inactive:', error);
-        } else {
-          console.log(`✅ Video ${youtubeVideoId} marked as inactive in Supabase`);
-          showToast(`Removed unplayable video: ${youtubeVideoId}`);
-        }
-      } else {
-        console.log(`✅ Video ${youtubeVideoId} is playable, skipping without removal`);
-        showToast('Skipped playable video');
-      }
-    } catch (error) {
-      console.error('Error in markVideoInactive:', error);
-    }
-  }, [isMarkedInactive, addToBlacklist]);
 
   // Create optimized HTML content with enhanced error handling and retry logic
   const htmlContent = `
@@ -194,14 +148,14 @@ export default function SeamlessVideoPlayer({
       <div id="error" class="error" style="display: none;"></div>
       
       <script>
-        console.log('Initializing enhanced video player for video ID: ${youtubeVideoId}');
+        console.log('Initializing video player for video ID: ${youtubeVideoId}');
         
         var player;
         var isPlayerReady = false;
         var currentTime = 0;
         var maxDuration = ${duration};
         var hasCompleted = false;
-        var autoPlayStarted = false;
+        var autoPlayEnabled = ${autoPlay};
         var progressCheckInterval;
         var loadingTimeoutId;
         var retryAttempt = ${retryCount};
@@ -210,6 +164,7 @@ export default function SeamlessVideoPlayer({
         var isLiveVideo = false;
         var hasError = false;
         var initializationInProgress = false;
+        var lastKnownState = -1;
 
         // Set loading timeout (5 seconds)
         loadingTimeoutId = setTimeout(function() {
@@ -286,7 +241,7 @@ export default function SeamlessVideoPlayer({
               width: '100%',
               videoId: '${youtubeVideoId}',
               playerVars: {
-                'autoplay': 0,
+                'autoplay': 0, // Always start with autoplay 0, control manually
                 'controls': 0,
                 'modestbranding': 1,
                 'showinfo': 0,
@@ -334,20 +289,8 @@ export default function SeamlessVideoPlayer({
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_READY',
             videoId: '${youtubeVideoId}',
-            autoPlay: true
+            autoPlay: autoPlayEnabled
           }));
-          
-          // Auto-start playback with delay to prevent stack overflow
-          setTimeout(function() {
-            if (player && player.playVideo && isPlayerReady && !hasError) {
-              try {
-                console.log('Starting auto-playback');
-                player.playVideo();
-              } catch (error) {
-                console.error('Error starting playback:', error);
-              }
-            }
-          }, 1500);
         }
 
         function onPlayerStateChange(event) {
@@ -356,6 +299,7 @@ export default function SeamlessVideoPlayer({
           }
           
           var state = event.data;
+          lastKnownState = state;
           var stateNames = {
             '-1': 'UNSTARTED',
             '0': 'ENDED',
@@ -410,23 +354,14 @@ export default function SeamlessVideoPlayer({
             }, 3000);
           }
           
-          if (state === 1) { // PLAYING
-            console.log('Video started playing successfully');
-            autoPlayStarted = true;
-            startProgressTracking();
-            
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'STATE_CHANGE',
-              state: state,
-              stateName: stateNames[state]
-            }));
-          } else if (state === 2) { // PAUSED
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'STATE_CHANGE',
-              state: state,
-              stateName: stateNames[state]
-            }));
-          } else if (state === 0) { // ENDED
+          // Send state change to React Native
+          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'STATE_CHANGE',
+            state: state,
+            stateName: stateNames[state] || 'UNKNOWN'
+          }));
+          
+          if (state === 0) { // ENDED
             console.log('Video ended naturally');
             if (!hasCompleted) {
               hasCompleted = true;
@@ -481,44 +416,10 @@ export default function SeamlessVideoPlayer({
           }
         }
 
-        function startProgressTracking() {
-          if (progressCheckInterval) {
-            clearInterval(progressCheckInterval);
-          }
-          
-          console.log('Starting progress tracking');
-          
-          progressCheckInterval = setInterval(function() {
-            if (isPlayerReady && !hasCompleted && autoPlayStarted) {
-              currentTime += 1;
-              
-              // Limit to user-set duration
-              if (currentTime >= maxDuration && !hasCompleted) {
-                hasCompleted = true;
-                console.log('Video completed at', currentTime, 'seconds');
-                if (progressCheckInterval) {
-                  clearInterval(progressCheckInterval);
-                }
-                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'VIDEO_COMPLETED',
-                  currentTime: currentTime
-                }));
-              } else if (currentTime < maxDuration) {
-                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'PROGRESS_UPDATE',
-                  currentTime: currentTime,
-                  progress: (currentTime / maxDuration) * 100
-                }));
-              }
-            }
-          }, 1000);
-        }
-
-        // Expose control functions
+        // Expose control functions for React Native
         window.playVideo = function() {
           if (isPlayerReady && player && player.playVideo && !hasError) {
             try {
-              autoPlayStarted = true;
               console.log('Manual play triggered');
               player.playVideo();
             } catch (error) {
@@ -538,6 +439,18 @@ export default function SeamlessVideoPlayer({
           }
         };
 
+        window.getPlayerState = function() {
+          if (isPlayerReady && player && player.getPlayerState) {
+            try {
+              return player.getPlayerState();
+            } catch (error) {
+              console.error('Error getting player state:', error);
+              return lastKnownState;
+            }
+          }
+          return lastKnownState;
+        };
+
         // Handle page errors
         window.onerror = function(msg, url, lineNo, columnNo, error) {
           console.error('Page error:', msg);
@@ -549,7 +462,7 @@ export default function SeamlessVideoPlayer({
             errorType: 'PAGE_ERROR',
             isEmbeddingError: false
           }));
-          return true; // Prevent default error handling
+          return true;
         };
 
         // Cleanup on page unload
@@ -566,88 +479,14 @@ export default function SeamlessVideoPlayer({
     </html>
   `;
 
-  // Handle app state changes
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        // App has come to the foreground
-      } else if (nextAppState.match(/inactive|background/)) {
-        // App has gone to the background - pause video
-        pauseVideo();
-      }
-      setAppState(nextAppState);
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription?.remove();
-  }, [appState]);
-
   // Reset states when video changes
   useEffect(() => {
     console.log('Video changed, resetting player state for:', videoId, youtubeUrl);
-    setIsPlaying(false);
-    setCurrentTime(0);
     setIsLoaded(false);
-    setHasStarted(false);
-    setIsCompleted(false);
     setPlayerError(null);
-    setIsMarkedInactive(false);
-    setSkipReason('');
-    setAutoPlayStarted(false);
     setRetryCount(0);
     setLoadingTimeout(false);
-    progressValue.value = 0;
   }, [videoId]);
-
-  const injectJavaScript = useCallback((script: string) => {
-    try {
-      webviewRef.current?.injectJavaScript(script);
-    } catch (error) {
-      console.error('JavaScript injection failed:', error);
-      handleVideoErrorInternal('Failed to control video player', 'INJECTION_FAILED', false);
-    }
-  }, []);
-
-  const playVideo = useCallback(() => {
-    injectJavaScript('window.playVideo && window.playVideo(); true;');
-  }, [injectJavaScript]);
-
-  const pauseVideo = useCallback(() => {
-    injectJavaScript('window.pauseVideo && window.pauseVideo(); true;');
-  }, [injectJavaScript]);
-
-  const handleVideoErrorInternal = useCallback(async (errorMessage: string, errorType: string, isEmbeddingError: boolean = false) => {
-    console.log('🚨 Video error detected:', errorMessage, 'for video:', youtubeVideoId, 'type:', errorType, 'isEmbeddingError:', isEmbeddingError);
-    
-    // Critical errors that indicate unplayable videos
-    const criticalErrors = ['NOT_EMBEDDABLE', 'LOADING_TIMEOUT', 'API_LOAD_FAILED', 'LIVE_VIDEO', 'STUCK_BUFFERING', 'PAGE_ERROR', 'INIT_ERROR'];
-    const shouldMarkInactive = isEmbeddingError || criticalErrors.includes(errorType);
-    
-    if (youtubeVideoId && !isMarkedInactive && shouldMarkInactive) {
-      await markVideoInactive(youtubeVideoId, errorType, true);
-      setSkipReason(`Removed unplayable video: ${youtubeVideoId} (${errorType})`);
-    } else {
-      setSkipReason(`Video error: ${errorType} (not marking inactive)`);
-    }
-
-    // Use video store error handling for queue management
-    if (shouldMarkInactive && youtubeVideoId) {
-      await handleVideoError(youtubeVideoId, errorType);
-    }
-
-    // Immediate skip for unplayable videos
-    setTimeout(() => {
-      if (shouldMarkInactive) {
-        showToast(`Video unavailable, skipping...`);
-        onVideoUnplayable();
-      } else {
-        showToast('Video error, skipping...');
-        onVideoSkip();
-      }
-    }, errorTimeoutDuration);
-
-    setPlayerError(errorMessage);
-  }, [youtubeVideoId, errorTimeoutDuration, handleVideoError, isMarkedInactive, markVideoInactive, onVideoUnplayable, onVideoSkip]);
 
   const handleWebViewMessage = useCallback((event: any) => {
     try {
@@ -660,104 +499,47 @@ export default function SeamlessVideoPlayer({
           setIsLoaded(true);
           setPlayerError(null);
           setLoadingTimeout(false);
-          if (data.autoPlay) {
-            setAutoPlayStarted(true);
-            setIsPlaying(true);
-            setHasStarted(true);
-          }
+          onPlayerReady?.();
           break;
           
         case 'STATE_CHANGE':
-          if (data.state === 1) { // PLAYING
-            console.log('Video started playing:', youtubeVideoId);
-            setIsPlaying(true);
-            if (!hasStarted) {
-              setHasStarted(true);
-            }
-            if (!autoPlayStarted) {
-              setAutoPlayStarted(true);
-            }
-          } else if (data.state === 2) { // PAUSED
-            setIsPlaying(false);
-          }
-          break;
-          
-        case 'PROGRESS_UPDATE':
-          const newTime = data.currentTime;
-          setCurrentTime(newTime);
-          const progress = Math.min(newTime / duration, 1);
-          progressValue.value = withTiming(progress, {
-            duration: 300,
-            easing: Easing.out(Easing.quad),
-          });
+          console.log('State change received:', data.stateName, 'state:', data.state);
+          onStateChange?.(data.state);
           break;
           
         case 'VIDEO_COMPLETED':
-          if (!isCompleted) {
-            console.log('Video completed:', youtubeVideoId);
-            setIsCompleted(true);
-            setIsPlaying(false);
-            
-            // Silent coin animation
-            coinBounce.value = withTiming(1.2, { duration: 200 }, () => {
-              coinBounce.value = withTiming(1, { duration: 200 });
-            });
-            
-            // Complete video instantly
-            setTimeout(() => {
-              onVideoComplete();
-            }, 100);
-          }
+          console.log('Video completed:', youtubeVideoId);
+          onVideoComplete();
           break;
           
         case 'RETRY_NEEDED':
           if (retryCount < maxRetries) {
             console.log(`Retrying video load (attempt ${data.retryAttempt})`);
-            showToast(`HTTP 502, retrying... (${data.retryAttempt}/${maxRetries})`);
             setRetryCount(data.retryAttempt);
             
             // Retry after 2 seconds
             setTimeout(() => {
-              // Force webview reload
               if (webviewRef.current) {
                 webviewRef.current.reload();
               }
             }, 2000);
           } else {
-            showToast('Video unavailable, skipping...');
-            handleVideoErrorInternal('Video failed to load after multiple attempts', 'MAX_RETRIES_REACHED', true);
+            console.log('Max retries reached, marking as unplayable');
+            onVideoUnplayable();
           }
           break;
           
         case 'VIDEO_UNPLAYABLE':
-          console.log('Video unplayable received:', data.message, 'for video:', youtubeVideoId, 'errorType:', data.errorType, 'isEmbeddingError:', data.isEmbeddingError);
-          handleVideoErrorInternal(data.message || 'Video unplayable', data.errorType || 'UNPLAYABLE', data.isEmbeddingError || false);
+          console.log('Video unplayable received:', data.message, 'for video:', youtubeVideoId);
+          setPlayerError(data.message);
+          onVideoUnplayable();
           break;
       }
     } catch (error) {
       console.error('Error parsing WebView message:', error);
-      handleVideoErrorInternal('Failed to parse video message', 'MESSAGE_PARSE_ERROR', false);
+      reportErrorToParent('Failed to parse video message');
     }
-  }, [duration, hasStarted, isCompleted, onVideoComplete, handleVideoErrorInternal, youtubeVideoId, autoPlayStarted, retryCount, maxRetries]);
-
-  const handlePlayPause = useCallback(() => {
-    if (isPlaying) {
-      pauseVideo();
-    } else {
-      playVideo();
-    }
-  }, [isPlaying, playVideo, pauseVideo]);
-
-  const handleSkip = useCallback(async () => {
-    console.log('🔄 Skip requested for video:', youtubeVideoId);
-    
-    // Instant skip for playable videos
-    console.log('✅ Video appears playable, skipping without removal');
-    setSkipReason('Skipped playable video');
-    showToast('Skipping video...');
-    pauseVideo();
-    onVideoSkip();
-  }, [youtubeVideoId, pauseVideo, onVideoSkip]);
+  }, [youtubeVideoId, retryCount, maxRetries, onPlayerReady, onStateChange, onVideoComplete, onVideoUnplayable, reportErrorToParent]);
 
   const handleWebViewLoad = useCallback(() => {
     console.log('WebView loaded for video:', youtubeVideoId);
@@ -765,170 +547,79 @@ export default function SeamlessVideoPlayer({
 
   const handleWebViewError = useCallback(() => {
     console.log('WebView error for video:', youtubeVideoId);
-    handleVideoErrorInternal('Failed to load video player', 'WEBVIEW_ERROR', false);
-  }, [handleVideoErrorInternal, youtubeVideoId]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const progressAnimatedStyle = useAnimatedStyle(() => ({
-    width: `${progressValue.value * 100}%`,
-  }));
-
-  const coinAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: coinBounce.value }],
-  }));
-
-  const progressPercentage = Math.round((currentTime / duration) * 100);
-  const remainingTime = Math.max(0, duration - currentTime);
+    setPlayerError('Failed to load video player');
+    reportErrorToParent('Failed to load video player');
+  }, [youtubeVideoId, reportErrorToParent]);
 
   // Show error if no video ID could be extracted
   if (!youtubeVideoId) {
     console.error('Could not extract video ID from:', youtubeUrl);
     return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <AlertTriangle color="#FF4757" size={32} />
-          <Text style={styles.errorText}>Invalid video ID format</Text>
-          <Text style={styles.errorSubtext}>Video ID/URL: {youtubeUrl}</Text>
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <SkipForward color="#666" size={16} />
-            <Text style={styles.skipButtonText}>Skip Video</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.errorContainer}>
+        <AlertTriangle color="#FF4757" size={32} />
+        <Text style={styles.errorText}>Invalid video ID format</Text>
+        <Text style={styles.errorSubtext}>Video ID/URL: {youtubeUrl}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* WebView Video Player */}
-      <View style={styles.playerContainer}>
-        {!isLoaded && !loadingTimeout && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF4757" />
-            <Text style={styles.loadingText}>Loading video...</Text>
-            <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
-            {retryCount > 0 && (
-              <Text style={styles.loadingSubtext}>Retry attempt: {retryCount}/{maxRetries}</Text>
-            )}
-          </View>
-        )}
-        
-        <WebView
-          ref={webviewRef}
-          source={{ html: htmlContent }}
-          style={[styles.webview, !isLoaded && styles.hidden]}
-          onMessage={handleWebViewMessage}
-          onLoad={handleWebViewLoad}
-          onError={handleWebViewError}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={false}
-          scalesPageToFit={true}
-          scrollEnabled={false}
-          bounces={false}
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          mixedContentMode="compatibility"
-          originWhitelist={['*']}
-          allowsFullscreenVideo={false}
-          allowsProtectedMedia={false}
-          dataDetectorTypes={['none']}
-        />
-        
-        {/* Progress Bar Overlay */}
-        <View style={styles.progressOverlay}>
-          <View style={styles.progressBar}>
-            <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
-          </View>
+      {/* Loading overlay */}
+      {!isLoaded && !loadingTimeout && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF4757" />
+          <Text style={styles.loadingText}>Loading video...</Text>
+          <Text style={styles.loadingSubtext}>Video ID: {youtubeVideoId}</Text>
+          {retryCount > 0 && (
+            <Text style={styles.loadingSubtext}>Retry attempt: {retryCount}/{maxRetries}</Text>
+          )}
         </View>
-        
-        {/* Error Overlay */}
-        {(playerError || loadingTimeout) && (
-          <View style={styles.errorOverlay}>
-            <AlertTriangle color="#FF4757" size={24} />
-            <Text style={styles.errorText}>
-              {loadingTimeout ? 'Video unavailable, skipping...' : 'Loading next video...'}
-            </Text>
-            <Text style={styles.errorSubtext}>{playerError}</Text>
-            {skipReason && (
-              <Text style={styles.skipReasonText}>{skipReason}</Text>
-            )}
-          </View>
-        )}
-      </View>
-
-      {/* Video Info */}
-      <View style={styles.videoInfo}>
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Clock color="#666" size={14} />
-            <Text style={styles.statValue}>{formatTime(remainingTime)}</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{progressPercentage}%</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Animated.View style={[styles.coinContainer, coinAnimatedStyle]}>
-              <Award color="#FFA726" size={14} />
-              <Text style={styles.statValue}>{coinReward}</Text>
-            </Animated.View>
-          </View>
-        </View>
-
-        {/* Status Display */}
-        {skipReason && (
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusText}>{skipReason}</Text>
-          </View>
-        )}
-
-        {/* Auto-play Status */}
-        <View style={styles.autoPlayStatus}>
-          <Text style={styles.autoPlayText}>
-            {autoPlayStarted ? '▶️ Auto-playing' : loadingTimeout ? '❌ Failed to load' : '⏳ Loading...'}
+      )}
+      
+      {/* WebView Player */}
+      <WebView
+        ref={webviewRef}
+        source={{ html: htmlContent }}
+        style={[styles.webview, !isLoaded && styles.hidden]}
+        onMessage={handleWebViewMessage}
+        onLoad={handleWebViewLoad}
+        onError={handleWebViewError}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        startInLoadingState={false}
+        scalesPageToFit={true}
+        scrollEnabled={false}
+        bounces={false}
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
+        mixedContentMode="compatibility"
+        originWhitelist={['*']}
+        allowsFullscreenVideo={false}
+        allowsProtectedMedia={false}
+        dataDetectorTypes={['none']}
+      />
+      
+      {/* Error overlay */}
+      {(playerError || loadingTimeout) && (
+        <View style={styles.errorOverlay}>
+          <AlertTriangle color="#FF4757" size={24} />
+          <Text style={styles.errorText}>
+            {loadingTimeout ? 'Video unavailable, skipping...' : 'Loading next video...'}
           </Text>
+          <Text style={styles.errorSubtext}>{playerError}</Text>
         </View>
-
-        {/* Minimal Controls */}
-        <View style={styles.controls}>
-          <TouchableOpacity 
-            style={styles.controlButton}
-            onPress={handlePlayPause}
-            disabled={!isLoaded || playerError !== null || loadingTimeout}
-          >
-            {isPlaying ? (
-              <Pause color="#FF4757" size={16} />
-            ) : (
-              <Play color="#FF4757" size={16} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <SkipForward color="#666" size={16} />
-          </TouchableOpacity>
-        </View>
-      </View>
+      )}
     </View>
   );
-}
+});
+
+SeamlessVideoPlayer.displayName = 'SeamlessVideoPlayer';
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
-  },
-  playerContainer: {
-    position: 'relative',
+    flex: 1,
     backgroundColor: '#000',
-    height: isSmallScreen ? 180 : 220,
-    borderRadius: 0,
-    overflow: 'hidden',
   },
   webview: {
     flex: 1,
@@ -959,22 +650,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
     textAlign: 'center',
-  },
-  progressOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#FF4757',
   },
   errorOverlay: {
     position: 'absolute',
@@ -1007,90 +682,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  skipReasonText: {
-    color: '#FFA726',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  videoInfo: {
-    padding: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statValue: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#333',
-  },
-  coinContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statusContainer: {
-    backgroundColor: '#F0F8FF',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4A90E2',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#4A90E2',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  autoPlayStatus: {
-    backgroundColor: '#E8F5E8',
-    padding: 6,
-    borderRadius: 4,
-    marginBottom: 8,
-    borderLeftWidth: 2,
-    borderLeftColor: '#2ECC71',
-  },
-  autoPlayText: {
-    fontSize: 10,
-    color: '#2ECC71',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  controlButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skipButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skipButtonText: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 2,
-  },
 });
+
+export default SeamlessVideoPlayer;
