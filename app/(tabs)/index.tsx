@@ -63,6 +63,7 @@ export default function ViewTab() {
   const webviewRef = useRef<WebView>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation values
   const progressValue = useSharedValue(0);
@@ -101,6 +102,34 @@ export default function ViewTab() {
   };
 
   const youtubeVideoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
+
+  // Calculate responsive iframe dimensions
+  const calculateIframeDimensions = () => {
+    const maxWidth = screenWidth * 0.9; // 90% of screen width
+    const maxHeight = screenHeight * 0.35; // 35% of screen height for small screens
+    
+    // Maintain 16:9 aspect ratio
+    const aspectRatio = 16 / 9;
+    
+    let width = maxWidth;
+    let height = width / aspectRatio;
+    
+    // If height exceeds max height, adjust based on height
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * aspectRatio;
+    }
+    
+    // Ensure minimum dimensions for small screens
+    if (isSmallScreen) {
+      width = Math.max(width, 280);
+      height = Math.max(height, 157); // 280/16*9
+    }
+    
+    return { width, height };
+  };
+
+  const { width: iframeWidth, height: iframeHeight } = calculateIframeDimensions();
 
   // Create enhanced HTML content for YouTube iframe
   const createHtmlContent = (videoId: string) => `
@@ -150,6 +179,8 @@ export default function ViewTab() {
         var hasCompleted = false;
         var targetDuration = ${targetDuration};
         var autoPlayEnabled = ${autoPlay};
+        var currentVideoTime = 0;
+        var isPlaying = false;
 
         // Load YouTube IFrame API
         var tag = document.createElement('script');
@@ -210,7 +241,7 @@ export default function ViewTab() {
             videoId: '${videoId}'
           }));
           
-          // Start progress tracking
+          // Start progress tracking immediately
           startProgressTracking();
         }
 
@@ -227,10 +258,13 @@ export default function ViewTab() {
           
           console.log('Player state:', stateNames[state] || state);
           
+          isPlaying = (state === 1);
+          
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'STATE_CHANGE',
             state: state,
-            stateName: stateNames[state] || 'UNKNOWN'
+            stateName: stateNames[state] || 'UNKNOWN',
+            isPlaying: isPlaying
           }));
           
           if (state === 0 && autoPlayEnabled && !hasCompleted) { // ENDED
@@ -265,26 +299,29 @@ export default function ViewTab() {
             clearInterval(progressInterval);
           }
           
+          console.log('Starting progress tracking');
+          
           progressInterval = setInterval(function() {
             if (player && player.getCurrentTime && isPlayerReady) {
               try {
-                var currentTime = player.getCurrentTime();
-                var progress = Math.min(currentTime / targetDuration, 1) * 100;
+                currentVideoTime = player.getCurrentTime();
+                var progress = Math.min(currentVideoTime / targetDuration, 1) * 100;
                 
                 window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'PROGRESS_UPDATE',
-                  currentTime: currentTime,
+                  currentTime: currentVideoTime,
                   progress: progress,
-                  targetDuration: targetDuration
+                  targetDuration: targetDuration,
+                  isPlaying: isPlaying
                 }));
                 
                 // Check for coin earning completion
-                if (currentTime >= targetDuration && !hasCompleted) {
+                if (currentVideoTime >= targetDuration && !hasCompleted && isPlaying) {
                   hasCompleted = true;
                   console.log('Target duration reached, awarding coins');
                   window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'COINS_EARNED',
-                    currentTime: currentTime,
+                    currentTime: currentVideoTime,
                     coinsEarned: ${coinReward}
                   }));
                 }
@@ -298,18 +335,21 @@ export default function ViewTab() {
         // Control functions
         window.playVideo = function() {
           if (player && player.playVideo && isPlayerReady) {
+            console.log('Playing video');
             player.playVideo();
           }
         };
 
         window.pauseVideo = function() {
           if (player && player.pauseVideo && isPlayerReady) {
+            console.log('Pausing video');
             player.pauseVideo();
           }
         };
 
         window.stopVideo = function() {
           if (player && player.stopVideo && isPlayerReady) {
+            console.log('Stopping video');
             player.stopVideo();
           }
         };
@@ -326,18 +366,61 @@ export default function ViewTab() {
     </html>
   `;
 
+  // Start local timer for coin countdown
+  const startLocalTimer = useCallback(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    
+    console.log('Starting local timer');
+    
+    timerIntervalRef.current = setInterval(() => {
+      if (isPlaying && !coinsEarned) {
+        setCurrentTime(prev => {
+          const newTime = prev + 1;
+          const progress = Math.min(newTime / targetDuration, 1);
+          
+          progressValue.value = withTiming(progress, {
+            duration: 300,
+            easing: Easing.out(Easing.quad),
+          });
+          
+          // Award coins when target duration is reached
+          if (newTime >= targetDuration && !coinsEarned) {
+            setCoinsEarned(true);
+            awardCoins(coinReward);
+          }
+          
+          return newTime;
+        });
+      }
+    }, 1000);
+  }, [isPlaying, coinsEarned, targetDuration, coinReward]);
+
+  // Stop local timer
+  const stopLocalTimer = useCallback(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+  }, []);
+
   // Handle app state changes for background playback prevention
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       console.log('App state changed:', appState, '->', nextAppState);
       
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        // App resumed - can resume playback if it was playing
+        // App resumed - can resume timer if video was playing
         console.log('App resumed');
+        if (isPlaying) {
+          startLocalTimer();
+        }
       } else if (nextAppState.match(/inactive|background/)) {
-        // App backgrounded - pause video immediately
-        console.log('App backgrounded, pausing video');
+        // App backgrounded - pause video and stop timer
+        console.log('App backgrounded, pausing video and stopping timer');
         pauseVideo();
+        stopLocalTimer();
         setIsPlaying(false);
       }
       setAppState(nextAppState);
@@ -345,7 +428,7 @@ export default function ViewTab() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [appState]);
+  }, [appState, isPlaying, startLocalTimer, stopLocalTimer]);
 
   // Fetch videos on component mount
   useEffect(() => {
@@ -367,7 +450,8 @@ export default function ViewTab() {
       setIsPlaying(false);
       progressValue.value = 0;
       
-      // Clear intervals
+      // Clear all intervals
+      stopLocalTimer();
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
@@ -388,6 +472,17 @@ export default function ViewTab() {
       }, 5000);
     }
   }, [currentVideo]);
+
+  // Start/stop timer based on playing state
+  useEffect(() => {
+    if (isPlaying && isVideoLoaded && !coinsEarned) {
+      startLocalTimer();
+    } else {
+      stopLocalTimer();
+    }
+    
+    return () => stopLocalTimer();
+  }, [isPlaying, isVideoLoaded, coinsEarned, startLocalTimer, stopLocalTimer]);
 
   // WebView message handler
   const handleWebViewMessage = useCallback((event: any) => {
@@ -415,12 +510,15 @@ export default function ViewTab() {
           break;
           
         case 'PROGRESS_UPDATE':
-          setCurrentTime(data.currentTime);
-          const progress = Math.min(data.currentTime / targetDuration, 1);
-          progressValue.value = withTiming(progress, {
-            duration: 300,
-            easing: Easing.out(Easing.quad),
-          });
+          // Use WebView progress as backup, but rely on local timer for accuracy
+          if (!timerIntervalRef.current) {
+            setCurrentTime(data.currentTime);
+            const progress = Math.min(data.currentTime / targetDuration, 1);
+            progressValue.value = withTiming(progress, {
+              duration: 300,
+              easing: Easing.out(Easing.quad),
+            });
+          }
           break;
           
         case 'COINS_EARNED':
@@ -514,6 +612,7 @@ export default function ViewTab() {
 
   const handleSkipVideo = () => {
     stopVideo();
+    stopLocalTimer();
     moveToNextVideo();
     if (user && videoQueue.length <= 2) {
       fetchVideos(user.id);
@@ -542,9 +641,8 @@ export default function ViewTab() {
     transform: [{ scale: coinBounce.value }],
   }));
 
-  // Calculate iframe dimensions
-  const iframeHeight = Math.min(screenHeight * 0.4, 300);
-  const iframeWidth = iframeHeight * 0.75; // 70-80% of height for proper aspect ratio
+  // Calculate remaining time
+  const remainingTime = Math.max(0, targetDuration - currentTime);
 
   if (isLoading && videoQueue.length === 0) {
     return (
@@ -607,7 +705,7 @@ export default function ViewTab() {
       <View style={styles.videoContainer}>
         {/* Loading State */}
         {(!isVideoLoaded || loadingTimeout) && (
-          <View style={styles.videoLoadingContainer}>
+          <View style={[styles.videoLoadingContainer, { width: iframeWidth, height: iframeHeight }]}>
             <ActivityIndicator size="large" color="#FF4757" />
             <Text style={styles.videoLoadingText}>
               {loadingTimeout ? 'Video stuck, skipping...' : 'Loading video...'}
@@ -676,7 +774,7 @@ export default function ViewTab() {
         {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{targetDuration}</Text>
+            <Text style={styles.statNumber}>{remainingTime}</Text>
             <Text style={styles.statLabel}>Seconds to get coins</Text>
           </View>
           <View style={styles.statItem}>
@@ -697,7 +795,9 @@ export default function ViewTab() {
             ) : (
               <Play color="rgba(255, 255, 255, 0.7)" size={24} />
             )}
-            <Text style={styles.playButtonText}>Play</Text>
+            <Text style={styles.playButtonText}>
+              {isPlaying ? 'Pause' : 'Play'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
@@ -784,18 +884,15 @@ const styles = StyleSheet.create({
   },
   videoLoadingContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#2C2C2C',
+    backgroundColor: '#000',
+    borderRadius: 8,
     zIndex: 10,
   },
   videoLoadingText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     marginTop: 16,
     textAlign: 'center',
   },
@@ -839,6 +936,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 20,
     alignItems: 'center',
+    maxWidth: screenWidth * 0.9,
   },
   videoTitle: {
     fontSize: 16,
@@ -928,22 +1026,19 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   playButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 40,
+    width: 80,
     height: 40,
     borderRadius: 20,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    gap: 8,
   },
   playButtonText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
-    position: 'absolute',
-    bottom: -20,
+    marginTop: 4,
   },
   skipButton: {
     flexDirection: 'row',
