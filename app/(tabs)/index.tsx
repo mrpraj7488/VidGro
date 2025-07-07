@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
   ActivityIndicator,
   AppState,
   AppStateStatus,
