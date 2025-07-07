@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, SkipForward, Award, Clock, DollarSign, Menu, Timer, Coins } from 'lucide-react-native';
+import { Play, Pause, SkipForward, Award, Clock, Menu, Timer, Coins } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
@@ -29,7 +29,7 @@ import Animated, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
-const videoHeight = isSmallScreen ? 200 : Math.min(screenHeight * 0.35, 280);
+const videoHeight = isSmallScreen ? 180 : Math.min(screenHeight * 0.32, 260);
 
 interface Video {
   id: string;
@@ -852,7 +852,7 @@ export default function ViewTab() {
           <Text style={styles.headerTitle}>VidGrow</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-            <DollarSign color="#FFD700" size={20} />
+            <Coins color="#FFD700" size={20} />
           </Animated.View>
         </LinearGradient>
         
@@ -872,7 +872,7 @@ export default function ViewTab() {
           <Text style={styles.headerTitle}>VidGrow</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-            <DollarSign color="#FFD700" size={20} />
+            <Coins color="#FFD700" size={20} />
           </Animated.View>
         </LinearGradient>
         
@@ -892,7 +892,7 @@ export default function ViewTab() {
         <Text style={styles.headerTitle}>VidGrow</Text>
         <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
           <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-          <DollarSign color="#FFD700" size={20} />
+          <Coins color="#FFD700" size={isSmallScreen ? 18 : 20} />
         </Animated.View>
       </LinearGradient>
 
@@ -952,16 +952,6 @@ export default function ViewTab() {
               </View>
             </View>
 
-            {/* Completion Overlay */}
-            {videoCompleted && !isSkipping && (
-              <View style={styles.completionOverlay}>
-                <View style={styles.completionContent}>
-                  <Award color="#4CAF50" size={32} />
-                  <Text style={styles.completionText}>Video Completed!</Text>
-                  <Text style={styles.completionSubtext}>Loading next video...</Text>
-                </View>
-              </View>
-            )}
           </View>
 
           {/* Video Title */}
@@ -979,7 +969,7 @@ export default function ViewTab() {
               <View style={styles.statIconContainer}>
                 <Timer color="#FF4757" size={18} />
               </View>
-              <Text style={styles.statValue}>{Math.ceil(remainingTime)}</Text>
+              <Text style={styles.statValue}>{Math.ceil(remainingTime)}s</Text>
               <Text style={styles.statLabel}>Remaining</Text>
             </View>
             
@@ -1061,12 +1051,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    minHeight: Platform.OS === 'ios' ? 100 : 90,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
     color: 'white',
   },
@@ -1074,15 +1065,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 16,
+    paddingHorizontal: isSmallScreen ? 8 : 12,
+    paddingVertical: isSmallScreen ? 6 : 8,
+    borderRadius: 20,
+    minWidth: isSmallScreen ? 60 : 70,
+    justifyContent: 'center',
   },
   coinCount: {
     color: '#FFD700',
-    fontSize: 14,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
-    marginRight: 4,
+    marginRight: isSmallScreen ? 3 : 4,
   },
   scrollView: {
     flex: 1,
@@ -1114,8 +1107,8 @@ const styles = StyleSheet.create({
   },
   videoSection: {
     backgroundColor: 'white',
-    marginHorizontal: 12,
-    marginTop: 12,
+    marginHorizontal: isSmallScreen ? 8 : 12,
+    marginTop: isSmallScreen ? 8 : 12,
     borderRadius: 12,
     overflow: 'hidden',
     ...Platform.select({
@@ -1187,59 +1180,29 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4CAF50',
   },
-  completionOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1001,
-  },
-  completionContent: {
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 24,
-  },
-  completionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4CAF50',
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  completionSubtext: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
   titleContainer: {
-    padding: 12,
+    padding: isSmallScreen ? 10 : 12,
   },
   videoTitle: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 13 : 14,
     fontWeight: '600',
     color: '#333',
     lineHeight: 18,
   },
   statsSection: {
-    marginHorizontal: 12,
-    marginTop: 12,
+    marginHorizontal: isSmallScreen ? 8 : 12,
+    marginTop: isSmallScreen ? 8 : 12,
   },
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: isSmallScreen ? 6 : 8,
   },
   statCard: {
     flex: 1,
     backgroundColor: 'white',
     borderRadius: 10,
-    padding: 12,
+    padding: isSmallScreen ? 10 : 12,
     alignItems: 'center',
     ...Platform.select({
       ios: {
@@ -1257,32 +1220,32 @@ const styles = StyleSheet.create({
     }),
   },
   statIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: isSmallScreen ? 28 : 32,
+    height: isSmallScreen ? 28 : 32,
+    borderRadius: isSmallScreen ? 14 : 16,
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: isSmallScreen ? 4 : 6,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 18 : 20,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 2,
+    marginBottom: isSmallScreen ? 1 : 2,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: isSmallScreen ? 9 : 10,
     color: '#666',
     textAlign: 'center',
   },
   controlsSection: {
     backgroundColor: 'white',
-    marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 24,
+    marginHorizontal: isSmallScreen ? 8 : 12,
+    marginTop: isSmallScreen ? 8 : 12,
+    marginBottom: isSmallScreen ? 20 : 24,
     borderRadius: 12,
-    padding: 16,
+    padding: isSmallScreen ? 12 : 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1302,22 +1265,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: isSmallScreen ? 12 : 16,
   },
   autoPlayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: isSmallScreen ? 6 : 8,
   },
   autoPlayLabel: {
-    fontSize: 12,
+    fontSize: isSmallScreen ? 11 : 12,
     color: '#333',
     fontWeight: '500',
   },
   autoPlayToggle: {
-    width: 40,
-    height: 24,
-    borderRadius: 12,
+    width: isSmallScreen ? 36 : 40,
+    height: isSmallScreen ? 20 : 24,
+    borderRadius: isSmallScreen ? 10 : 12,
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     paddingHorizontal: 2,
@@ -1327,9 +1290,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF4757',
   },
   autoPlayThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: isSmallScreen ? 16 : 20,
+    height: isSmallScreen ? 16 : 20,
+    borderRadius: isSmallScreen ? 8 : 10,
     backgroundColor: 'white',
     position: 'absolute',
     left: 2,
@@ -1354,12 +1317,12 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: isSmallScreen ? 8 : 12,
   },
   playButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: isSmallScreen ? 44 : 48,
+    height: isSmallScreen ? 44 : 48,
+    borderRadius: isSmallScreen ? 22 : 24,
     backgroundColor: '#FF4757',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1387,9 +1350,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6B7280',
-    paddingVertical: 12,
+    paddingVertical: isSmallScreen ? 10 : 12,
     borderRadius: 8,
-    gap: 6,
+    gap: isSmallScreen ? 4 : 6,
     ...Platform.select({
       ios: {
         shadowColor: '#6B7280',
@@ -1407,7 +1370,7 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: isSmallScreen ? 11 : 12,
     fontWeight: '600',
   },
   securityWarning: {
@@ -1415,12 +1378,12 @@ const styles = StyleSheet.create({
     borderColor: '#FFEAA7',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
+    padding: isSmallScreen ? 10 : 12,
+    marginTop: isSmallScreen ? 10 : 12,
   },
   securityWarningText: {
     color: '#856404',
-    fontSize: 12,
+    fontSize: isSmallScreen ? 11 : 12,
     textAlign: 'center',
     fontWeight: '500',
   },
