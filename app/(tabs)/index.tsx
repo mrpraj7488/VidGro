@@ -30,8 +30,8 @@ import Animated, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
-// Increase video height to 80-90% of screen height for better visibility
-const videoHeight = Math.min(screenHeight * 0.85, screenHeight - 200);
+// Make video take up most of the screen (about 70% of screen height)
+const videoHeight = Math.min(screenHeight * 0.7, screenHeight - 150);
 
 interface Video {
   id: string;
@@ -74,7 +74,6 @@ export default function ViewTab() {
   // Animation values
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
-  const loadingRotation = useSharedValue(0);
 
   const currentVideo = getCurrentVideo();
   const targetDuration = 30; // 30 seconds to earn coins
@@ -730,143 +729,111 @@ export default function ViewTab() {
         </Animated.View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Video Player Container - Increased size */}
-        <View style={styles.videoSection}>
-          <View style={styles.videoContainer}>
-            {/* Loading State */}
-            {(!isVideoLoaded || loadingTimeout) && (
-              <View style={styles.videoLoadingContainer}>
-                <ActivityIndicator size="large" color="#FF4757" />
-                <Text style={styles.videoLoadingText}>
-                  {loadingTimeout ? 'Video stuck, skipping...' : 'Loading video...'}
+      {/* Video Player Container - Much Larger Size */}
+      <View style={styles.videoSection}>
+        <View style={styles.videoContainer}>
+          {/* Loading State */}
+          {(!isVideoLoaded || loadingTimeout) && (
+            <View style={styles.videoLoadingContainer}>
+              <ActivityIndicator size="large" color="#FF4757" />
+              <Text style={styles.videoLoadingText}>
+                {loadingTimeout ? 'Video stuck, skipping...' : 'Loading video...'}
+              </Text>
+              <Text style={styles.videoIdText}>Video ID: {youtubeVideoId}</Text>
+            </View>
+          )}
+
+          {/* WebView Player */}
+          {youtubeVideoId && (
+            <WebView
+              ref={webviewRef}
+              source={{ html: createHtmlContent(youtubeVideoId) }}
+              style={[styles.webview, !isVideoLoaded && styles.hidden]}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={false}
+              scalesPageToFit={true}
+              scrollEnabled={false}
+              bounces={false}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              mixedContentMode="compatibility"
+              originWhitelist={['*']}
+              allowsFullscreenVideo={false}
+            />
+          )}
+          
+          {/* Progress Bar */}
+          <View style={styles.progressOverlay}>
+            <View style={styles.progressBar}>
+              <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
+            </View>
+          </View>
+
+          {/* Completion Overlay */}
+          {videoCompleted && (
+            <View style={styles.completionOverlay}>
+              <View style={styles.completionContent}>
+                <Award color="#4CAF50" size={32} />
+                <Text style={styles.completionText}>Video Completed!</Text>
+                <Text style={styles.completionSubtext}>
+                  {autoPlay ? 'Moving to next video...' : 'Tap skip to continue'}
                 </Text>
-                <Text style={styles.videoIdText}>Video ID: {youtubeVideoId}</Text>
-              </View>
-            )}
-
-            {/* WebView Player */}
-            {youtubeVideoId && (
-              <WebView
-                ref={webviewRef}
-                source={{ html: createHtmlContent(youtubeVideoId) }}
-                style={[styles.webview, !isVideoLoaded && styles.hidden]}
-                onMessage={handleWebViewMessage}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                startInLoadingState={false}
-                scalesPageToFit={true}
-                scrollEnabled={false}
-                bounces={false}
-                allowsInlineMediaPlayback={true}
-                mediaPlaybackRequiresUserAction={false}
-                mixedContentMode="compatibility"
-                originWhitelist={['*']}
-                allowsFullscreenVideo={false}
-              />
-            )}
-            
-            {/* Progress Bar */}
-            <View style={styles.progressOverlay}>
-              <View style={styles.progressBar}>
-                <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
               </View>
             </View>
-
-            {/* Completion Overlay */}
-            {videoCompleted && (
-              <View style={styles.completionOverlay}>
-                <View style={styles.completionContent}>
-                  <Award color="#4CAF50" size={32} />
-                  <Text style={styles.completionText}>Video Completed!</Text>
-                  <Text style={styles.completionSubtext}>
-                    {autoPlay ? 'Moving to next video...' : 'Tap skip to continue'}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Video Title - Bold white with shadow */}
-          <View style={styles.titleContainer}>
-            <Text style={styles.videoTitle} numberOfLines={2} ellipsizeMode="tail">
-              {currentVideo.title}
-            </Text>
-          </View>
+          )}
         </View>
+      </View>
 
-        {/* Stats Cards - Removed Progress, kept only Remaining and Coins */}
-        <View style={styles.statsSection}>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <View style={styles.statIconContainer}>
-                <Timer color="#FF4757" size={20} />
-              </View>
-              <Text style={styles.statValue}>{formatTime(remainingTime)}</Text>
-              <Text style={styles.statLabel}>Remaining</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <Animated.View style={[styles.statIconContainer, coinAnimatedStyle]}>
-                <Coins color="#FFA726" size={20} />
-              </Animated.View>
-              <Text style={styles.statValue}>{coinReward}</Text>
-              <Text style={styles.statLabel}>Coins</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Controls Section */}
-        <View style={styles.controlsSection}>
-          {/* Auto-play and Open YouTube */}
-          <View style={styles.topControls}>
-            <TouchableOpacity style={styles.youtubeButton} onPress={openOnYoutube}>
-              <ExternalLink color="#666" size={16} />
-              <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.autoPlayContainer}>
-              <Text style={styles.autoPlayLabel}>Auto Skip</Text>
-              <TouchableOpacity 
-                style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
-                onPress={toggleAutoPlay}
-              >
-                <View 
-                  style={[
-                    styles.autoPlayThumb, 
-                    autoPlay && styles.autoPlayThumbActive,
-                    {
-                      transform: [{
-                        translateX: autoPlay ? 20 : 0
-                      }]
-                    }
-                  ]} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Play/Skip Buttons */}
-          <View style={styles.buttonContainer}>
+      {/* Bottom Section with Stats and Controls */}
+      <View style={styles.bottomSection}>
+        {/* Open on YouTube and Auto Play Toggle */}
+        <View style={styles.topControls}>
+          <TouchableOpacity style={styles.youtubeButton} onPress={openOnYoutube}>
+            <ExternalLink color="#666" size={16} />
+            <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.autoPlayContainer}>
+            <Text style={styles.autoPlayLabel}>Auto Play</Text>
             <TouchableOpacity 
-              style={[styles.playButton, (!isVideoLoaded || loadingTimeout) && styles.playButtonDisabled]}
-              onPress={handlePlayPause}
-              disabled={!isVideoLoaded || loadingTimeout}
+              style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
+              onPress={toggleAutoPlay}
             >
-              {isPlaying ? (
-                <Pause color="white" size={24} />
-              ) : (
-                <Play color="white" size={24} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
-              <SkipForward color="white" size={20} />
-              <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
+              <View 
+                style={[
+                  styles.autoPlayThumb, 
+                  autoPlay && styles.autoPlayThumbActive,
+                  {
+                    transform: [{
+                      translateX: autoPlay ? 20 : 0
+                    }]
+                  }
+                ]} 
+              />
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+
+        {/* Stats - Only Remaining Time and Coins */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{formatTime(remainingTime).split(':')[1]}</Text>
+            <Text style={styles.statLabel}>Seconds to get coins</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{coinReward}</Text>
+            <Text style={styles.statLabel}>Coins will be added</Text>
+          </View>
+        </View>
+
+        {/* Skip Button */}
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
+          <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -904,9 +871,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 4,
   },
-  scrollView: {
-    flex: 1,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -941,28 +905,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   videoSection: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
+    flex: 1,
+    backgroundColor: '#000',
+    margin: 0,
   },
   videoContainer: {
-    height: videoHeight, // Increased height (80-90% of screen)
+    height: videoHeight, // Much larger height (70% of screen)
     backgroundColor: '#000',
     position: 'relative',
   },
@@ -1042,95 +990,10 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  titleContainer: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF', // Bold white color
-    lineHeight: 22,
-    textAlign: 'center',
-    fontFamily: Platform.OS === 'android' ? 'Roboto' : 'System',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)', // Subtle shadow
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-    paddingHorizontal: 5,
-  },
-  statsSection: {
-    marginHorizontal: 16,
-    marginTop: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around', // Balanced spacing for 2 items
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
+  bottomSection: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  controlsSection: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 32,
-    borderRadius: 16,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
+    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
   topControls: {
     flexDirection: 'row',
@@ -1199,65 +1062,37 @@ const styles = StyleSheet.create({
   autoPlayThumbActive: {
     // Animation handled by transform
   },
-  buttonContainer: {
+  statsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+    justifyContent: 'space-around',
+    marginBottom: 24,
   },
-  playButton: {
-    width: 40, // Circular play/pause button (40px)
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FF4757',
-    justifyContent: 'center',
+  statItem: {
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#FF4757',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
-      },
-    }),
   },
-  playButtonDisabled: {
-    opacity: 0.5,
+  statNumber: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    maxWidth: 120,
   },
   skipButton: {
-    flex: 1,
-    flexDirection: 'row',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 25,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6B7280',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-    height: 30, // Rectangular skip button (30px height)
-    minWidth: 80, // Minimum width (80px)
-    ...Platform.select({
-      ios: {
-        shadowColor: '#6B7280',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(107, 114, 128, 0.2)',
-      },
-    }),
   },
   skipButtonText: {
-    color: 'white',
-    fontSize: 14,
+    color: '#666',
+    fontSize: 16,
     fontWeight: '600',
+    letterSpacing: 1,
   },
 });
