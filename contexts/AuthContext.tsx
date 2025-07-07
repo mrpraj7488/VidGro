@@ -226,11 +226,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       console.log('Refreshing profile for user:', user.id, 'at', new Date().toLocaleTimeString());
       const oldCoins = profile?.coins || 0;
-      await fetchProfile(user.id);
-      const newCoins = profile?.coins || 0;
-      console.log('Profile refresh completed at', new Date().toLocaleTimeString());
-      console.log('Coin balance change:', oldCoins, '->', newCoins);
-      if (newCoins !== oldCoins) console.log('✅ Coin balance updated successfully!');
+      
+      try {
+        // Force a fresh fetch from the database
+        const { data: freshProfile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) {
+          console.error('Error refreshing profile:', error);
+          return;
+        }
+        
+        if (freshProfile) {
+          setProfile(freshProfile);
+          const newCoins = freshProfile.coins || 0;
+          console.log('Profile refresh completed at', new Date().toLocaleTimeString());
+          console.log('Coin balance change:', oldCoins, '->', newCoins);
+          if (newCoins !== oldCoins) {
+            console.log('✅ Coin balance updated successfully!');
+          } else {
+            console.log('⚠️ No coin balance change detected');
+          }
+        }
+      } catch (error) {
+        console.error('Error in refreshProfile:', error);
+        // Fallback to the original method
+        await fetchProfile(user.id);
+      }
     }
   };
 

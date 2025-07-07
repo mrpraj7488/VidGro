@@ -639,6 +639,8 @@ export default function ViewTab() {
   useEffect(() => {
     if (currentVideo) {
       addDebugLog(`Video changed to: ${currentVideo.youtube_url}`);
+      
+      // Reset all video-specific states
       setCurrentTime(0);
       setIsVideoLoaded(false);
       setPlayerError(null);
@@ -718,13 +720,14 @@ export default function ViewTab() {
 
   // Enhanced award coins function with retry mechanism
   const awardCoins = useCallback(async (coins: number) => {
-    if (!user || !currentVideo || coinsEarned || coinUpdateInProgress) {
+    if (!user || !currentVideo || coinsEarned || coinUpdateInProgress || coinsAwarded) {
       addDebugLog(`Coin award skipped - user: ${!!user}, video: ${!!currentVideo}, earned: ${coinsEarned}, inProgress: ${coinUpdateInProgress}, awarded: ${coinsAwarded}`);
       return;
     }
     
     setCoinUpdateInProgress(true);
     setCoinsEarned(true);
+    setCoinsAwarded(true); // Set this immediately to prevent double awards
     
     const maxRetryAttempts = 3;
     let retryAttempt = 0;
@@ -750,12 +753,29 @@ export default function ViewTab() {
 
         if (result) {
           addDebugLog(`Coins awarded successfully: ${coins}`);
-          setCoinsAwarded(true);
           
-          // Refresh profile to update coin count in UI immediately
+          // Add delay before refreshing profile to ensure database transaction is committed
+          addDebugLog('Waiting for database transaction to commit...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
           addDebugLog('Refreshing profile to update coin balance...');
+          const oldCoins = profile?.coins || 0;
           await refreshProfile();
-          addDebugLog(`Balance updated to ${(profile?.coins || 0) + coins} coins`);
+          
+          // Verify the update worked
+          setTimeout(() => {
+            const newCoins = profile?.coins || 0;
+            addDebugLog(`Balance verification: ${oldCoins} -> ${newCoins} (expected: ${oldCoins + coins})`);
+            if (newCoins === oldCoins + coins) {
+              addDebugLog('✅ Coin balance updated correctly!');
+            } else {
+              addDebugLog('⚠️ Coin balance update may have failed, triggering another refresh...');
+              // Try one more refresh after a longer delay
+              setTimeout(() => {
+                refreshProfile();
+              }, 2000);
+            }
+          }, 500);
           
           // Subtle coin animation
           coinBounce.value = withSpring(1.2, {
@@ -799,6 +819,7 @@ export default function ViewTab() {
       addDebugLog(`Final coin update error after ${maxRetryAttempts} attempts: ${error.message}`);
       // Reset states on final failure
       setCoinsEarned(false);
+      setCoinsAwarded(false);
     } finally {
       addDebugLog('Coin award process completed');
       setCoinUpdateInProgress(false);
@@ -867,7 +888,7 @@ export default function ViewTab() {
           addDebugLog(`Video completion received: ${data.reason}, currentTime: ${data.currentTime}, targetDuration: ${targetDuration}`);
           
           // Award coins if video was watched for sufficient time and not already earned
-          if (!coinsEarned && !coinsAwarded && data.currentTime >= (targetDuration * 0.9)) {
+          if (!coinsEarned && !coinsAwarded && data.currentTime >= (targetDuration * 0.9) && !coinUpdateInProgress) {
             addDebugLog(`Video watched for ${data.currentTime}s of ${targetDuration}s, awarding ${coinReward} coins`);
             await awardCoins(coinReward);
           }
