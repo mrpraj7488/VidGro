@@ -214,11 +214,10 @@ export default function ViewTab() {
         var progressInterval;
         var hasCompleted = false;
         var targetDuration = ${targetDuration};
-        var autoPlayEnabled = ${autoPlay};
+        var autoSkipEnabled = ${autoSkip};
         var currentTime = 0;
         var hasEarnedCoins = false;
         var hasStarted = false;
-        var autoSkipEnabled = ${autoSkip};
         var isTabVisible = true;
         var wasPlayingBeforeHidden = false;
         var loadingTimeoutId;
@@ -990,7 +989,12 @@ export default function ViewTab() {
     
     // Update auto-skip setting in WebView
     if (webviewRef.current) {
-      webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoSkip}); true;`);
+      webviewRef.current.injectJavaScript(`
+        if (window.updateAutoSkip) {
+          window.updateAutoSkip(${newAutoSkip});
+        }
+        true;
+      `);
     }
   };
 
@@ -1157,7 +1161,22 @@ export default function ViewTab() {
           <View style={styles.topControls}>
             <TouchableOpacity 
               style={styles.youtubeContainer}
-              onPress={openInYouTube}
+              <TouchableOpacity 
+                style={styles.youtubeLink}
+                onPress={() => {
+                  if (youtubeVideoId) {
+                    const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+                    if (Platform.OS === 'web') {
+                      window.open(youtubeUrl, '_blank');
+                    } else {
+                      // For mobile, you could use Linking.openURL(youtubeUrl)
+                      console.log('Open YouTube:', youtubeUrl);
+                    }
+                  }
+                }}
+              >
+                <Text style={styles.youtubeLinkText}>Watch On YouTube</Text>
+              </TouchableOpacity>
               disabled={!currentVideoUrl}
             >
               <Youtube color="#FF0000" size={16} />
@@ -1166,15 +1185,15 @@ export default function ViewTab() {
               </Text>
             </TouchableOpacity>
             <View style={styles.autoSkipContainer}>
-              <Text style={styles.autoSkipLabel}>Auto Skip</Text>
+              <Text style={styles.autoPlayLabel}>Auto Skip</Text>
               <TouchableOpacity 
-                style={[styles.autoSkipToggle, autoSkip && styles.autoSkipToggleActive]}
+                style={[styles.autoPlayToggle, autoSkip && styles.autoPlayToggleActive]}
                 onPress={toggleAutoSkip}
               >
                 <View 
                   style={[
                     styles.autoSkipThumb, 
-                    autoSkip && styles.autoSkipThumbActive,
+                    autoSkip && styles.autoPlayThumbActive,
                     {
                       transform: [{
                         translateX: autoSkip ? 16 : 0
@@ -1497,6 +1516,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: isSmallScreen ? 6 : 8,
+  },
+  youtubeLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  youtubeLinkText: {
+    fontSize: isSmallScreen ? 12 : 14,
+    color: '#FF0000', // YouTube red color
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
   autoSkipLabel: {
     fontSize: isSmallScreen ? 12 : 14,
