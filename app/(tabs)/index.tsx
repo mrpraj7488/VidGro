@@ -11,10 +11,11 @@ import {
   Dimensions,
   ToastAndroid,
   ScrollView,
+  Image,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, SkipForward, Award, Clock, Menu, Timer, Coins } from 'lucide-react-native';
+import { Play, Pause, SkipForward, Award, Clock, Menu, Timer, Coins, ExternalLink } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
@@ -29,7 +30,12 @@ import Animated, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
-const videoHeight = isSmallScreen ? 180 : Math.min(screenHeight * 0.32, 260);
+const videoHeight = isSmallScreen ? 200 : Math.min(screenHeight * 0.35, 280);
+
+// Calculate proper video aspect ratio (16:9)
+const videoWidth = screenWidth - (isSmallScreen ? 16 : 24);
+const calculatedVideoHeight = (videoWidth * 9) / 16;
+const finalVideoHeight = Math.min(calculatedVideoHeight, videoHeight);
 
 interface Video {
   id: string;
@@ -64,6 +70,8 @@ export default function ViewTab() {
   const [isTabFocused, setIsTabFocused] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [isSkipping, setIsSkipping] = useState(false);
+  const [showPlayButton, setShowPlayButton] = useState(true);
+  const [videoTitle, setVideoTitle] = useState('');
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -607,6 +615,8 @@ export default function ViewTab() {
       setHasStarted(false);
       setRetryCount(0);
       setIsSkipping(false);
+      setShowPlayButton(true);
+      setVideoTitle(currentVideo.title || '');
       progressValue.value = 0;
       
       // Clear all timeouts
@@ -768,6 +778,7 @@ export default function ViewTab() {
       }
 
       if (result) {
+        // Immediately refresh profile to update coin balance
         await refreshProfile();
         
         // Subtle coin animation
@@ -792,12 +803,14 @@ export default function ViewTab() {
   const playVideo = useCallback(() => {
     if (webviewRef.current && isTabFocused && appState === 'active') {
       webviewRef.current.injectJavaScript('window.playVideo && window.playVideo(); true;');
+      setShowPlayButton(false);
     }
   }, [isTabFocused, appState]);
 
   const pauseVideo = useCallback(() => {
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript('window.pauseVideo && window.pauseVideo(); true;');
+      setShowPlayButton(true);
     }
   }, []);
 
@@ -824,6 +837,15 @@ export default function ViewTab() {
     
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoPlay}); true;`);
+    }
+  };
+
+  const openInYouTube = () => {
+    if (currentVideo) {
+      const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+      if (Platform.OS === 'web') {
+        window.open(youtubeUrl, '_blank');
+      }
     }
   };
 
@@ -945,6 +967,19 @@ export default function ViewTab() {
               />
             )}
             
+            {/* Play Button Overlay */}
+            {showPlayButton && isVideoLoaded && !isSkipping && (
+              <TouchableOpacity 
+                style={styles.playButtonOverlay}
+                onPress={handlePlayPause}
+                activeOpacity={0.8}
+              >
+                <View style={styles.playButtonCircle}>
+                  <Play color="white" size={isSmallScreen ? 24 : 28} />
+                </View>
+              </TouchableOpacity>
+            )}
+
             {/* Progress Bar */}
             <View style={styles.progressOverlay}>
               <View style={styles.progressBar}>
@@ -955,39 +990,21 @@ export default function ViewTab() {
           </View>
 
           {/* Video Title */}
-          <View style={styles.titleContainer}>
-            <Text style={styles.videoTitle} numberOfLines={2} ellipsizeMode="tail">
-              {currentVideo.title}
-            </Text>
-          </View>
-        </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsSection}>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <View style={styles.statIconContainer}>
-                <Timer color="#FF4757" size={18} />
-              </View>
-              <Text style={styles.statValue}>{Math.ceil(remainingTime)}s</Text>
-              <Text style={styles.statLabel}>Remaining</Text>
+          <View style={styles.videoInfoContainer}>
+            <View style={styles.titleRow}>
+              <Text style={styles.videoTitle} numberOfLines={2} ellipsizeMode="tail">
+                {videoTitle || currentVideo.title}
+              </Text>
+              <TouchableOpacity 
+                style={styles.youtubeButton}
+                onPress={openInYouTube}
+              >
+                <ExternalLink color="#FF4757" size={16} />
+                <Text style={styles.youtubeButtonText}>YouTube</Text>
+              </TouchableOpacity>
             </View>
             
-            <View style={styles.statCard}>
-              <Animated.View style={[styles.statIconContainer, coinAnimatedStyle]}>
-                <Coins color="#FFA726" size={18} />
-              </Animated.View>
-              <Text style={styles.statValue}>{coinReward}</Text>
-              <Text style={styles.statLabel}>Coins</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Controls Section */}
-        <View style={styles.controlsSection}>
-          {/* Auto-play Toggle */}
-          <View style={styles.topControls}>
-            <View style={styles.autoPlayContainer}>
+            <View style={styles.autoPlayRow}>
               <Text style={styles.autoPlayLabel}>Auto Play</Text>
               <TouchableOpacity 
                 style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
@@ -999,7 +1016,7 @@ export default function ViewTab() {
                     autoPlay && styles.autoPlayThumbActive,
                     {
                       transform: [{
-                        translateX: autoPlay ? 16 : 0
+                        translateX: autoPlay ? (isSmallScreen ? 14 : 16) : 0
                       }]
                     }
                   ]} 
@@ -1007,36 +1024,41 @@ export default function ViewTab() {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Play/Skip Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={[styles.playButton, (!isVideoLoaded || !isTabFocused) && styles.playButtonDisabled]}
-              onPress={handlePlayPause}
-              disabled={!isVideoLoaded || !isTabFocused}
-            >
-              {isPlaying ? (
-                <Pause color="white" size={20} />
-              ) : (
-                <Play color="white" size={20} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
-              <SkipForward color="white" size={16} />
-              <Text style={styles.skipButtonText}>SKIP</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Security Status */}
-          {(!isTabFocused || appState !== 'active') && (
-            <View style={styles.securityWarning}>
-              <Text style={styles.securityWarningText}>
-                🔒 Stay on this tab to watch videos
-              </Text>
-            </View>
-          )}
         </View>
+
+        {/* Stats Display */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{Math.ceil(remainingTime)}</Text>
+            <Text style={styles.statLabel}>Seconds to get coins</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Animated.View style={coinAnimatedStyle}>
+              <Text style={styles.statNumber}>{coinReward}</Text>
+            </Animated.View>
+            <Text style={styles.statLabel}>Coins will be added</Text>
+          </View>
+        </View>
+
+
+
+
+        {/* Skip Button */}
+        <View style={styles.skipContainer}>
+          <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
+            <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Security Status */}
+        {(!isTabFocused || appState !== 'active') && (
+          <View style={styles.securityWarning}>
+            <Text style={styles.securityWarningText}>
+              🔒 Stay on this tab to watch videos
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -1163,6 +1185,39 @@ const styles = StyleSheet.create({
   hidden: {
     opacity: 0,
   },
+  playButtonOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 5,
+  },
+  playButtonCircle: {
+    width: isSmallScreen ? 60 : 70,
+    height: isSmallScreen ? 60 : 70,
+    borderRadius: isSmallScreen ? 30 : 35,
+    backgroundColor: 'rgba(255, 71, 87, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+      },
+    }),
+  },
   progressOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -1180,100 +1235,44 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4CAF50',
   },
-  titleContainer: {
+  videoInfoContainer: {
     padding: isSmallScreen ? 10 : 12,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   videoTitle: {
     fontSize: isSmallScreen ? 13 : 14,
     fontWeight: '600',
     color: '#333',
     lineHeight: 18,
+    flex: 1,
+    marginRight: 12,
   },
-  statsSection: {
-    marginHorizontal: isSmallScreen ? 8 : 12,
-    marginTop: isSmallScreen ? 8 : 12,
+  youtubeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
   },
-  statsGrid: {
+  youtubeButtonText: {
+    fontSize: 11,
+    color: '#FF4757',
+    fontWeight: '500',
+  },
+  autoPlayRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: isSmallScreen ? 6 : 8,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: isSmallScreen ? 10 : 12,
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  statIconContainer: {
-    width: isSmallScreen ? 28 : 32,
-    height: isSmallScreen ? 28 : 32,
-    borderRadius: isSmallScreen ? 14 : 16,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: isSmallScreen ? 4 : 6,
-  },
-  statValue: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: isSmallScreen ? 1 : 2,
-  },
-  statLabel: {
-    fontSize: isSmallScreen ? 9 : 10,
-    color: '#666',
-    textAlign: 'center',
-  },
-  controlsSection: {
-    backgroundColor: 'white',
-    marginHorizontal: isSmallScreen ? 8 : 12,
-    marginTop: isSmallScreen ? 8 : 12,
-    marginBottom: isSmallScreen ? 20 : 24,
-    borderRadius: 12,
-    padding: isSmallScreen ? 12 : 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  topControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: isSmallScreen ? 12 : 16,
-  },
-  autoPlayContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: isSmallScreen ? 6 : 8,
   },
   autoPlayLabel: {
-    fontSize: isSmallScreen ? 11 : 12,
+    fontSize: isSmallScreen ? 13 : 14,
     color: '#333',
     fontWeight: '500',
   },
@@ -1314,75 +1313,88 @@ const styles = StyleSheet.create({
   autoPlayThumbActive: {
     // Animation handled by transform
   },
-  buttonContainer: {
+  statsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: isSmallScreen ? 8 : 12,
-  },
-  playButton: {
-    width: isSmallScreen ? 44 : 48,
-    height: isSmallScreen ? 44 : 48,
-    borderRadius: isSmallScreen ? 22 : 24,
-    backgroundColor: '#FF4757',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'white',
+    marginHorizontal: isSmallScreen ? 8 : 12,
+    marginTop: isSmallScreen ? 8 : 12,
+    paddingVertical: isSmallScreen ? 16 : 20,
+    borderRadius: 12,
     ...Platform.select({
       ios: {
-        shadowColor: '#FF4757',
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.1,
         shadowRadius: 4,
       },
       android: {
         elevation: 3,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(255, 71, 87, 0.3)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
-  playButtonDisabled: {
-    opacity: 0.5,
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: isSmallScreen ? 32 : 36,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: isSmallScreen ? 12 : 13,
+    color: '#666',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  skipContainer: {
+    marginHorizontal: isSmallScreen ? 8 : 12,
+    marginTop: isSmallScreen ? 8 : 12,
+    marginBottom: isSmallScreen ? 20 : 24,
   },
   skipButton: {
-    flex: 1,
-    flexDirection: 'row',
+    backgroundColor: '#6B7280',
+    paddingVertical: isSmallScreen ? 14 : 16,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6B7280',
-    paddingVertical: isSmallScreen ? 10 : 12,
-    borderRadius: 8,
-    gap: isSmallScreen ? 4 : 6,
     ...Platform.select({
       ios: {
         shadowColor: '#6B7280',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
-        shadowRadius: 2,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 2,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 1px 2px rgba(107, 114, 128, 0.2)',
+        boxShadow: '0 2px 4px rgba(107, 114, 128, 0.2)',
       },
     }),
   },
   skipButtonText: {
     color: 'white',
-    fontSize: isSmallScreen ? 11 : 12,
+    fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '600',
+    letterSpacing: 0.5,
   },
   securityWarning: {
-    backgroundColor: '#FFF3CD',
-    borderColor: '#FFEAA7',
+    backgroundColor: 'white',
+    borderColor: '#FFA726',
     borderWidth: 1,
     borderRadius: 8,
-    padding: isSmallScreen ? 10 : 12,
-    marginTop: isSmallScreen ? 10 : 12,
+    marginHorizontal: isSmallScreen ? 8 : 12,
+    marginBottom: isSmallScreen ? 20 : 24,
+    padding: isSmallScreen ? 12 : 16,
   },
   securityWarningText: {
-    color: '#856404',
+    color: '#FFA726',
     fontSize: isSmallScreen ? 11 : 12,
     textAlign: 'center',
     fontWeight: '500',
