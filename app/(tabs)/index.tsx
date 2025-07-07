@@ -56,7 +56,7 @@ export default function ViewTab() {
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [appState, setAppState] = useState(AppState.currentState);
-  const [autoSkip, setAutoSkip] = useState(true); // Renamed from autoPlay to autoSkip
+  const [autoPlay, setautoPlay] = useState(true); // Renamed from autoPlay to autoPlay
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
@@ -218,7 +218,7 @@ export default function ViewTab() {
         var currentTime = 0;
         var hasEarnedCoins = false;
         var hasStarted = false;
-        var autoSkipEnabled = ${autoSkip};
+        var autoPlayEnabled = ${autoPlay};
         var isTabVisible = true;
         var wasPlayingBeforeHidden = false;
         var loadingTimeoutId;
@@ -355,7 +355,7 @@ export default function ViewTab() {
           
           startProgressTracking();
           
-          // Always auto-start playback (independent of autoSkip setting)
+          // Always auto-start playback (independent of autoPlay setting)
           if (isTabVisible) {
             setTimeout(function() {
               if (player && player.playVideo && isPlayerReady && !hasError) {
@@ -431,7 +431,7 @@ export default function ViewTab() {
               reason: 'natural_end',
               shouldAwardCoins: currentTime >= targetDuration,
               currentTime: currentTime,
-              autoSkip: autoSkipEnabled
+              autoPlay: autoPlayEnabled
             }));
           }
           
@@ -502,7 +502,7 @@ export default function ViewTab() {
                   }));
                   
                   // Auto-complete if enabled
-                  if (autoSkipEnabled) {
+                  if (autoPlayEnabled) {
                     setTimeout(function() {
                       if (!hasCompleted) {
                         hasCompleted = true;
@@ -519,7 +519,7 @@ export default function ViewTab() {
                           reason: 'auto_complete_after_coins',
                           shouldAwardCoins: false,
                           currentTime: currentTime,
-                          autoSkip: true
+                          autoPlay: true
                         }));
                       }
                     }, 500);
@@ -575,8 +575,8 @@ export default function ViewTab() {
         };
 
         // Update auto-skip setting
-        window.updateAutoSkip = function(enabled) {
-          autoSkipEnabled = enabled;
+        window.updateautoPlay = function(enabled) {
+          autoPlayEnabled = enabled;
           debugLog('Auto-skip updated: ' + enabled);
         };
 
@@ -904,8 +904,8 @@ export default function ViewTab() {
             setVideoCompleted(true);
             setIsPlaying(false);
             
-            // Only auto-skip if autoSkip is enabled
-            if (autoSkip) {
+            // Only auto-skip if autoPlay is enabled
+            if (autoPlay) {
               completionTimeoutRef.current = setTimeout(() => {
                 handleInstantSkip('Video completed');
               }, 500);
@@ -983,14 +983,14 @@ export default function ViewTab() {
     handleInstantSkip('Manual skip');
   };
 
-  const toggleAutoSkip = () => {
-    const newAutoSkip = !autoSkip;
-    setAutoSkip(newAutoSkip);
-    addDebugLog(`Auto-skip toggled: ${newAutoSkip}`);
+  const toggleautoPlay = () => {
+    const newautoPlay = !autoPlay;
+    setautoPlay(newautoPlay);
+    addDebugLog(`Auto-skip toggled: ${newautoPlay}`);
     
     // Update auto-skip setting in WebView
     if (webviewRef.current) {
-      webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoSkip}); true;`);
+      webviewRef.current.injectJavaScript(`window.updateautoPlay && window.updateautoPlay(${newautoPlay}); true;`);
     }
   };
 
@@ -1165,19 +1165,19 @@ export default function ViewTab() {
                 Watch On YouTube
               </Text>
             </TouchableOpacity>
-            <View style={styles.autoSkipContainer}>
-              <Text style={styles.autoSkipLabel}>Auto Skip</Text>
+            <View style={styles.autoPlayContainer}>
+              <Text style={styles.autoPlayLabel}>Auto Skip</Text>
               <TouchableOpacity 
-                style={[styles.autoSkipToggle, autoSkip && styles.autoSkipToggleActive]}
-                onPress={toggleAutoSkip}
+                style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
+                onPress={toggleautoPlay}
               >
                 <View 
                   style={[
-                    styles.autoSkipThumb, 
-                    autoSkip && styles.autoSkipThumbActive,
+                    styles.autoPlayThumb, 
+                    autoPlay && styles.autoPlayThumbActive,
                     {
                       transform: [{
-                        translateX: autoSkip ? 16 : 0
+                        translateX: autoPlay ? 16 : 0
                       }]
                     }
                   ]} 
@@ -1216,7 +1216,7 @@ export default function ViewTab() {
           )}
           
           {/* Auto-skip Status */}
-          {videoCompleted && !autoSkip && (
+          {videoCompleted && !autoPlay && (
             <View style={styles.completionBanner}>
               <Text style={styles.completionText}>
                 ✅ Video completed! Auto-skip is disabled.
@@ -1493,17 +1493,17 @@ const styles = StyleSheet.create({
   disabledText: {
     color: '#999',
   },
-  autoSkipContainer: {
+  autoPlayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: isSmallScreen ? 6 : 8,
   },
-  autoSkipLabel: {
+  autoPlayLabel: {
     fontSize: isSmallScreen ? 12 : 14,
     color: '#333',
     fontWeight: '500',
   },
-  autoSkipToggle: {
+  autoPlayToggle: {
     width: isSmallScreen ? 36 : 40,
     height: isSmallScreen ? 20 : 24,
     borderRadius: isSmallScreen ? 10 : 12,
@@ -1512,10 +1512,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     position: 'relative',
   },
-  autoSkipToggleActive: {
+  autoPlayToggleActive: {
     backgroundColor: '#FF4757',
   },
-  autoSkipThumb: {
+  autoPlayThumb: {
     width: isSmallScreen ? 16 : 20,
     height: isSmallScreen ? 16 : 20,
     borderRadius: isSmallScreen ? 8 : 10,
@@ -1537,7 +1537,7 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  autoSkipThumbActive: {
+  autoPlayThumbActive: {
     // Animation handled by transform
   },
   buttonContainer: {
