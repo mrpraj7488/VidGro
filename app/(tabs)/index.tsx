@@ -65,6 +65,7 @@ export default function ViewTab() {
   const [showCompletionMessage, setShowCompletionMessage] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [coinUpdateInProgress, setCoinUpdateInProgress] = useState(false);
+  const [coinsAwarded, setCoinsAwarded] = useState(false);
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -631,6 +632,7 @@ export default function ViewTab() {
       setHasStarted(false);
       setRetryCount(0);
       setIsSkipping(false);
+      setCoinsAwarded(false);
       setShowCompletionMessage(false);
       progressValue.value = 0;
       
@@ -702,7 +704,7 @@ export default function ViewTab() {
   // Enhanced award coins function with detailed logging
   const awardCoins = useCallback(async (coins: number) => {
     if (!user || !currentVideo || coinsEarned || coinUpdateInProgress) {
-      addDebugLog(`Coin award skipped - user: ${!!user}, video: ${!!currentVideo}, earned: ${coinsEarned}, inProgress: ${coinUpdateInProgress}`);
+      addDebugLog(`Coin award skipped - user: ${!!user}, video: ${!!currentVideo}, earned: ${coinsEarned}, inProgress: ${coinUpdateInProgress}, awarded: ${coinsAwarded}`);
       return;
     }
     
@@ -710,6 +712,7 @@ export default function ViewTab() {
     setCoinsEarned(true);
     
     try {
+      addDebugLog(`Starting coin award process for ${coins} coins`);
       addDebugLog(`Awarding ${coins} coins for video: ${currentVideo.youtube_url}`);
       
       // Call Supabase function to update coins
@@ -725,6 +728,7 @@ export default function ViewTab() {
       if (error) {
         addDebugLog(`Error awarding coins: ${error.message}`);
         addDebugLog(`Supabase error details: ${JSON.stringify(error)}`);
+        addDebugLog(`Error code: ${error.code}, hint: ${error.hint}`);
         console.error('Error awarding coins:', error);
         return;
       }
@@ -732,6 +736,8 @@ export default function ViewTab() {
       if (result) {
         addDebugLog(`Coins awarded successfully: ${coins}`);
         // Refresh profile to update coin count in UI immediately
+        addDebugLog('Refreshing profile to update coin balance...');
+        setCoinsAwarded(true);
         await refreshProfile();
         addDebugLog('Profile refreshed after coin award');
         
@@ -749,6 +755,7 @@ export default function ViewTab() {
         addDebugLog(`Coin balance updated for ${currentVideo.youtube_url}`);
       } else {
         addDebugLog('Coin award failed: no result returned');
+        addDebugLog('Supabase function returned null or false');
         // Reset states on failure
         setCoinsEarned(false);
       }
@@ -758,12 +765,13 @@ export default function ViewTab() {
       // Reset states on error
       setCoinsEarned(false);
     } finally {
+      addDebugLog('Coin award process completed');
       setCoinUpdateInProgress(false);
     }
   }, [user, currentVideo, coinsEarned, coinUpdateInProgress, refreshProfile, addDebugLog]);
 
   // WebView message handler with seamless experience
-  const handleWebViewMessage = useCallback((event: any) => {
+  const handleWebViewMessage = useCallback(async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       
@@ -816,7 +824,13 @@ export default function ViewTab() {
           break;
           
         case 'VIDEO_COMPLETED':
-          addDebugLog(`Video completion received: ${data.reason}`);
+          addDebugLog(`Video completion received: ${data.reason}, shouldAwardCoins: ${data.shouldAwardCoins}, currentTime: ${data.currentTime}`);
+          
+          // Award coins for natural completion if target duration reached
+          if (data.reason === 'natural_end' && data.currentTime >= targetDuration && !coinsAwarded && !coinsEarned) {
+            addDebugLog(`Video watched for ${data.currentTime}s, awarding ${coinReward} coins`);
+            await awardCoins(coinReward);
+          }
           
           // Only award coins if explicitly indicated and not already earned
           if (data.shouldAwardCoins && !coinsEarned) {
@@ -827,6 +841,7 @@ export default function ViewTab() {
           if (!videoCompleted) {
             setVideoCompleted(true);
             setIsPlaying(false);
+            setShowCompletionMessage(true);
             // Hide completion message and move to next video seamlessly
             completionTimeoutRef.current = setTimeout(() => {
               setShowCompletionMessage(false);
@@ -1519,12 +1534,6 @@ const styles = StyleSheet.create({
   },
   debugSection: {
     backgroundColor: '#F0F8FF',
-  coinUpdateText: {
-    color: '#FFA726',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 4,
-  },
     margin: 16,
     padding: 12,
     borderRadius: 8,
@@ -1542,5 +1551,11 @@ const styles = StyleSheet.create({
     color: '#666',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     marginBottom: 2,
+  },
+  coinUpdateText: {
+    color: '#FFA726',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

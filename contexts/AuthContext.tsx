@@ -224,9 +224,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
-      console.log('Refreshing profile for user:', user.id);
+      console.log('Refreshing profile for user:', user.id, 'at', new Date().toLocaleTimeString());
+      const oldCoins = profile?.coins || 0;
       await fetchProfile(user.id);
-      console.log('Profile refresh completed');
+      const newCoins = profile?.coins || 0;
+      console.log('Profile refresh completed at', new Date().toLocaleTimeString());
+      console.log('Coin balance change:', oldCoins, '->', newCoins);
+      if (newCoins !== oldCoins) console.log('✅ Coin balance updated successfully!');
     }
   };
 
