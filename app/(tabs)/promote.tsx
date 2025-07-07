@@ -581,7 +581,7 @@ export default function PromoteTab() {
           break;
           
         case 'PAGE_ERROR':
-          console.error('Page error in iframe:', data.message);
+          console.log('Page error in iframe:', data.message);
           setError('Page error occurred in video player.');
           break;
       }
@@ -797,7 +797,7 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with adjusted padding */}
       <LinearGradient
         colors={['#FF4757', '#FF6B8A']}
         style={styles.header}
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingBottom: 16,
     paddingHorizontal: 16,
   },

@@ -199,7 +199,7 @@ export default function AnalyticsTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with adjusted padding */}
       <LinearGradient
         colors={['#FF4757', '#FF6B8A']}
         style={styles.header}
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingBottom: 16,
     paddingHorizontal: 16,
   },
