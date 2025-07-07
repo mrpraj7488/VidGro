@@ -62,7 +62,6 @@ export default function ViewTab() {
   const [isTabFocused, setIsTabFocused] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [isSkipping, setIsSkipping] = useState(false);
-  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [coinUpdateInProgress, setCoinUpdateInProgress] = useState(false);
   const [coinsAwarded, setCoinsAwarded] = useState(false);
@@ -124,7 +123,7 @@ export default function ViewTab() {
     }
   }, []);
 
-  // Create HTML content for YouTube iframe with enhanced debugging
+  // Create HTML content for YouTube iframe with enhanced popup suppression
   const createHtmlContent = (videoId: string) => `
     <!DOCTYPE html>
     <html>
@@ -224,6 +223,8 @@ export default function ViewTab() {
         var hasTimedOut = false;
         var hasError = false;
         var debugMode = true;
+        var popupSuppressed = false;
+        
         function debugLog(message) {
           if (debugMode) {
             console.log('[WebView Debug] ' + message);
@@ -400,10 +401,22 @@ export default function ViewTab() {
             }
           }
           
-          // Handle video end
+          // Handle video end with popup suppression
           if (state === 0 && !hasCompleted) { // ENDED
             hasCompleted = true;
-            debugLog('Video ended naturally - checking for coin award');
+            debugLog('Video ended naturally - suppressing popup and checking for coin award');
+            
+            // Immediately stop the video to prevent end screen popup
+            if (player && player.stopVideo && !popupSuppressed) {
+              try {
+                player.stopVideo();
+                popupSuppressed = true;
+                debugLog('Popup suppressed for ${videoId}');
+              } catch (error) {
+                debugLog('Error stopping video: ' + error);
+              }
+            }
+            
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_COMPLETED',
               reason: 'natural_end',
@@ -478,6 +491,8 @@ export default function ViewTab() {
                         
                         if (player && player.stopVideo) {
                           player.stopVideo();
+                          popupSuppressed = true;
+                          debugLog('Popup suppressed for ${videoId} after coin award');
                         }
                         
                         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -514,6 +529,8 @@ export default function ViewTab() {
         window.stopVideo = function() {
           if (player && player.stopVideo && isPlayerReady) {
             player.stopVideo();
+            popupSuppressed = true;
+            debugLog('Manual stop - popup suppressed for ${videoId}');
           }
         };
 
@@ -604,7 +621,7 @@ export default function ViewTab() {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(true); true;');
         }
       } else if (nextAppState.match(/inactive|background/)) {
-        addDebugLog('App backgrounded, pausing video');
+        addDebugLog('App backgrounded, pausing video and stopping timer for security');
         pauseVideo();
         setIsPlaying(false);
         if (webviewRef.current) {
@@ -633,7 +650,6 @@ export default function ViewTab() {
       setRetryCount(0);
       setIsSkipping(false);
       setCoinsAwarded(false);
-      setShowCompletionMessage(false);
       progressValue.value = 0;
       
       // Clear all timeouts
@@ -685,7 +701,6 @@ export default function ViewTab() {
     setVideoCompleted(false);
     setCoinsEarned(false);
     setHasStarted(false);
-    setShowCompletionMessage(false);
     progressValue.value = 0;
     
     // Move to next video instantly
@@ -701,7 +716,7 @@ export default function ViewTab() {
     }, 100); // Minimal delay for smooth transition
   }, [isSkipping, moveToNextVideo, user, videoQueue.length, fetchVideos, addDebugLog]);
 
-  // Enhanced award coins function with detailed logging
+  // Enhanced award coins function with retry mechanism
   const awardCoins = useCallback(async (coins: number) => {
     if (!user || !currentVideo || coinsEarned || coinUpdateInProgress) {
       addDebugLog(`Coin award skipped - user: ${!!user}, video: ${!!currentVideo}, earned: ${coinsEarned}, inProgress: ${coinUpdateInProgress}, awarded: ${coinsAwarded}`);
@@ -711,66 +726,86 @@ export default function ViewTab() {
     setCoinUpdateInProgress(true);
     setCoinsEarned(true);
     
-    try {
-      addDebugLog(`Starting coin award process for ${coins} coins`);
-      addDebugLog(`Awarding ${coins} coins for video: ${currentVideo.youtube_url}`);
-      
-      // Call Supabase function to update coins
-      const { data: result, error } = await supabase
-        .rpc('update_user_coins', {
-          user_uuid: user.id,
-          coin_amount: coins,
-          transaction_type_param: 'video_watch',
-          description_param: `Watched video: ${currentVideo.title}`,
-          reference_uuid: currentVideo.id
-        });
-
-      if (error) {
-        addDebugLog(`Error awarding coins: ${error.message}`);
-        addDebugLog(`Supabase error details: ${JSON.stringify(error)}`);
-        addDebugLog(`Error code: ${error.code}, hint: ${error.hint}`);
-        console.error('Error awarding coins:', error);
-        return;
-      }
-
-      if (result) {
-        addDebugLog(`Coins awarded successfully: ${coins}`);
-        // Refresh profile to update coin count in UI immediately
-        addDebugLog('Refreshing profile to update coin balance...');
-        setCoinsAwarded(true);
-        await refreshProfile();
-        addDebugLog('Profile refreshed after coin award');
+    const maxRetryAttempts = 3;
+    let retryAttempt = 0;
+    
+    const attemptCoinUpdate = async (): Promise<boolean> => {
+      try {
+        addDebugLog(`Attempting coin update (attempt ${retryAttempt + 1}/${maxRetryAttempts}) for ${coins} coins`);
         
-        // Subtle coin animation
-        coinBounce.value = withSpring(1.2, {
-          damping: 15,
-          stiffness: 150,
-        }, () => {
-          coinBounce.value = withSpring(1, {
+        // Call Supabase function to update coins
+        const { data: result, error } = await supabase
+          .rpc('update_user_coins', {
+            user_uuid: user.id,
+            coin_amount: coins,
+            transaction_type_param: 'video_watch',
+            description_param: `Watched video: ${currentVideo.title}`,
+            reference_uuid: currentVideo.id
+          });
+
+        if (error) {
+          addDebugLog(`Coin update failed: ${error.code} - ${error.message}`);
+          throw error;
+        }
+
+        if (result) {
+          addDebugLog(`Coins awarded successfully: ${coins}`);
+          setCoinsAwarded(true);
+          
+          // Refresh profile to update coin count in UI immediately
+          addDebugLog('Refreshing profile to update coin balance...');
+          await refreshProfile();
+          addDebugLog(`Balance updated to ${(profile?.coins || 0) + coins} coins`);
+          
+          // Subtle coin animation
+          coinBounce.value = withSpring(1.2, {
             damping: 15,
             stiffness: 150,
+          }, () => {
+            coinBounce.value = withSpring(1, {
+              damping: 15,
+              stiffness: 150,
+            });
           });
-        });
+          
+          return true;
+        } else {
+          addDebugLog('Coin award failed: no result returned');
+          throw new Error('No result returned from coin update function');
+        }
+      } catch (error: any) {
+        addDebugLog(`Coin update error (attempt ${retryAttempt + 1}): ${error.message}`);
         
-        addDebugLog(`Coin balance updated for ${currentVideo.youtube_url}`);
-      } else {
-        addDebugLog('Coin award failed: no result returned');
-        addDebugLog('Supabase function returned null or false');
-        // Reset states on failure
-        setCoinsEarned(false);
+        // Check if it's a network error that we should retry
+        const isRetryableError = error.code === 'PGRST301' || 
+                                error.message?.includes('500') || 
+                                error.message?.includes('network') ||
+                                error.message?.includes('timeout');
+        
+        if (isRetryableError && retryAttempt < maxRetryAttempts - 1) {
+          retryAttempt++;
+          addDebugLog(`Retrying coin update in 1 second...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return attemptCoinUpdate();
+        }
+        
+        throw error;
       }
-    } catch (error) {
-      addDebugLog(`Error in awardCoins: ${error}`);
-      console.error('Error in awardCoins:', error);
-      // Reset states on error
+    };
+    
+    try {
+      await attemptCoinUpdate();
+    } catch (error: any) {
+      addDebugLog(`Final coin update error after ${maxRetryAttempts} attempts: ${error.message}`);
+      // Reset states on final failure
       setCoinsEarned(false);
     } finally {
       addDebugLog('Coin award process completed');
       setCoinUpdateInProgress(false);
     }
-  }, [user, currentVideo, coinsEarned, coinUpdateInProgress, refreshProfile, addDebugLog]);
+  }, [user, currentVideo, coinsEarned, coinUpdateInProgress, refreshProfile, addDebugLog, profile?.coins]);
 
-  // WebView message handler with seamless experience
+  // WebView message handler with enhanced coin logic
   const handleWebViewMessage = useCallback(async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -801,6 +836,11 @@ export default function ViewTab() {
             setIsPlaying(true);
           } else if (data.state === 2) { // PAUSED
             setIsPlaying(false);
+          } else if (data.state === 0) { // ENDED
+            // Inject stopVideo to suppress popup
+            if (webviewRef.current) {
+              webviewRef.current.injectJavaScript('window.stopVideo && window.stopVideo(); true;');
+            }
           }
           break;
           
@@ -841,12 +881,10 @@ export default function ViewTab() {
           if (!videoCompleted) {
             setVideoCompleted(true);
             setIsPlaying(false);
-            setShowCompletionMessage(true);
-            // Hide completion message and move to next video seamlessly
+            // Move to next video instantly without showing completion message
             completionTimeoutRef.current = setTimeout(() => {
-              setShowCompletionMessage(false);
               handleInstantSkip('Video completed');
-            }, 1000); // Brief completion message
+            }, 500); // Brief delay for smooth transition
           }
           break;
           
@@ -1043,16 +1081,6 @@ export default function ViewTab() {
                 <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
               </View>
             </View>
-
-            {/* Completion Message Overlay */}
-            {showCompletionMessage && (
-              <View style={styles.completionOverlay}>
-                <View style={styles.completionMessage}>
-                  <Coins color="#FFD700" size={32} />
-                  <Text style={styles.completionText}>+{coinReward} coins earned!</Text>
-                </View>
-              </View>
-            )}
           </View>
 
           {/* Video Title */}
@@ -1299,30 +1327,6 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     backgroundColor: '#4CAF50',
-  },
-  completionOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    zIndex: 2000,
-  },
-  completionMessage: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 20,
-    borderRadius: 16,
-  },
-  completionText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 12,
-    textAlign: 'center',
   },
   titleContainer: {
     padding: isSmallScreen ? 12 : 16,
