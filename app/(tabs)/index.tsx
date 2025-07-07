@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Menu, DollarSign, RefreshCw, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, ExternalLink } from 'lucide-react-native';
-import SeamlessVideoPlayer from '@/components/SeamlessVideoPlayer';
+import EnhancedVideoPlayer from '@/components/EnhancedVideoPlayer';
 import { useVideoStore } from '@/store/videoStore';
 import Animated, { 
   useSharedValue, 
@@ -86,19 +86,17 @@ export default function ViewTab() {
       setSystemStatus('healthy');
       setStatusMessage('Loading active videos...');
       
-      console.log('🔄 Loading video queue for user:', user.id);
+      console.log('🔄 Loading enhanced video queue for user:', user.id);
       
       await fetchVideos(user.id);
       
       const video = getCurrentVideo();
       if (!video) {
-        // No videos available, try reset
         console.log('⚠️ No active videos in queue, attempting reset...');
         setStatusMessage('Refreshing active video queue...');
         
         await resetQueue(user.id);
         
-        // Check again after reset
         const newVideo = getCurrentVideo();
         if (!newVideo) {
           setError('No active videos available for viewing at the moment.');
@@ -116,7 +114,7 @@ export default function ViewTab() {
       }
       
     } catch (error: any) {
-      console.error('❌ Error loading video queue:', error);
+      console.error('❌ Error loading enhanced video queue:', error);
       setError(error.message || 'Failed to load videos. Please try again.');
       setSystemStatus('error');
       setStatusMessage('Failed to load videos');
@@ -132,7 +130,7 @@ export default function ViewTab() {
     }
 
     try {
-      console.log('🎯 Completing video silently:', currentVideo.youtube_url);
+      console.log('🎯 Completing enhanced video silently:', currentVideo.youtube_url);
       setStatusMessage('Processing completion...');
 
       // Check if user has already watched this video
@@ -147,17 +145,15 @@ export default function ViewTab() {
       let shouldUpdateVideoCount = true;
 
       if (existingView) {
-        // User has watched this video before (looping scenario)
         console.log('🔄 User has watched this video before, updating existing view...');
         
-        // Update the existing view record
         const { error: updateError } = await supabase
           .from('video_views')
           .update({
             watched_duration: currentVideo.duration_seconds,
             completed: true,
             coins_earned: existingView.coins_earned + currentVideo.coin_reward,
-            created_at: new Date().toISOString() // Update timestamp for latest view
+            created_at: new Date().toISOString()
           })
           .eq('id', existingView.id);
 
@@ -166,11 +162,9 @@ export default function ViewTab() {
           throw new Error(`Failed to update video view: ${updateError.message}`);
         }
 
-        // Don't update video view count for repeat views
         shouldUpdateVideoCount = false;
         console.log('✅ Existing video view updated successfully');
       } else {
-        // First time watching this video
         console.log('🆕 First time watching this video, creating new view...');
         
         const { error: viewError } = await supabase
@@ -191,7 +185,7 @@ export default function ViewTab() {
         console.log('✅ New video view recorded successfully');
       }
 
-      // Always update user coins (both for new and repeat views)
+      // Always update user coins
       const { error: coinError } = await supabase
         .from('profiles')
         .update({ 
@@ -218,12 +212,10 @@ export default function ViewTab() {
 
       if (transactionError) {
         console.error('⚠️ Error recording transaction:', transactionError);
-        // Don't throw error for transaction recording failure
       }
 
       // Update video view count only for first-time views
       if (shouldUpdateVideoCount) {
-        // Get current views count first, then increment it
         const { data: videoData, error: fetchError } = await supabase
           .from('videos')
           .select('views_count')
@@ -245,12 +237,11 @@ export default function ViewTab() {
 
           if (videoUpdateError) {
             console.error('⚠️ Error updating video view count:', videoUpdateError);
-            // Don't throw error for view count update failure
           }
         }
       }
 
-      console.log('✅ Video completion processed successfully');
+      console.log('✅ Enhanced video completion processed successfully');
 
       // Silently refresh profile
       await refreshProfile();
@@ -268,7 +259,7 @@ export default function ViewTab() {
 
       // Move to next video immediately without popup
       setTimeout(() => {
-        console.log('🔄 Moving to next video after completion...');
+        console.log('🔄 Moving to next video after enhanced completion...');
         moveToNextVideo();
         
         // Check if we need to reload queue
@@ -281,10 +272,10 @@ export default function ViewTab() {
             console.log('✅ Next video ready:', nextVideo.youtube_url);
           }
         }, 100);
-      }, 100); // Instant transition
+      }, 100);
 
     } catch (error: any) {
-      console.error('❌ Error completing video:', error);
+      console.error('❌ Error completing enhanced video:', error);
       setError(error.message || 'Failed to complete video. Please try again.');
       setSystemStatus('error');
       setStatusMessage('Failed to complete video');
@@ -292,14 +283,12 @@ export default function ViewTab() {
   };
 
   const handleVideoSkip = () => {
-    // Silent skip without confirmation - for playable videos only
-    console.log('⏭️ Skipping playable video (user choice)');
+    console.log('⏭️ Skipping enhanced video (user choice)');
     setStatusMessage('Skipping video...');
-    showToast('Skipped playable video');
+    showToast('Skipped video');
     
     moveToNextVideo();
     
-    // Check if we need to reload queue
     setTimeout(() => {
       const nextVideo = getCurrentVideo();
       if (!nextVideo) {
@@ -312,13 +301,11 @@ export default function ViewTab() {
   };
 
   const handleVideoUnplayable = async () => {
-    console.log('🚨 Video is unplayable, removing from queue...');
+    console.log('🚨 Enhanced video is unplayable, removing from queue...');
     showToast('Removed unplayable video');
     
-    // Remove the unplayable video and move to next
     await removeCurrentVideo();
     
-    // Check if we need to reload queue
     setTimeout(() => {
       const nextVideo = getCurrentVideo();
       if (!nextVideo) {
@@ -331,12 +318,11 @@ export default function ViewTab() {
   };
 
   const handleVideoError = (errorMessage: string) => {
-    console.error('❌ Video error:', errorMessage);
+    console.error('❌ Enhanced video error:', errorMessage);
     setError(errorMessage);
     setSystemStatus('error');
     setStatusMessage('Video playback error');
     
-    // Auto-skip after 5 seconds
     setTimeout(() => {
       handleVideoUnplayable();
     }, 5000);
@@ -444,7 +430,7 @@ export default function ViewTab() {
 
         <View style={styles.loadingContainer}>
           <RefreshCw color="#FF4757" size={32} />
-          <Text style={styles.loadingText}>Loading active videos...</Text>
+          <Text style={styles.loadingText}>Loading enhanced videos...</Text>
           <Text style={styles.loadingSubtext}>Filtering for embeddable content...</Text>
           {queueState && (
             <Text style={styles.loadingSubtext}>{queueState}</Text>
@@ -531,10 +517,10 @@ export default function ViewTab() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Seamless Video Player */}
+        {/* Enhanced Video Player */}
         {currentVideo && videoId && (
           <View style={styles.videoSection}>
-            <SeamlessVideoPlayer
+            <EnhancedVideoPlayer
               videoId={currentVideo.id}
               youtubeUrl={currentVideo.youtube_url}
               duration={currentVideo.duration_seconds}
@@ -547,7 +533,7 @@ export default function ViewTab() {
           </View>
         )}
 
-        {/* Video Info Card */}
+        {/* Enhanced Video Info Card */}
         {currentVideo && (
           <View style={styles.videoInfoCard}>
             <View style={styles.videoHeader}>
@@ -571,15 +557,15 @@ export default function ViewTab() {
               {currentVideo.title}
             </Text>
 
-            {/* Queue State Display */}
+            {/* Enhanced Queue State Display */}
             {queueState && (
               <View style={styles.queueStateContainer}>
                 <Text style={styles.queueStateText}>{queueState}</Text>
-                <Text style={styles.queueStateSubtext}>Video ID: {currentVideo.youtube_url}</Text>
+                <Text style={styles.queueStateSubtext}>Enhanced Player • Video ID: {currentVideo.youtube_url}</Text>
               </View>
             )}
 
-            {/* Stats Row */}
+            {/* Enhanced Stats Row */}
             <View style={styles.statsContainer}>
               <Animated.View style={[styles.statItem, progressAnimatedStyle]}>
                 <Text style={styles.statNumber}>{Math.floor(currentVideo.duration_seconds / 60)}</Text>
@@ -596,13 +582,13 @@ export default function ViewTab() {
           </View>
         )}
 
-        {/* Auto Play Toggle */}
+        {/* Enhanced Auto Play Toggle */}
         <View style={styles.autoPlayCard}>
           <View style={styles.autoPlayInfo}>
             <View style={styles.autoPlayIcon}>
-              <Text style={styles.autoPlayIconText}>AP</Text>
+              <Text style={styles.autoPlayIconText}>EP</Text>
             </View>
-            <Text style={styles.autoPlayText}>Auto Play</Text>
+            <Text style={styles.autoPlayText}>Enhanced Player</Text>
           </View>
           <View style={styles.toggleContainer}>
             <View style={[styles.toggle, styles.toggleActive]}>
