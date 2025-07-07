@@ -8,11 +8,12 @@ import {
   Platform,
   Dimensions,
   ToastAndroid,
+  StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Menu, DollarSign, RefreshCw, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, ExternalLink } from 'lucide-react-native';
+import { DollarSign, RefreshCw, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Play, Pause, SkipForward } from 'lucide-react-native';
 import EnhancedVideoPlayer from '@/components/EnhancedVideoPlayer';
 import { useVideoStore } from '@/store/videoStore';
 import Animated, { 
@@ -37,13 +38,14 @@ export default function ViewTab() {
     resetQueue
   } = useVideoStore();
   
-  const [showMenu, setShowMenu] = useState(false);
   const [videosWatched, setVideosWatched] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [systemStatus, setSystemStatus] = useState<'healthy' | 'warning' | 'error'>('healthy');
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [queueState, setQueueState] = useState<string>('');
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const coinBounce = useSharedValue(1);
   const progressScale = useSharedValue(0);
@@ -63,7 +65,6 @@ export default function ViewTab() {
     }
   }, [user, profile]);
 
-  // Auto-reload when queue is empty
   useEffect(() => {
     if (user && !currentVideo && !loading && !isLoadingQueue) {
       console.log('🔄 No current video, auto-reloading queue...');
@@ -71,10 +72,9 @@ export default function ViewTab() {
     }
   }, [currentVideo, user, loading, isLoadingQueue]);
 
-  // Update queue state display
   useEffect(() => {
     const { videoQueue, currentVideoIndex } = useVideoStore.getState();
-    setQueueState(`Queue: ${currentVideoIndex + 1}/${videoQueue.length}`);
+    setQueueState(`${currentVideoIndex + 1}/${videoQueue.length}`);
   }, [currentVideo]);
 
   const loadVideoQueue = async () => {
@@ -84,7 +84,7 @@ export default function ViewTab() {
       setLoading(true);
       setError(null);
       setSystemStatus('healthy');
-      setStatusMessage('Loading active videos...');
+      setStatusMessage('Loading videos...');
       
       console.log('🔄 Loading enhanced video queue for user:', user.id);
       
@@ -93,7 +93,7 @@ export default function ViewTab() {
       const video = getCurrentVideo();
       if (!video) {
         console.log('⚠️ No active videos in queue, attempting reset...');
-        setStatusMessage('Refreshing active video queue...');
+        setStatusMessage('Refreshing video queue...');
         
         await resetQueue(user.id);
         
@@ -101,7 +101,7 @@ export default function ViewTab() {
         if (!newVideo) {
           setError('No active videos available for viewing at the moment.');
           setSystemStatus('warning');
-          setStatusMessage('No active videos available');
+          setStatusMessage('No videos available');
         } else {
           setSystemStatus('healthy');
           setStatusMessage('Ready to watch');
@@ -133,7 +133,6 @@ export default function ViewTab() {
       console.log('🎯 Completing enhanced video silently:', currentVideo.youtube_url);
       setStatusMessage('Processing completion...');
 
-      // Check if user has already watched this video
       const { data: existingView } = await supabase
         .from('video_views')
         .select('id, coins_earned')
@@ -185,7 +184,6 @@ export default function ViewTab() {
         console.log('✅ New video view recorded successfully');
       }
 
-      // Always update user coins
       const { error: coinError } = await supabase
         .from('profiles')
         .update({ 
@@ -199,7 +197,6 @@ export default function ViewTab() {
         throw new Error(`Failed to update coins: ${coinError.message}`);
       }
 
-      // Record coin transaction
       const { error: transactionError } = await supabase
         .from('coin_transactions')
         .insert({
@@ -214,7 +211,6 @@ export default function ViewTab() {
         console.error('⚠️ Error recording transaction:', transactionError);
       }
 
-      // Update video view count only for first-time views
       if (shouldUpdateVideoCount) {
         const { data: videoData, error: fetchError } = await supabase
           .from('videos')
@@ -243,10 +239,8 @@ export default function ViewTab() {
 
       console.log('✅ Enhanced video completion processed successfully');
 
-      // Silently refresh profile
       await refreshProfile();
 
-      // Silent coin animation
       coinBounce.value = withSpring(1.3, { damping: 8 }, () => {
         coinBounce.value = withSpring(1);
       });
@@ -257,12 +251,10 @@ export default function ViewTab() {
 
       setVideosWatched(prev => prev + 1);
 
-      // Move to next video immediately without popup
       setTimeout(() => {
         console.log('🔄 Moving to next video after enhanced completion...');
         moveToNextVideo();
         
-        // Check if we need to reload queue
         setTimeout(() => {
           const nextVideo = getCurrentVideo();
           if (!nextVideo) {
@@ -343,14 +335,10 @@ export default function ViewTab() {
     return null;
   };
 
-  const openInYouTube = () => {
-    if (currentVideo) {
-      if (Platform.OS === 'web') {
-        window.open(`https://www.youtube.com/watch?v=${currentVideo.youtube_url}`, '_blank');
-      } else {
-        showToast('Opening in YouTube...');
-      }
-    }
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const coinAnimatedStyle = useAnimatedStyle(() => ({
@@ -361,43 +349,18 @@ export default function ViewTab() {
     transform: [{ scale: progressScale.value }],
   }));
 
-  const getStatusIcon = () => {
-    switch (systemStatus) {
-      case 'healthy':
-        return <CheckCircle color="#2ECC71" size={14} />;
-      case 'warning':
-        return <AlertTriangle color="#FFA726" size={14} />;
-      case 'error':
-        return <AlertTriangle color="#E74C3C" size={14} />;
-      default:
-        return <Info color="#666" size={14} />;
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (systemStatus) {
-      case 'healthy':
-        return '#2ECC71';
-      case 'warning':
-        return '#FFA726';
-      case 'error':
-        return '#E74C3C';
-      default:
-        return '#666';
-    }
-  };
-
   if (!profile) {
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#FF4757', '#FF6B8A']}
-          style={styles.header}
-        >
-          <Text style={styles.headerTitle}>VidGro</Text>
-        </LinearGradient>
+        <View style={styles.navbar}>
+          <Text style={styles.logo}>VidGro</Text>
+          <View style={styles.coinDisplay}>
+            <Text style={styles.coinText}>0</Text>
+            <DollarSign color="#FFD700" size={16} />
+          </View>
+        </View>
         <View style={styles.loadingContainer}>
-          <RefreshCw color="#FF4757" size={32} />
+          <RefreshCw color="#4CAF50" size={32} />
           <Text style={styles.loadingText}>Loading your profile...</Text>
         </View>
       </View>
@@ -407,29 +370,17 @@ export default function ViewTab() {
   if (loading || isLoadingQueue) {
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#FF4757', '#FF6B8A']}
-          style={styles.header}
-        >
-          <TouchableOpacity 
-            onPress={() => setShowMenu(true)}
-            style={styles.menuButton}
-          >
-            <Menu color="white" size={20} />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>VidGro</Text>
-          
+        <View style={styles.navbar}>
+          <Text style={styles.logo}>VidGro</Text>
           <View style={styles.coinDisplay}>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-            <View style={styles.coinIcon}>
-              <Text style={styles.coinSymbol}>$</Text>
-            </View>
+            <Animated.View style={coinAnimatedStyle}>
+              <Text style={styles.coinText}>{profile?.coins || 0}</Text>
+            </Animated.View>
+            <DollarSign color="#FFD700" size={16} />
           </View>
-        </LinearGradient>
-
+        </View>
         <View style={styles.loadingContainer}>
-          <RefreshCw color="#FF4757" size={32} />
+          <RefreshCw color="#4CAF50" size={32} />
           <Text style={styles.loadingText}>Loading enhanced videos...</Text>
           <Text style={styles.loadingSubtext}>Filtering for embeddable content...</Text>
           {queueState && (
@@ -443,27 +394,15 @@ export default function ViewTab() {
   if (error && !currentVideo) {
     return (
       <View style={styles.container}>
-        <LinearGradient
-          colors={['#FF4757', '#FF6B8A']}
-          style={styles.header}
-        >
-          <TouchableOpacity 
-            onPress={() => setShowMenu(true)}
-            style={styles.menuButton}
-          >
-            <Menu color="white" size={20} />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>VidGro</Text>
-          
+        <View style={styles.navbar}>
+          <Text style={styles.logo}>VidGro</Text>
           <View style={styles.coinDisplay}>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-            <View style={styles.coinIcon}>
-              <Text style={styles.coinSymbol}>$</Text>
-            </View>
+            <Animated.View style={coinAnimatedStyle}>
+              <Text style={styles.coinText}>{profile?.coins || 0}</Text>
+            </Animated.View>
+            <DollarSign color="#FFD700" size={16} />
           </View>
-        </LinearGradient>
-
+        </View>
         <View style={styles.errorContainer}>
           <AlertTriangle color="#E74C3C" size={48} />
           <Text style={styles.errorText}>{error}</Text>
@@ -485,39 +424,26 @@ export default function ViewTab() {
   }
 
   const videoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
+  const progressPercentage = currentVideo ? Math.round((currentTime / currentVideo.duration_seconds) * 100) : 0;
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#FF4757', '#FF6B8A']}
-        style={styles.header}
-      >
-        <TouchableOpacity 
-          onPress={() => setShowMenu(true)}
-          style={styles.menuButton}
-        >
-          <Menu color="white" size={20} />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>VidGro</Text>
-        
+      <StatusBar barStyle="light-content" backgroundColor="#2C2C2C" />
+      
+      {/* Modern Navbar */}
+      <View style={styles.navbar}>
+        <Text style={styles.logo}>VidGro</Text>
         <View style={styles.coinDisplay}>
           <Animated.View style={coinAnimatedStyle}>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+            <Text style={styles.coinText}>{profile?.coins || 0}</Text>
           </Animated.View>
-          <View style={styles.coinIcon}>
-            <Text style={styles.coinSymbol}>$</Text>
-          </View>
+          <DollarSign color="#FFD700" size={16} />
         </View>
-      </LinearGradient>
+      </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Enhanced Video Player */}
+      {/* Main Content */}
+      <View style={styles.mainContent}>
+        {/* Video Player Section */}
         {currentVideo && videoId && (
           <View style={styles.videoSection}>
             <EnhancedVideoPlayer
@@ -533,70 +459,97 @@ export default function ViewTab() {
           </View>
         )}
 
-        {/* Enhanced Video Info Card */}
+        {/* Progress Bar */}
         {currentVideo && (
-          <View style={styles.videoInfoCard}>
-            <View style={styles.videoHeader}>
-              <View style={styles.statusIndicator}>
-                {getStatusIcon()}
-                <Text style={[styles.statusText, { color: getStatusColor() }]}>
-                  {statusMessage}
-                </Text>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.youtubeButton}
-                onPress={openInYouTube}
-              >
-                <ExternalLink color="#FF4757" size={16} />
-                <Text style={styles.youtubeButtonText}>YouTube</Text>
-              </TouchableOpacity>
+          <View style={styles.progressSection}>
+            <View style={styles.progressBar}>
+              <LinearGradient
+                colors={['#4CAF50', '#45A049']}
+                style={[styles.progressFill, { width: `${progressPercentage}%` }]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              />
             </View>
+            <Text style={styles.progressText}>{progressPercentage}% complete</Text>
+          </View>
+        )}
 
+        {/* Control Buttons */}
+        {currentVideo && (
+          <View style={styles.controlsSection}>
+            <TouchableOpacity 
+              style={styles.playPauseButton}
+              onPress={() => {
+                // This would be handled by the EnhancedVideoPlayer
+                setIsPlaying(!isPlaying);
+              }}
+            >
+              {isPlaying ? (
+                <Pause color="white" size={20} />
+              ) : (
+                <Play color="white" size={20} />
+              )}
+            </TouchableOpacity>
+            
+            {screenWidth >= 350 && (
+              <TouchableOpacity 
+                style={styles.skipButton}
+                onPress={handleVideoSkip}
+              >
+                <SkipForward color="#4CAF50" size={16} />
+                <Text style={styles.skipButtonText}>Skip</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Video Info */}
+        {currentVideo && (
+          <View style={styles.videoInfo}>
             <Text style={styles.videoTitle} numberOfLines={2}>
               {currentVideo.title}
             </Text>
-
-            {/* Enhanced Queue State Display */}
-            {queueState && (
-              <View style={styles.queueStateContainer}>
-                <Text style={styles.queueStateText}>{queueState}</Text>
-                <Text style={styles.queueStateSubtext}>Enhanced Player • Video ID: {currentVideo.youtube_url}</Text>
+            
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{formatTime(currentVideo.duration_seconds)}</Text>
+                <Text style={styles.statLabel}>Duration</Text>
               </View>
-            )}
-
-            {/* Enhanced Stats Row */}
-            <View style={styles.statsContainer}>
-              <Animated.View style={[styles.statItem, progressAnimatedStyle]}>
-                <Text style={styles.statNumber}>{Math.floor(currentVideo.duration_seconds / 60)}</Text>
-                <Text style={styles.statLabel}>Minutes</Text>
-              </Animated.View>
               
               <View style={styles.statDivider} />
               
-              <Animated.View style={[styles.statItem, coinAnimatedStyle]}>
-                <Text style={styles.statNumber}>{currentVideo.coin_reward}</Text>
+              <View style={styles.statItem}>
+                <Animated.View style={coinAnimatedStyle}>
+                  <Text style={styles.statValue}>{currentVideo.coin_reward}</Text>
+                </Animated.View>
                 <Text style={styles.statLabel}>Coins</Text>
-              </Animated.View>
+              </View>
+              
+              <View style={styles.statDivider} />
+              
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{queueState}</Text>
+                <Text style={styles.statLabel}>Queue</Text>
+              </View>
             </View>
           </View>
         )}
 
-        {/* Enhanced Auto Play Toggle */}
-        <View style={styles.autoPlayCard}>
-          <View style={styles.autoPlayInfo}>
-            <View style={styles.autoPlayIcon}>
-              <Text style={styles.autoPlayIconText}>EP</Text>
-            </View>
-            <Text style={styles.autoPlayText}>Enhanced Player</Text>
-          </View>
-          <View style={styles.toggleContainer}>
-            <View style={[styles.toggle, styles.toggleActive]}>
-              <View style={styles.toggleThumb} />
-            </View>
+        {/* Status Display */}
+        <View style={styles.statusSection}>
+          <View style={styles.statusIndicator}>
+            {systemStatus === 'healthy' && <CheckCircle color="#4CAF50" size={16} />}
+            {systemStatus === 'warning' && <AlertTriangle color="#FFA726" size={16} />}
+            {systemStatus === 'error' && <AlertTriangle color="#E74C3C" size={16} />}
+            <Text style={[styles.statusText, { 
+              color: systemStatus === 'healthy' ? '#4CAF50' : 
+                     systemStatus === 'warning' ? '#FFA726' : '#E74C3C' 
+            }]}>
+              {statusMessage}
+            </Text>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -604,271 +557,175 @@ export default function ViewTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#1E1E1E',
   },
-  header: {
+  navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#2C2C2C',
     paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingBottom: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
   },
-  menuButton: {
-    padding: 8,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: 'white',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 16,
+  logo: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   coinDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    minWidth: 60,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
   },
-  coinCount: {
-    color: 'white',
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  coinIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FF4757',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  coinSymbol: {
-    color: 'white',
-    fontSize: 12,
+  coinText: {
+    color: '#FFD700',
+    fontSize: 16,
     fontWeight: 'bold',
+    marginRight: 4,
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
-  scrollView: {
+  mainContent: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
+    paddingHorizontal: 16,
   },
   videoSection: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
+    marginTop: 20,
+    borderRadius: 12,
     overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-      },
-    }),
+    height: isSmallScreen ? screenHeight * 0.7 * 0.7 : screenHeight * 0.8 * 0.7,
+    maxHeight: 400,
+    backgroundColor: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 12,
   },
-  videoInfoCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 16,
-    padding: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  videoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  progressSection: {
+    marginTop: 16,
     alignItems: 'center',
-    marginBottom: 12,
   },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
+  progressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
   },
-  statusText: {
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressText: {
+    color: '#FFFFFF',
     fontSize: 12,
+    marginTop: 8,
     fontWeight: '500',
   },
-  youtubeButton: {
+  controlsSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 20,
+  },
+  playPauseButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  skipButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#FFF5F5',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
   },
-  youtubeButtonText: {
-    fontSize: 11,
-    color: '#FF4757',
-    fontWeight: '500',
+  skipButtonText: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  videoInfo: {
+    marginTop: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
   },
   videoTitle: {
-    fontSize: isSmallScreen ? 14 : 16,
+    color: '#FFFFFF',
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
-    color: '#333',
-    lineHeight: 22,
+    textAlign: 'center',
     marginBottom: 16,
+    lineHeight: 24,
   },
-  queueStateContainer: {
-    backgroundColor: '#F0F8FF',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4A90E2',
-  },
-  queueStateText: {
-    fontSize: 12,
-    color: '#4A90E2',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  queueStateSubtext: {
-    fontSize: 10,
-    color: '#666',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  statsContainer: {
+  statsRow: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
-  statNumber: {
-    fontSize: isSmallScreen ? 24 : 28,
+  statValue: {
+    color: '#FFFFFF',
+    fontSize: isSmallScreen ? 18 : 20,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: isSmallScreen ? 11 : 12,
-    color: '#666',
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 16,
   },
   statDivider: {
     width: 1,
-    height: 40,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 20,
+    height: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginHorizontal: 8,
   },
-  autoPlayCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 16,
-    padding: 16,
+  statusSection: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  autoPlayInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  autoPlayIcon: {
-    width: 32,
-    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: 6,
   },
-  autoPlayIconText: {
+  statusText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#666',
-  },
-  autoPlayText: {
-    fontSize: 16,
     fontWeight: '500',
-    color: '#333',
-  },
-  toggleContainer: {
-    padding: 4,
-  },
-  toggle: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleActive: {
-    backgroundColor: '#FF4757',
-  },
-  toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'white',
-    alignSelf: 'flex-end',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
-      },
-    }),
   },
   loadingContainer: {
     flex: 1,
@@ -877,15 +734,15 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginTop: 12,
     fontWeight: '500',
   },
   loadingSubtext: {
+    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
-    color: '#999',
     textAlign: 'center',
     marginTop: 8,
   },
@@ -896,8 +753,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 20,
     marginTop: 12,
@@ -906,25 +763,16 @@ const styles = StyleSheet.create({
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FF4757',
+    backgroundColor: '#4CAF50',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 25,
     gap: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#FF4757',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
-      },
-    }),
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   retryButtonText: {
     color: 'white',
