@@ -55,14 +55,13 @@ export default function ViewTab() {
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [appState, setAppState] = useState(AppState.currentState);
-  const [autoPlay, setAutoPlay] = useState(true);
+  const [autoPlay, setAutoPlay] = useState(true); // Controls auto-skipping behavior
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [isTabFocused, setIsTabFocused] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [isSkipping, setIsSkipping] = useState(false);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [coinUpdateInProgress, setCoinUpdateInProgress] = useState(false);
   const [coinsAwarded, setCoinsAwarded] = useState(false);
 
@@ -86,14 +85,6 @@ export default function ViewTab() {
   // Calculate remaining time for UI display
   const remainingTime = Math.max(0, targetDuration - currentTime);
 
-  // Debug logging function
-  const addDebugLog = useCallback((message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    const logMessage = `${timestamp}: ${message}`;
-    console.log(`[ViewTab] ${logMessage}`);
-    setDebugLogs(prev => [...prev.slice(-9), logMessage]);
-  }, []);
-
   // Extract YouTube video ID
   const extractVideoId = (url: string): string | null => {
     if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
@@ -115,6 +106,7 @@ export default function ViewTab() {
   };
 
   const youtubeVideoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
+  const youtubeWatchUrl = youtubeVideoId ? `https://www.youtube.com/watch?v=${youtubeVideoId}` : null;
 
   // Show toast only on Android platform
   const showToast = useCallback((message: string) => {
@@ -205,24 +197,22 @@ export default function ViewTab() {
       </div>
       
       <script>
-        console.log('Initializing enhanced video player for: ${videoId}');
         
         var player;
         var isPlayerReady = false;
         var progressInterval;
         var hasCompleted = false;
         var targetDuration = ${targetDuration};
-        var autoPlayEnabled = ${autoPlay};
+        var autoSkipEnabled = ${autoPlay}; // Controls auto-skipping, not auto-play
         var currentTime = 0;
         var hasEarnedCoins = false;
         var hasStarted = false;
-        var autoSkipEnabled = ${autoPlay};
         var isTabVisible = true;
         var wasPlayingBeforeHidden = false;
         var loadingTimeoutId;
         var hasTimedOut = false;
         var hasError = false;
-        var debugMode = true;
+        var debugMode = false; // Turn off debug logs
         var popupSuppressed = false;
         
         function debugLog(message) {
@@ -235,13 +225,10 @@ export default function ViewTab() {
           }
         }
 
-        debugLog('Initializing video player for: ${videoId}');
-
         // Set loading timeout
         loadingTimeoutId = setTimeout(function() {
           if (!isPlayerReady && !hasTimedOut && !hasError) {
             hasTimedOut = true;
-            debugLog('Loading timeout reached, seamless skip');
             
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'LOADING_TIMEOUT',
@@ -258,7 +245,6 @@ export default function ViewTab() {
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         tag.onerror = function() {
-          debugLog('Failed to load YouTube API - seamless skip');
           if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
           hasError = true;
           
@@ -280,7 +266,6 @@ export default function ViewTab() {
             return;
           }
           
-          debugLog('YouTube API ready');
           
           try {
             player = new YT.Player('player', {
@@ -288,7 +273,7 @@ export default function ViewTab() {
               width: '100%',
               videoId: '${videoId}',
               playerVars: {
-                'autoplay': 0,
+                'autoplay': 1, // Always auto-play videos
                 'controls': 0,
                 'modestbranding': 1,
                 'showinfo': 0,
@@ -310,7 +295,6 @@ export default function ViewTab() {
               }
             });
           } catch (error) {
-            debugLog('Error creating player: ' + error);
             hasError = true;
             if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
             
@@ -330,7 +314,6 @@ export default function ViewTab() {
             return;
           }
           
-          debugLog('Player ready');
           isPlayerReady = true;
           if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
           document.getElementById('loading').style.display = 'none';
@@ -353,15 +336,13 @@ export default function ViewTab() {
           
           startProgressTracking();
           
-          // Auto-start playback if enabled
-          if (autoPlayEnabled && isTabVisible) {
+          // Auto-start playback (always enabled)
+          if (isTabVisible) {
             setTimeout(function() {
               if (player && player.playVideo && isPlayerReady && !hasError) {
                 try {
-                  debugLog('Starting auto-playback');
                   player.playVideo();
                 } catch (error) {
-                  debugLog('Error starting playback: ' + error);
                 }
               }
             }, 500);
@@ -383,7 +364,6 @@ export default function ViewTab() {
             '5': 'CUED'
           };
           
-          debugLog('Player state: ' + (stateNames[state] || state));
           
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'STATE_CHANGE',
@@ -394,7 +374,6 @@ export default function ViewTab() {
           if (state === 1) { // PLAYING
             if (!hasStarted) {
               hasStarted = true;
-              debugLog('Video playback started successfully');
               window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'VIDEO_STARTED'
               }));
@@ -404,16 +383,13 @@ export default function ViewTab() {
           // Handle video end with popup suppression
           if (state === 0 && !hasCompleted) { // ENDED
             hasCompleted = true;
-            debugLog('Video ended naturally - suppressing popup and checking for coin award');
             
             // Immediately stop the video to prevent end screen popup
             if (player && player.stopVideo && !popupSuppressed) {
               try {
                 player.stopVideo();
                 popupSuppressed = true;
-                debugLog('Popup suppressed for ${videoId}');
               } catch (error) {
-                debugLog('Error stopping video: ' + error);
               }
             }
             
@@ -428,7 +404,6 @@ export default function ViewTab() {
         }
 
         function onPlayerError(event) {
-          debugLog('Player error: ' + event.data);
           hasError = true;
           if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
           
@@ -457,7 +432,6 @@ export default function ViewTab() {
             clearInterval(progressInterval);
           }
           
-          debugLog('Starting progress tracking');
           
           progressInterval = setInterval(function() {
             if (player && player.getCurrentTime && isPlayerReady && !hasCompleted) {
@@ -475,7 +449,6 @@ export default function ViewTab() {
                 // Check for completion
                 if (currentTime >= targetDuration && !hasEarnedCoins) {
                   hasEarnedCoins = true;
-                  debugLog('Target duration reached (' + currentTime + 's), triggering coin award');
                   window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'COINS_EARNED',
                     currentTime: currentTime,
@@ -487,12 +460,10 @@ export default function ViewTab() {
                     setTimeout(function() {
                       if (!hasCompleted) {
                         hasCompleted = true;
-                        debugLog('Auto-completing after earning coins');
                         
                         if (player && player.stopVideo) {
                           player.stopVideo();
                           popupSuppressed = true;
-                          debugLog('Popup suppressed for ${videoId} after coin award');
                         }
                         
                         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -507,7 +478,6 @@ export default function ViewTab() {
                   }
                 }
               } catch (error) {
-                debugLog('Error getting current time: ' + error);
               }
             }
           }, 1000);
@@ -530,14 +500,12 @@ export default function ViewTab() {
           if (player && player.stopVideo && isPlayerReady) {
             player.stopVideo();
             popupSuppressed = true;
-            debugLog('Manual stop - popup suppressed for ${videoId}');
           }
         };
 
         // Tab visibility control
         window.setTabVisibility = function(visible) {
           isTabVisible = visible;
-          debugLog('Tab visibility changed: ' + visible);
           
           if (!visible) {
             if (player && player.getPlayerState && player.getPlayerState() === 1) {
@@ -547,7 +515,7 @@ export default function ViewTab() {
               wasPlayingBeforeHidden = false;
             }
           } else {
-            if (wasPlayingBeforeHidden && autoPlayEnabled) {
+            if (wasPlayingBeforeHidden) {
               setTimeout(function() {
                 window.playVideo();
               }, 500);
@@ -558,16 +526,13 @@ export default function ViewTab() {
         // Update auto-skip setting
         window.updateAutoSkip = function(enabled) {
           autoSkipEnabled = enabled;
-          debugLog('Auto-skip updated: ' + enabled);
         };
 
         // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
           if (document.hidden) {
-            debugLog('Page hidden, pausing video');
             window.pauseVideo();
-          } else if (isTabVisible && autoPlayEnabled) {
-            debugLog('Page visible, resuming video');
+          } else if (isTabVisible) {
             setTimeout(function() {
               window.playVideo();
             }, 500);
@@ -576,7 +541,6 @@ export default function ViewTab() {
 
         // Security: Block navigation
         window.open = function() {
-          debugLog('Navigation blocked for security');
           return null;
         };
 
@@ -592,7 +556,6 @@ export default function ViewTab() {
   // Handle tab focus changes
   useFocusEffect(
     useCallback(() => {
-      addDebugLog('Tab focused');
       setIsTabFocused(true);
       
       if (webviewRef.current) {
@@ -600,28 +563,24 @@ export default function ViewTab() {
       }
 
       return () => {
-        addDebugLog('Tab unfocused');
         setIsTabFocused(false);
         
         if (webviewRef.current) {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(false); true;');
         }
       };
-    }, [addDebugLog])
+    }, [])
   );
 
   // Handle app state changes
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      addDebugLog(`App state changed: ${appState} -> ${nextAppState}`);
       
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        addDebugLog('App resumed');
         if (isTabFocused && webviewRef.current) {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(true); true;');
         }
       } else if (nextAppState.match(/inactive|background/)) {
-        addDebugLog('App backgrounded, pausing video and stopping timer for security');
         pauseVideo();
         setIsPlaying(false);
         if (webviewRef.current) {
@@ -633,14 +592,13 @@ export default function ViewTab() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [appState, isTabFocused, addDebugLog]);
+  }, [appState, isTabFocused]);
 
   // Reset states when video changes
   useEffect(() => {
     if (currentVideo) {
       addDebugLog(`Video changed to: ${currentVideo.youtube_url}`);
       
-      // Reset all video-specific states
       setCurrentTime(0);
       setIsVideoLoaded(false);
       setPlayerError(null);
@@ -665,26 +623,23 @@ export default function ViewTab() {
       // Set loading timeout for instant skip
       loadingTimeoutRef.current = setTimeout(() => {
         if (!isVideoLoaded && !isSkipping) {
-          addDebugLog('Video loading timeout - instant skip');
           handleInstantSkip('Loading timeout');
         }
       }, loadingTimeoutDuration);
     }
-  }, [currentVideo, addDebugLog]);
+  }, [currentVideo]);
 
   // Fetch videos on component mount
   useEffect(() => {
     if (user && videoQueue.length === 0) {
-      addDebugLog('Fetching initial video queue');
       fetchVideos(user.id);
     }
-  }, [user, videoQueue.length, fetchVideos, addDebugLog]);
+  }, [user, videoQueue.length, fetchVideos]);
 
   // Instant skip function for seamless experience
   const handleInstantSkip = useCallback((reason: string = 'Video unavailable') => {
     if (isSkipping) return;
     
-    addDebugLog(`Instant skip: ${reason}`);
     setIsSkipping(true);
     
     // Clear all timeouts
@@ -716,7 +671,7 @@ export default function ViewTab() {
       
       setIsSkipping(false);
     }, 100); // Minimal delay for smooth transition
-  }, [isSkipping, moveToNextVideo, user, videoQueue.length, fetchVideos, addDebugLog]);
+  }, [isSkipping, moveToNextVideo, user, videoQueue.length, fetchVideos]);
 
   // Enhanced award coins function with retry mechanism
   const awardCoins = useCallback(async (coins: number) => {
@@ -724,7 +679,6 @@ export default function ViewTab() {
       addDebugLog(`Coin award skipped - user: ${!!user}, video: ${!!currentVideo}, earned: ${coinsEarned}, inProgress: ${coinUpdateInProgress}, awarded: ${coinsAwarded}`);
       return;
     }
-    
     setCoinUpdateInProgress(true);
     setCoinsEarned(true);
     setCoinsAwarded(true); // Set this immediately to prevent double awards
@@ -736,7 +690,6 @@ export default function ViewTab() {
       try {
         addDebugLog(`Attempting coin update (attempt ${retryAttempt + 1}/${maxRetryAttempts}) for ${coins} coins`);
         
-        // Call Supabase function to update coins
         const { data: result, error } = await supabase
           .rpc('update_user_coins', {
             user_uuid: user.id,
@@ -749,16 +702,15 @@ export default function ViewTab() {
         if (error) {
           addDebugLog(`Coin update failed: ${error.code} - ${error.message}`);
           throw error;
-        }
 
         if (result) {
           addDebugLog(`Coins awarded successfully: ${coins}`);
           
-          // Add delay before refreshing profile to ensure database transaction is committed
           addDebugLog('Waiting for database transaction to commit...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           
-          addDebugLog('Refreshing profile to update coin balance...');
+          // Add delay to ensure database transaction is committed
+          await new Promise(resolve => setTimeout(resolve, 1000));
           const oldCoins = profile?.coins || 0;
           await refreshProfile();
           
@@ -776,7 +728,6 @@ export default function ViewTab() {
               }, 2000);
             }
           }, 500);
-          
           // Subtle coin animation
           coinBounce.value = withSpring(1.2, {
             damping: 15,
@@ -791,11 +742,9 @@ export default function ViewTab() {
           return true;
         } else {
           addDebugLog('Coin award failed: no result returned');
-          throw new Error('No result returned from coin update function');
         }
       } catch (error: any) {
         addDebugLog(`Coin update error (attempt ${retryAttempt + 1}): ${error.message}`);
-        
         // Check if it's a network error that we should retry
         const isRetryableError = error.code === 'PGRST301' || 
                                 error.message?.includes('500') || 
@@ -805,7 +754,6 @@ export default function ViewTab() {
         if (isRetryableError && retryAttempt < maxRetryAttempts - 1) {
           retryAttempt++;
           addDebugLog(`Retrying coin update in 1 second...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
           return attemptCoinUpdate();
         }
         
@@ -817,14 +765,12 @@ export default function ViewTab() {
       await attemptCoinUpdate();
     } catch (error: any) {
       addDebugLog(`Final coin update error after ${maxRetryAttempts} attempts: ${error.message}`);
-      // Reset states on final failure
       setCoinsEarned(false);
       setCoinsAwarded(false);
     } finally {
-      addDebugLog('Coin award process completed');
       setCoinUpdateInProgress(false);
     }
-  }, [user, currentVideo, coinsEarned, coinUpdateInProgress, refreshProfile, addDebugLog, profile?.coins]);
+  }, [user, currentVideo, coinsEarned, coinUpdateInProgress, refreshProfile]);
 
   // WebView message handler with enhanced coin logic
   const handleWebViewMessage = useCallback(async (event: any) => {
@@ -832,12 +778,7 @@ export default function ViewTab() {
       const data = JSON.parse(event.nativeEvent.data);
       
       switch (data.type) {
-        case 'DEBUG_LOG':
-          addDebugLog(`WebView: ${data.message}`);
-          break;
-          
         case 'PLAYER_READY_SUCCESS':
-          addDebugLog('Player ready message received');
           setIsVideoLoaded(true);
           setPlayerError(null);
           if (loadingTimeoutRef.current) {
@@ -847,7 +788,6 @@ export default function ViewTab() {
           break;
           
         case 'VIDEO_STARTED':
-          addDebugLog('Video started playing');
           setHasStarted(true);
           setIsPlaying(true);
           break;
@@ -875,31 +815,29 @@ export default function ViewTab() {
           break;
           
         case 'COINS_EARNED':
-          addDebugLog(`Coins earned event received: ${data.coinsEarned}`);
           if (!coinsEarned) {
-            addDebugLog('Processing coin award...');
             awardCoins(data.coinsEarned);
           } else {
-            addDebugLog('Coins already earned for this video');
           }
           break;
           
         case 'VIDEO_COMPLETED':
-          addDebugLog(`Video completion received: ${data.reason}, currentTime: ${data.currentTime}, targetDuration: ${targetDuration}`);
           
           // Award coins if video was watched for sufficient time and not already earned
           if (!coinsEarned && !coinsAwarded && data.currentTime >= (targetDuration * 0.9) && !coinUpdateInProgress) {
-            addDebugLog(`Video watched for ${data.currentTime}s of ${targetDuration}s, awarding ${coinReward} coins`);
             await awardCoins(coinReward);
           }
           
           if (!videoCompleted) {
             setVideoCompleted(true);
             setIsPlaying(false);
-            // Move to next video instantly without showing completion message
-            completionTimeoutRef.current = setTimeout(() => {
-              handleInstantSkip('Video completed');
-            }, 500); // Brief delay for smooth transition
+            
+            // Only auto-skip if autoPlay is enabled
+            if (autoPlay) {
+              completionTimeoutRef.current = setTimeout(() => {
+                handleInstantSkip('Video completed');
+              }, 500);
+            }
           }
           break;
           
@@ -907,7 +845,6 @@ export default function ViewTab() {
         case 'API_LOAD_ERROR':
         case 'PLAYER_INIT_ERROR':
         case 'PLAYER_ERROR':
-          addDebugLog(`Video error: ${data.message}`);
           if (data.instantSkip) {
             handleInstantSkip(data.message);
           } else {
@@ -916,7 +853,6 @@ export default function ViewTab() {
           break;
           
         case 'VIDEO_UNPLAYABLE':
-          addDebugLog(`Video unplayable: ${data.message}`);
           if (data.instantSkip) {
             handleInstantSkip(data.message);
           } else if (retryCount < maxRetries) {
@@ -933,24 +869,21 @@ export default function ViewTab() {
           break;
       }
     } catch (error) {
-      addDebugLog(`Error parsing WebView message: ${error}`);
       handleInstantSkip('Message parse error');
     }
-  }, [coinsEarned, targetDuration, videoCompleted, retryCount, maxRetries, handleInstantSkip, awardCoins, addDebugLog]);
+  }, [coinsEarned, targetDuration, videoCompleted, retryCount, maxRetries, handleInstantSkip, awardCoins, autoPlay]);
 
   const pauseVideo = useCallback(() => {
     if (webviewRef.current) {
-      addDebugLog('Manual pause triggered');
       webviewRef.current.injectJavaScript('window.pauseVideo && window.pauseVideo(); true;');
     }
-  }, [addDebugLog]);
+  }, []);
 
   const playVideo = useCallback(() => {
     if (webviewRef.current && isTabFocused && appState === 'active') {
-      addDebugLog('Manual play triggered');
       webviewRef.current.injectJavaScript('window.playVideo && window.playVideo(); true;');
     }
-  }, [isTabFocused, appState, addDebugLog]);
+  }, [isTabFocused, appState]);
 
   const handlePlayPause = () => {
     if (!isTabFocused || appState !== 'active') {
@@ -965,18 +898,25 @@ export default function ViewTab() {
   };
 
   const handleSkipVideo = () => {
-    addDebugLog('Manual skip requested');
     handleInstantSkip('Manual skip');
   };
 
   const toggleAutoPlay = () => {
     const newAutoPlay = !autoPlay;
     setAutoPlay(newAutoPlay);
-    addDebugLog(`Auto-play toggled: ${newAutoPlay}`);
     
     // Update auto-skip setting in WebView
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoPlay}); true;`);
+    }
+    
+    // If auto-skip is turned off and video is completed, don't auto-skip
+    if (!newAutoPlay && videoCompleted) {
+      // Clear any pending skip timeout
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
+      }
     }
   };
 
@@ -1132,8 +1072,25 @@ export default function ViewTab() {
           {/* Top Controls */}
           <View style={styles.topControls}>
             <View style={styles.autoPlayContainer}>
-              <ExternalLink color="#666" size={16} />
-              <Text style={styles.autoPlayLabel}>YouTube</Text>
+              {youtubeWatchUrl ? (
+                <TouchableOpacity 
+                  style={styles.youtubeLink}
+                  onPress={() => {
+                    // Open YouTube link in browser
+                    if (Platform.OS === 'web') {
+                      window.open(youtubeWatchUrl, '_blank');
+                    }
+                  }}
+                >
+                  <ExternalLink color="#FF4757" size={16} />
+                  <Text style={styles.youtubeLinkText}>Watch on YouTube</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.autoPlayContainer}>
+                  <ExternalLink color="#666" size={16} />
+                  <Text style={styles.autoPlayLabel}>YouTube</Text>
+                </View>
+              )}
             </View>
             <View style={styles.autoPlayContainer}>
               <Text style={styles.autoPlayLabel}>Auto Play</Text>
@@ -1159,7 +1116,11 @@ export default function ViewTab() {
           {/* Play/Skip Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={[styles.playButton, (!isVideoLoaded || !isTabFocused) && styles.playButtonDisabled]}
+              style={[
+                styles.playButton, 
+                (!isVideoLoaded || !isTabFocused) && styles.playButtonDisabled,
+                !isPlaying && styles.playButtonPaused
+              ]}
               onPress={handlePlayPause}
               disabled={!isVideoLoaded || !isTabFocused}
             >
@@ -1185,19 +1146,6 @@ export default function ViewTab() {
             </View>
           )}
         </View>
-
-        {/* Debug Information */}
-        {debugLogs.length > 0 && (
-          <View style={styles.debugSection}>
-            <Text style={styles.debugTitle}>Debug Log:</Text>
-            {debugLogs.map((log, index) => (
-              <Text key={index} style={styles.debugText}>{log}</Text>
-            ))}
-            {coinUpdateInProgress && (
-              <Text style={styles.coinUpdateText}>Updating coins...</Text>
-            )}
-          </View>
-        )}
       </ScrollView>
     </View>
   );
@@ -1436,6 +1384,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: isSmallScreen ? 6 : 8,
   },
+  youtubeLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isSmallScreen ? 6 : 8,
+    backgroundColor: '#FFF5F5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFE5E5',
+  },
+  youtubeLinkText: {
+    fontSize: isSmallScreen ? 12 : 14,
+    color: '#FF4757',
+    fontWeight: '500',
+  },
   autoPlayLabel: {
     fontSize: isSmallScreen ? 12 : 14,
     color: '#333',
@@ -1508,6 +1472,9 @@ const styles = StyleSheet.create({
   playButtonDisabled: {
     opacity: 0.5,
   },
+  playButtonPaused: {
+    backgroundColor: '#6B7280',
+  },
   skipButton: {
     flex: 1,
     flexDirection: 'row',
@@ -1550,31 +1517,5 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 11 : 12,
     textAlign: 'center',
     fontWeight: '500',
-  },
-  debugSection: {
-    backgroundColor: '#F0F8FF',
-    margin: 16,
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4A90E2',
-  },
-  debugTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4A90E2',
-    marginBottom: 8,
-  },
-  debugText: {
-    fontSize: 11,
-    color: '#666',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    marginBottom: 2,
-  },
-  coinUpdateText: {
-    color: '#FFA726',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 4,
   },
 });
