@@ -82,7 +82,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     set({ isLoading: true, errorCount: 0 });
 
     try {
-      console.log('🔄 Fetching top 10 video queue for user:', userId);
+      console.log('🔄 Fetching video queue for user:', userId, 'at', new Date().toLocaleTimeString());
       
       // First, get videos that the user has already watched
       const { data: watchedVideos, error: watchedError } = await supabase
@@ -96,7 +96,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
-      console.log('📊 User has watched videos:', watchedVideoIds.length);
+      console.log('📊 User has watched', watchedVideoIds.length, 'videos');
       
       // Get only ACTIVE videos with fresh query (top 10)
       let query = supabase
@@ -115,7 +115,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       if (!allVideos || allVideos.length === 0) {
-        console.log('❌ No active videos available in database');
+        console.log('❌ No active videos available in database at', new Date().toLocaleTimeString());
         set({ 
           videoQueue: [], 
           currentVideoIndex: 0,
@@ -126,7 +126,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         return;
       }
 
-      console.log(`📊 Found ${allVideos.length} total active videos in database`);
+      console.log(`📊 Found ${allVideos.length} total active videos in database at`, new Date().toLocaleTimeString());
 
       // Filter videos on the client side with better logic
       const availableVideos = allVideos
@@ -143,7 +143,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           const isAvailable = hasRemainingViews && notWatched && notBlacklisted && isActive;
           
           if (!isAvailable) {
-            console.log(`🚫 Filtered out video ${video.youtube_url}: views(${hasRemainingViews}) watched(${!notWatched}) blacklisted(${!notBlacklisted}) active(${isActive})`);
+            console.log(`🚫 Filtered out video ${video.youtube_url}: views(${hasRemainingViews}) watched(${!notWatched}) blacklisted(${!notBlacklisted}) active(${isActive}) at`, new Date().toLocaleTimeString());
           }
           
           return isAvailable;
@@ -158,15 +158,15 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         }));
 
       if (availableVideos.length === 0) {
-        console.log('⚠️ No available active videos with remaining views, will reset queue');
+        console.log('⚠️ No available active videos with remaining views, will reset queue at', new Date().toLocaleTimeString());
         // Instead of setting empty queue, trigger reset
         set({ isLoading: false });
         await get().resetQueue(userId);
         return;
       }
 
-      console.log(`✅ Fetched top ${availableVideos.length} active videos for queue`);
-      console.log('📊 Queue state after fetch:', {
+      console.log(`✅ Fetched top ${availableVideos.length} active videos for queue at`, new Date().toLocaleTimeString());
+      console.log('📊 Queue state after fetch at', new Date().toLocaleTimeString(), ':', {
         totalVideos: availableVideos.length,
         firstVideo: availableVideos[0]?.youtube_url,
         lastVideo: availableVideos[availableVideos.length - 1]?.youtube_url,
@@ -186,7 +186,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       });
 
     } catch (error) {
-      console.error('❌ Error in fetchVideos:', error);
+      console.error('❌ Error in fetchVideos at', new Date().toLocaleTimeString(), ':', error);
       set({ isLoading: false, errorCount: 0 });
       throw error;
     }
