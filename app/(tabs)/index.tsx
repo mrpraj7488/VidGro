@@ -83,6 +83,9 @@ export default function ViewTab() {
   const maxRetries = 1;
   const loadingTimeoutDuration = 3000;
 
+  // Calculate remaining time for UI display
+  const remainingTime = Math.max(0, targetDuration - currentTime);
+
   // Debug logging function
   const addDebugLog = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString();
