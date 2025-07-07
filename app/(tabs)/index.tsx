@@ -67,6 +67,7 @@ export default function ViewTab() {
   const webviewRef = useRef<WebView>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation values - Initialize with proper default values
   const progressValue = useSharedValue(0);
@@ -155,6 +156,8 @@ export default function ViewTab() {
         var hasCompleted = false;
         var targetDuration = ${targetDuration};
         var autoPlayEnabled = ${autoPlay};
+        var currentTime = 0;
+        var hasEarnedCoins = false;
 
         // Load YouTube IFrame API
         var tag = document.createElement('script');
@@ -238,12 +241,15 @@ export default function ViewTab() {
             stateName: stateNames[state] || 'UNKNOWN'
           }));
           
-          if (state === 0 && autoPlayEnabled && !hasCompleted) { // ENDED
+          // Handle video end
+          if (state === 0 && !hasCompleted) { // ENDED
             hasCompleted = true;
-            console.log('Video ended naturally');
+            console.log('Video ended naturally - triggering completion');
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'VIDEO_ENDED',
-              autoSkip: true
+              type: 'VIDEO_COMPLETED',
+              reason: 'natural_end',
+              currentTime: currentTime,
+              autoSkip: autoPlayEnabled
             }));
           }
         }
@@ -271,9 +277,9 @@ export default function ViewTab() {
           }
           
           progressInterval = setInterval(function() {
-            if (player && player.getCurrentTime && isPlayerReady) {
+            if (player && player.getCurrentTime && isPlayerReady && !hasCompleted) {
               try {
-                var currentTime = player.getCurrentTime();
+                currentTime = player.getCurrentTime();
                 var progress = Math.min(currentTime / targetDuration, 1) * 100;
                 
                 window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -284,14 +290,30 @@ export default function ViewTab() {
                 }));
                 
                 // Check for coin earning completion
-                if (currentTime >= targetDuration && !hasCompleted) {
-                  hasCompleted = true;
+                if (currentTime >= targetDuration && !hasEarnedCoins) {
+                  hasEarnedCoins = true;
                   console.log('Target duration reached, awarding coins');
                   window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'COINS_EARNED',
                     currentTime: currentTime,
                     coinsEarned: ${coinReward}
                   }));
+                  
+                  // Auto-complete after earning coins if auto-play is enabled
+                  if (autoPlayEnabled) {
+                    setTimeout(function() {
+                      if (!hasCompleted) {
+                        hasCompleted = true;
+                        console.log('Auto-completing after earning coins');
+                        window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                          type: 'VIDEO_COMPLETED',
+                          reason: 'target_reached',
+                          currentTime: currentTime,
+                          autoSkip: true
+                        }));
+                      }
+                    }, 2000); // Wait 2 seconds after earning coins
+                  }
                 }
               } catch (error) {
                 console.error('Error getting current time:', error);
@@ -380,17 +402,23 @@ export default function ViewTab() {
         loadingRotation.value = 0;
       });
       
-      // Clear intervals
+      // Clear all intervals and timeouts
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
         progressIntervalRef.current = null;
       }
       
-      // Set loading timeout
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
       }
       
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
+      }
+      
+      // Set loading timeout
       loadingTimeoutRef.current = setTimeout(() => {
         if (!isVideoLoaded) {
           console.log('Video loading timeout');
@@ -443,9 +471,21 @@ export default function ViewTab() {
           }
           break;
           
-        case 'VIDEO_ENDED':
-          if (autoPlay && data.autoSkip) {
-            handleAutoSkip();
+        case 'VIDEO_COMPLETED':
+          console.log('Video completion received:', data.reason, 'autoSkip:', data.autoSkip);
+          if (!videoCompleted) {
+            setVideoCompleted(true);
+            setIsPlaying(false);
+            
+            // Show completion feedback
+            showToast('Video completed! Moving to next...');
+            
+            // Auto-skip if enabled
+            if (autoPlay && data.autoSkip) {
+              completionTimeoutRef.current = setTimeout(() => {
+                handleSkipVideo();
+              }, 1500); // 1.5 second delay for user feedback
+            }
           }
           break;
           
@@ -459,7 +499,7 @@ export default function ViewTab() {
     } catch (error) {
       console.error('Error parsing WebView message:', error);
     }
-  }, [autoPlay, coinsEarned, targetDuration]);
+  }, [autoPlay, coinsEarned, targetDuration, videoCompleted]);
 
   // Award coins function
   const awardCoins = async (coins: number) => {
@@ -496,7 +536,7 @@ export default function ViewTab() {
           });
         });
         
-        showToast(`Coins awarded: ${coins} for ${currentVideo.youtube_url}`);
+        showToast(`Earned ${coins} coins! 🎉`);
         console.log(`Coins awarded: ${coins} for ${currentVideo.youtube_url}`);
       }
     } catch (error) {
@@ -532,18 +572,20 @@ export default function ViewTab() {
   };
 
   const handleSkipVideo = () => {
+    console.log('Skipping video manually');
+    
+    // Clear all timeouts
+    if (completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
+    
     stopVideo();
     moveToNextVideo();
+    
+    // Fetch more videos if queue is running low
     if (user && videoQueue.length <= 2) {
       fetchVideos(user.id);
-    }
-  };
-
-  const handleAutoSkip = () => {
-    if (autoPlay) {
-      setTimeout(() => {
-        handleSkipVideo();
-      }, 1000);
     }
   };
 
@@ -685,6 +727,19 @@ export default function ViewTab() {
                 <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
               </View>
             </View>
+
+            {/* Completion Overlay */}
+            {videoCompleted && (
+              <View style={styles.completionOverlay}>
+                <View style={styles.completionContent}>
+                  <Award color="#4CAF50" size={32} />
+                  <Text style={styles.completionText}>Video Completed!</Text>
+                  <Text style={styles.completionSubtext}>
+                    {autoPlay ? 'Moving to next video...' : 'Tap skip to continue'}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Video Title */}
@@ -928,6 +983,36 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     backgroundColor: '#4CAF50',
+  },
+  completionOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  completionContent: {
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 32,
+  },
+  completionText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4CAF50',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  completionSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   titleContainer: {
     padding: 16,
