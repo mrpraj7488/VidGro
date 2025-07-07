@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { DollarSign, RefreshCw, TriangleAlert as AlertTriangle } from 'lucide-react-native';
+import { DollarSign, RefreshCw, TriangleAlert as AlertTriangle, Menu } from 'lucide-react-native';
 import SeamlessVideoPlayer from '@/components/SeamlessVideoPlayer';
 import { useVideoStore } from '@/store/videoStore';
 import Animated, { 
@@ -37,6 +37,7 @@ export default function ViewTab() {
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [autoPlay, setAutoPlay] = useState(true);
 
   const coinBounce = useSharedValue(1);
   const currentVideo = getCurrentVideo();
@@ -282,6 +283,16 @@ export default function ViewTab() {
     }, 5000);
   };
 
+  const openInYouTube = () => {
+    if (currentVideo) {
+      if (Platform.OS === 'web') {
+        window.open(`https://www.youtube.com/watch?v=${currentVideo.youtube_url}`, '_blank');
+      } else {
+        showToast('Opening in YouTube...');
+      }
+    }
+  };
+
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinBounce.value }],
   }));
@@ -290,12 +301,11 @@ export default function ViewTab() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <Menu color="white" size={24} />
           <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Text style={styles.coinCount}>0</Text>
-            <View style={styles.coinIcon}>
-              <DollarSign color="white" size={16} />
-            </View>
+            <DollarSign color="white" size={16} />
           </View>
         </View>
         <View style={styles.loadingContainer}>
@@ -310,14 +320,13 @@ export default function ViewTab() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <Menu color="white" size={24} />
           <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Animated.View style={coinAnimatedStyle}>
               <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             </Animated.View>
-            <View style={styles.coinIcon}>
-              <DollarSign color="white" size={16} />
-            </View>
+            <DollarSign color="white" size={16} />
           </View>
         </View>
         <View style={styles.loadingContainer}>
@@ -332,14 +341,13 @@ export default function ViewTab() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
+          <Menu color="white" size={24} />
           <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Animated.View style={coinAnimatedStyle}>
               <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             </Animated.View>
-            <View style={styles.coinIcon}>
-              <DollarSign color="white" size={16} />
-            </View>
+            <DollarSign color="white" size={16} />
           </View>
         </View>
         <View style={styles.errorContainer}>
@@ -367,21 +375,20 @@ export default function ViewTab() {
       
       {/* Clean Header */}
       <View style={styles.header}>
+        <Menu color="white" size={24} />
         <Text style={styles.headerTitle}>Video Promoter</Text>
         <View style={styles.coinDisplay}>
           <Animated.View style={coinAnimatedStyle}>
             <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
           </Animated.View>
-          <View style={styles.coinIcon}>
-            <DollarSign color="white" size={16} />
-          </View>
+          <DollarSign color="white" size={16} />
         </View>
       </View>
 
-      {/* Video Player Section - Centered and Clean */}
+      {/* Clean Video Player Section - No Overlays */}
       {currentVideo && (
         <View style={styles.videoSection}>
-          <SeamlessVideoPlayer
+          <CleanVideoPlayer
             videoId={currentVideo.id}
             youtubeUrl={currentVideo.youtube_url}
             duration={currentVideo.duration_seconds}
@@ -394,12 +401,121 @@ export default function ViewTab() {
         </View>
       )}
 
-      {/* Video Title - Clean and Minimal */}
-      {currentVideo && (
-        <View style={styles.titleSection}>
-          <Text style={styles.videoTitle} numberOfLines={2}>
-            {currentVideo.title}
-          </Text>
+      {/* Bottom Controls Section */}
+      <View style={styles.bottomSection}>
+        {/* Open on YouTube & Auto Play */}
+        <View style={styles.controlsRow}>
+          <TouchableOpacity 
+            style={styles.youtubeButton}
+            onPress={openInYouTube}
+          >
+            <Text style={styles.youtubeButtonText}>Open on Youtube</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.autoPlayContainer}>
+            <Text style={styles.autoPlayLabel}>Auto Play</Text>
+            <TouchableOpacity
+              style={[styles.toggleSwitch, autoPlay && styles.toggleSwitchActive]}
+              onPress={() => setAutoPlay(!autoPlay)}
+            >
+              <View style={[styles.toggleThumb, autoPlay && styles.toggleThumbActive]} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Stats Row */}
+        {currentVideo && (
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{currentVideo.duration_seconds}</Text>
+              <Text style={styles.statLabel}>Seconds to get coins</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{currentVideo.coin_reward}</Text>
+              <Text style={styles.statLabel}>Coins will be added</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Skip Button */}
+        <TouchableOpacity style={styles.skipButton} onPress={handleVideoSkip}>
+          <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// Clean Video Player Component without overlays
+function CleanVideoPlayer({ 
+  videoId, 
+  youtubeUrl, 
+  duration, 
+  coinReward, 
+  onVideoComplete, 
+  onVideoSkip, 
+  onError, 
+  onVideoUnplayable 
+}: {
+  videoId: string;
+  youtubeUrl: string;
+  duration: number;
+  coinReward: number;
+  onVideoComplete: () => void;
+  onVideoSkip: () => void;
+  onError: (error: string) => void;
+  onVideoUnplayable: () => void;
+}) {
+  const extractVideoIdFromUrl = (videoIdOrUrl: string): string | null => {
+    if (/^[a-zA-Z0-9_-]{11}$/.test(videoIdOrUrl)) {
+      return videoIdOrUrl;
+    }
+    
+    const patterns = [
+      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=))([^"&?\/\s]{11})/,
+      /(?:youtu\.be\/)([^"&?\/\s]{11})/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = videoIdOrUrl.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  const youtubeVideoId = extractVideoIdFromUrl(youtubeUrl);
+
+  if (!youtubeVideoId) {
+    return (
+      <View style={styles.errorVideoContainer}>
+        <AlertTriangle color="#FF4757" size={32} />
+        <Text style={styles.errorVideoText}>Invalid video format</Text>
+      </View>
+    );
+  }
+
+  const embedUrl = `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&controls=0&modestbranding=1&showinfo=0&rel=0&fs=0&disablekb=1`;
+
+  return (
+    <View style={styles.cleanVideoContainer}>
+      {Platform.OS === 'web' ? (
+        <iframe
+          src={embedUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 'none',
+          }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen={false}
+        />
+      ) : (
+        <View style={styles.mobileVideoPlaceholder}>
+          <Text style={styles.mobileVideoText}>Video Player</Text>
+          <Text style={styles.mobileVideoSubtext}>Video ID: {youtubeVideoId}</Text>
         </View>
       )}
     </View>
@@ -439,35 +555,142 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 4,
   },
-  coinIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FF4757',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   videoSection: {
-    backgroundColor: 'white',
-    marginHorizontal: 0,
-    marginTop: 0,
-    borderRadius: 0,
-    overflow: 'hidden',
-    height: isSmallScreen ? screenHeight * 0.5 : screenHeight * 0.55,
+    backgroundColor: '#000',
+    height: isSmallScreen ? screenHeight * 0.45 : screenHeight * 0.5,
   },
-  titleSection: {
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+  cleanVideoContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  errorVideoContainer: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
   },
-  videoTitle: {
-    fontSize: isSmallScreen ? 18 : 22,
+  errorVideoText: {
+    color: 'white',
+    fontSize: 16,
+    marginTop: 12,
+  },
+  mobileVideoPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  mobileVideoText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: '600',
+  },
+  mobileVideoSubtext: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginTop: 8,
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  youtubeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  youtubeButtonText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  autoPlayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  autoPlayLabel: {
+    fontSize: 16,
     color: '#333',
+    fontWeight: '500',
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleSwitchActive: {
+    backgroundColor: '#FF4757',
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'white',
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  toggleThumbActive: {
+    alignSelf: 'flex-end',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 40,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: isSmallScreen ? 36 : 42,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  statLabel: {
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#666',
     textAlign: 'center',
-    lineHeight: 28,
+    lineHeight: 20,
+  },
+  skipButton: {
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: 25,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  skipButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    letterSpacing: 1,
   },
   loadingContainer: {
     flex: 1,
