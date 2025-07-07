@@ -37,7 +37,6 @@ export default function ViewTab() {
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [autoPlay, setAutoPlay] = useState(true);
 
   const coinBounce = useSharedValue(1);
   const currentVideo = getCurrentVideo();
@@ -283,16 +282,6 @@ export default function ViewTab() {
     }, 5000);
   };
 
-  const openInYouTube = () => {
-    if (currentVideo) {
-      if (Platform.OS === 'web') {
-        window.open(`https://www.youtube.com/watch?v=${currentVideo.youtube_url}`, '_blank');
-      } else {
-        showToast('Opening in YouTube...');
-      }
-    }
-  };
-
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinBounce.value }],
   }));
@@ -389,7 +378,7 @@ export default function ViewTab() {
         </View>
       </View>
 
-      {/* Video Player Section */}
+      {/* Video Player Section - Centered and Clean */}
       {currentVideo && (
         <View style={styles.videoSection}>
           <SeamlessVideoPlayer
@@ -405,7 +394,7 @@ export default function ViewTab() {
         </View>
       )}
 
-      {/* Video Title */}
+      {/* Video Title - Clean and Minimal */}
       {currentVideo && (
         <View style={styles.titleSection}>
           <Text style={styles.videoTitle} numberOfLines={2}>
@@ -413,49 +402,6 @@ export default function ViewTab() {
           </Text>
         </View>
       )}
-
-      {/* Bottom Section */}
-      <View style={styles.bottomSection}>
-        {/* Open on YouTube & Auto Play */}
-        <View style={styles.controlsRow}>
-          <TouchableOpacity 
-            style={styles.youtubeButton}
-            onPress={openInYouTube}
-          >
-            <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.autoPlayContainer}>
-            <Text style={styles.autoPlayLabel}>Auto Play</Text>
-            <TouchableOpacity
-              style={[styles.toggleSwitch, autoPlay && styles.toggleSwitchActive]}
-              onPress={() => setAutoPlay(!autoPlay)}
-            >
-              <View style={[styles.toggleThumb, autoPlay && styles.toggleThumbActive]} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Stats Row */}
-        {currentVideo && (
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{Math.floor(currentVideo.duration_seconds / 60)}</Text>
-              <Text style={styles.statLabel}>Seconds to get coins</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{currentVideo.coin_reward}</Text>
-              <Text style={styles.statLabel}>Coins will be added</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Skip Button */}
-        <TouchableOpacity style={styles.skipButton} onPress={handleVideoSkip}>
-          <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -507,121 +453,21 @@ const styles = StyleSheet.create({
     marginTop: 0,
     borderRadius: 0,
     overflow: 'hidden',
-    height: isSmallScreen ? screenHeight * 0.4 : screenHeight * 0.45,
+    height: isSmallScreen ? screenHeight * 0.5 : screenHeight * 0.55,
   },
   titleSection: {
     backgroundColor: 'white',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 20,
+    flex: 1,
+    justifyContent: 'center',
   },
   videoTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
+    fontSize: isSmallScreen ? 18 : 22,
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
-    lineHeight: 24,
-  },
-  bottomSection: {
-    flex: 1,
-    backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  youtubeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  youtubeButtonText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  autoPlayContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  autoPlayLabel: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  toggleSwitch: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#E0E0E0',
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleSwitchActive: {
-    backgroundColor: '#FF4757',
-  },
-  toggleThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'white',
-    alignSelf: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  toggleThumbActive: {
-    alignSelf: 'flex-end',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 40,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: isSmallScreen ? 36 : 42,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  statLabel: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  skipButton: {
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderRadius: 25,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  skipButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-    letterSpacing: 1,
+    lineHeight: 28,
   },
   loadingContainer: {
     flex: 1,
