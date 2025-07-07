@@ -4,22 +4,19 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Platform,
   Dimensions,
   ToastAndroid,
   StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { DollarSign, RefreshCw, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Info, Play, Pause, SkipForward } from 'lucide-react-native';
-import EnhancedVideoPlayer from '@/components/EnhancedVideoPlayer';
+import { DollarSign, RefreshCw, TriangleAlert as AlertTriangle } from 'lucide-react-native';
+import SeamlessVideoPlayer from '@/components/SeamlessVideoPlayer';
 import { useVideoStore } from '@/store/videoStore';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
-  withTiming,
   withSpring
 } from 'react-native-reanimated';
 
@@ -38,17 +35,11 @@ export default function ViewTab() {
     resetQueue
   } = useVideoStore();
   
-  const [videosWatched, setVideosWatched] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [systemStatus, setSystemStatus] = useState<'healthy' | 'warning' | 'error'>('healthy');
-  const [statusMessage, setStatusMessage] = useState<string>('');
-  const [queueState, setQueueState] = useState<string>('');
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [autoPlay, setAutoPlay] = useState(true);
 
   const coinBounce = useSharedValue(1);
-  const progressScale = useSharedValue(0);
   const currentVideo = getCurrentVideo();
 
   const showToast = (message: string) => {
@@ -72,52 +63,36 @@ export default function ViewTab() {
     }
   }, [currentVideo, user, loading, isLoadingQueue]);
 
-  useEffect(() => {
-    const { videoQueue, currentVideoIndex } = useVideoStore.getState();
-    setQueueState(`${currentVideoIndex + 1}/${videoQueue.length}`);
-  }, [currentVideo]);
-
   const loadVideoQueue = async () => {
     if (!user || isLoadingQueue || loading) return;
 
     try {
       setLoading(true);
       setError(null);
-      setSystemStatus('healthy');
-      setStatusMessage('Loading videos...');
       
-      console.log('🔄 Loading enhanced video queue for user:', user.id);
+      console.log('🔄 Loading video queue for user:', user.id);
       
       await fetchVideos(user.id);
       
       const video = getCurrentVideo();
       if (!video) {
         console.log('⚠️ No active videos in queue, attempting reset...');
-        setStatusMessage('Refreshing video queue...');
         
         await resetQueue(user.id);
         
         const newVideo = getCurrentVideo();
         if (!newVideo) {
           setError('No active videos available for viewing at the moment.');
-          setSystemStatus('warning');
-          setStatusMessage('No videos available');
         } else {
-          setSystemStatus('healthy');
-          setStatusMessage('Ready to watch');
           console.log('✅ Active video loaded after reset:', newVideo.youtube_url);
         }
       } else {
-        setSystemStatus('healthy');
-        setStatusMessage('Ready to watch');
         console.log('✅ Current active video loaded:', video.youtube_url);
       }
       
     } catch (error: any) {
-      console.error('❌ Error loading enhanced video queue:', error);
+      console.error('❌ Error loading video queue:', error);
       setError(error.message || 'Failed to load videos. Please try again.');
-      setSystemStatus('error');
-      setStatusMessage('Failed to load videos');
     } finally {
       setLoading(false);
     }
@@ -130,8 +105,7 @@ export default function ViewTab() {
     }
 
     try {
-      console.log('🎯 Completing enhanced video silently:', currentVideo.youtube_url);
-      setStatusMessage('Processing completion...');
+      console.log('🎯 Completing video silently:', currentVideo.youtube_url);
 
       const { data: existingView } = await supabase
         .from('video_views')
@@ -237,22 +211,16 @@ export default function ViewTab() {
         }
       }
 
-      console.log('✅ Enhanced video completion processed successfully');
+      console.log('✅ Video completion processed successfully');
 
       await refreshProfile();
 
       coinBounce.value = withSpring(1.3, { damping: 8 }, () => {
         coinBounce.value = withSpring(1);
       });
-      
-      progressScale.value = withTiming(1.2, { duration: 300 }, () => {
-        progressScale.value = withTiming(1, { duration: 200 });
-      });
-
-      setVideosWatched(prev => prev + 1);
 
       setTimeout(() => {
-        console.log('🔄 Moving to next video after enhanced completion...');
+        console.log('🔄 Moving to next video after completion...');
         moveToNextVideo();
         
         setTimeout(() => {
@@ -267,16 +235,13 @@ export default function ViewTab() {
       }, 100);
 
     } catch (error: any) {
-      console.error('❌ Error completing enhanced video:', error);
+      console.error('❌ Error completing video:', error);
       setError(error.message || 'Failed to complete video. Please try again.');
-      setSystemStatus('error');
-      setStatusMessage('Failed to complete video');
     }
   };
 
   const handleVideoSkip = () => {
-    console.log('⏭️ Skipping enhanced video (user choice)');
-    setStatusMessage('Skipping video...');
+    console.log('⏭️ Skipping video (user choice)');
     showToast('Skipped video');
     
     moveToNextVideo();
@@ -293,7 +258,7 @@ export default function ViewTab() {
   };
 
   const handleVideoUnplayable = async () => {
-    console.log('🚨 Enhanced video is unplayable, removing from queue...');
+    console.log('🚨 Video is unplayable, removing from queue...');
     showToast('Removed unplayable video');
     
     await removeCurrentVideo();
@@ -310,57 +275,42 @@ export default function ViewTab() {
   };
 
   const handleVideoError = (errorMessage: string) => {
-    console.error('❌ Enhanced video error:', errorMessage);
+    console.error('❌ Video error:', errorMessage);
     setError(errorMessage);
-    setSystemStatus('error');
-    setStatusMessage('Video playback error');
     
     setTimeout(() => {
       handleVideoUnplayable();
     }, 5000);
   };
 
-  const extractVideoId = (youtubeUrl: string): string | null => {
-    const patterns = [
-      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/,
-      /^([a-zA-Z0-9_-]{11})$/
-    ];
-
-    for (const pattern of patterns) {
-      const match = youtubeUrl.match(pattern);
-      if (match && match[1]) {
-        return match[1];
+  const openInYouTube = () => {
+    if (currentVideo) {
+      if (Platform.OS === 'web') {
+        window.open(`https://www.youtube.com/watch?v=${currentVideo.youtube_url}`, '_blank');
+      } else {
+        showToast('Opening in YouTube...');
       }
     }
-    return null;
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinBounce.value }],
   }));
 
-  const progressAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: progressScale.value }],
-  }));
-
   if (!profile) {
     return (
       <View style={styles.container}>
-        <View style={styles.navbar}>
-          <Text style={styles.logo}>VidGro</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
-            <Text style={styles.coinText}>0</Text>
-            <DollarSign color="#FFD700" size={16} />
+            <Text style={styles.coinCount}>0</Text>
+            <View style={styles.coinIcon}>
+              <DollarSign color="white" size={16} />
+            </View>
           </View>
         </View>
         <View style={styles.loadingContainer}>
-          <RefreshCw color="#4CAF50" size={32} />
+          <RefreshCw color="#FF4757" size={32} />
           <Text style={styles.loadingText}>Loading your profile...</Text>
         </View>
       </View>
@@ -370,22 +320,20 @@ export default function ViewTab() {
   if (loading || isLoadingQueue) {
     return (
       <View style={styles.container}>
-        <View style={styles.navbar}>
-          <Text style={styles.logo}>VidGro</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Animated.View style={coinAnimatedStyle}>
-              <Text style={styles.coinText}>{profile?.coins || 0}</Text>
+              <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             </Animated.View>
-            <DollarSign color="#FFD700" size={16} />
+            <View style={styles.coinIcon}>
+              <DollarSign color="white" size={16} />
+            </View>
           </View>
         </View>
         <View style={styles.loadingContainer}>
-          <RefreshCw color="#4CAF50" size={32} />
-          <Text style={styles.loadingText}>Loading enhanced videos...</Text>
-          <Text style={styles.loadingSubtext}>Filtering for embeddable content...</Text>
-          {queueState && (
-            <Text style={styles.loadingSubtext}>{queueState}</Text>
-          )}
+          <RefreshCw color="#FF4757" size={32} />
+          <Text style={styles.loadingText}>Loading videos...</Text>
         </View>
       </View>
     );
@@ -394,13 +342,15 @@ export default function ViewTab() {
   if (error && !currentVideo) {
     return (
       <View style={styles.container}>
-        <View style={styles.navbar}>
-          <Text style={styles.logo}>VidGro</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Video Promoter</Text>
           <View style={styles.coinDisplay}>
             <Animated.View style={coinAnimatedStyle}>
-              <Text style={styles.coinText}>{profile?.coins || 0}</Text>
+              <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
             </Animated.View>
-            <DollarSign color="#FFD700" size={16} />
+            <View style={styles.coinIcon}>
+              <DollarSign color="white" size={16} />
+            </View>
           </View>
         </View>
         <View style={styles.errorContainer}>
@@ -410,7 +360,6 @@ export default function ViewTab() {
             style={styles.retryButton} 
             onPress={() => {
               setError(null);
-              setSystemStatus('healthy');
               clearQueue();
               loadVideoQueue();
             }}
@@ -423,132 +372,89 @@ export default function ViewTab() {
     );
   }
 
-  const videoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
-  const progressPercentage = currentVideo ? Math.round((currentTime / currentVideo.duration_seconds) * 100) : 0;
-
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2C2C2C" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF4757" />
       
-      {/* Modern Navbar */}
-      <View style={styles.navbar}>
-        <Text style={styles.logo}>VidGro</Text>
+      {/* Clean Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Video Promoter</Text>
         <View style={styles.coinDisplay}>
           <Animated.View style={coinAnimatedStyle}>
-            <Text style={styles.coinText}>{profile?.coins || 0}</Text>
+            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
           </Animated.View>
-          <DollarSign color="#FFD700" size={16} />
+          <View style={styles.coinIcon}>
+            <DollarSign color="white" size={16} />
+          </View>
         </View>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.mainContent}>
-        {/* Video Player Section */}
-        {currentVideo && videoId && (
-          <View style={styles.videoSection}>
-            <EnhancedVideoPlayer
-              videoId={currentVideo.id}
-              youtubeUrl={currentVideo.youtube_url}
-              duration={currentVideo.duration_seconds}
-              coinReward={currentVideo.coin_reward}
-              onVideoComplete={handleVideoComplete}
-              onVideoSkip={handleVideoSkip}
-              onError={handleVideoError}
-              onVideoUnplayable={handleVideoUnplayable}
-            />
-          </View>
-        )}
+      {/* Video Player Section */}
+      {currentVideo && (
+        <View style={styles.videoSection}>
+          <SeamlessVideoPlayer
+            videoId={currentVideo.id}
+            youtubeUrl={currentVideo.youtube_url}
+            duration={currentVideo.duration_seconds}
+            coinReward={currentVideo.coin_reward}
+            onVideoComplete={handleVideoComplete}
+            onVideoSkip={handleVideoSkip}
+            onError={handleVideoError}
+            onVideoUnplayable={handleVideoUnplayable}
+          />
+        </View>
+      )}
 
-        {/* Progress Bar */}
-        {currentVideo && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressBar}>
-              <LinearGradient
-                colors={['#4CAF50', '#45A049']}
-                style={[styles.progressFill, { width: `${progressPercentage}%` }]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              />
-            </View>
-            <Text style={styles.progressText}>{progressPercentage}% complete</Text>
-          </View>
-        )}
+      {/* Video Title */}
+      {currentVideo && (
+        <View style={styles.titleSection}>
+          <Text style={styles.videoTitle} numberOfLines={2}>
+            {currentVideo.title}
+          </Text>
+        </View>
+      )}
 
-        {/* Control Buttons */}
-        {currentVideo && (
-          <View style={styles.controlsSection}>
-            <TouchableOpacity 
-              style={styles.playPauseButton}
-              onPress={() => {
-                // This would be handled by the EnhancedVideoPlayer
-                setIsPlaying(!isPlaying);
-              }}
+      {/* Bottom Section */}
+      <View style={styles.bottomSection}>
+        {/* Open on YouTube & Auto Play */}
+        <View style={styles.controlsRow}>
+          <TouchableOpacity 
+            style={styles.youtubeButton}
+            onPress={openInYouTube}
+          >
+            <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.autoPlayContainer}>
+            <Text style={styles.autoPlayLabel}>Auto Play</Text>
+            <TouchableOpacity
+              style={[styles.toggleSwitch, autoPlay && styles.toggleSwitchActive]}
+              onPress={() => setAutoPlay(!autoPlay)}
             >
-              {isPlaying ? (
-                <Pause color="white" size={20} />
-              ) : (
-                <Play color="white" size={20} />
-              )}
+              <View style={[styles.toggleThumb, autoPlay && styles.toggleThumbActive]} />
             </TouchableOpacity>
-            
-            {screenWidth >= 350 && (
-              <TouchableOpacity 
-                style={styles.skipButton}
-                onPress={handleVideoSkip}
-              >
-                <SkipForward color="#4CAF50" size={16} />
-                <Text style={styles.skipButtonText}>Skip</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-
-        {/* Video Info */}
-        {currentVideo && (
-          <View style={styles.videoInfo}>
-            <Text style={styles.videoTitle} numberOfLines={2}>
-              {currentVideo.title}
-            </Text>
-            
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{formatTime(currentVideo.duration_seconds)}</Text>
-                <Text style={styles.statLabel}>Duration</Text>
-              </View>
-              
-              <View style={styles.statDivider} />
-              
-              <View style={styles.statItem}>
-                <Animated.View style={coinAnimatedStyle}>
-                  <Text style={styles.statValue}>{currentVideo.coin_reward}</Text>
-                </Animated.View>
-                <Text style={styles.statLabel}>Coins</Text>
-              </View>
-              
-              <View style={styles.statDivider} />
-              
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{queueState}</Text>
-                <Text style={styles.statLabel}>Queue</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Status Display */}
-        <View style={styles.statusSection}>
-          <View style={styles.statusIndicator}>
-            {systemStatus === 'healthy' && <CheckCircle color="#4CAF50" size={16} />}
-            {systemStatus === 'warning' && <AlertTriangle color="#FFA726" size={16} />}
-            {systemStatus === 'error' && <AlertTriangle color="#E74C3C" size={16} />}
-            <Text style={[styles.statusText, { 
-              color: systemStatus === 'healthy' ? '#4CAF50' : 
-                     systemStatus === 'warning' ? '#FFA726' : '#E74C3C' 
-            }]}>
-              {statusMessage}
-            </Text>
           </View>
         </View>
+
+        {/* Stats Row */}
+        {currentVideo && (
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{Math.floor(currentVideo.duration_seconds / 60)}</Text>
+              <Text style={styles.statLabel}>Seconds to get coins</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{currentVideo.coin_reward}</Text>
+              <Text style={styles.statLabel}>Coins will be added</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Skip Button */}
+        <TouchableOpacity style={styles.skipButton} onPress={handleVideoSkip}>
+          <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -557,175 +463,165 @@ export default function ViewTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#F5F5F5',
   },
-  navbar: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2C2C2C',
+    backgroundColor: '#FF4757',
     paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingBottom: 16,
     paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
   },
-  logo: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
   },
   coinDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
   },
-  coinText: {
-    color: '#FFD700',
+  coinCount: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginRight: 4,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
-  mainContent: {
-    flex: 1,
-    paddingHorizontal: 16,
+  coinIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FF4757',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   videoSection: {
-    marginTop: 20,
-    borderRadius: 12,
+    backgroundColor: 'white',
+    marginHorizontal: 0,
+    marginTop: 0,
+    borderRadius: 0,
     overflow: 'hidden',
-    height: isSmallScreen ? screenHeight * 0.7 * 0.7 : screenHeight * 0.8 * 0.7,
-    maxHeight: 400,
-    backgroundColor: '#000',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 12,
+    height: isSmallScreen ? screenHeight * 0.4 : screenHeight * 0.45,
   },
-  progressSection: {
-    marginTop: 16,
-    alignItems: 'center',
+  titleSection: {
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  progressBar: {
-    width: '100%',
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 3,
-    overflow: 'hidden',
+  videoTitle: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    lineHeight: 24,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
+  bottomSection: {
+    flex: 1,
+    backgroundColor: 'white',
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
-  progressText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  controlsSection: {
+  controlsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 20,
-    gap: 20,
+    marginBottom: 30,
   },
-  playPauseButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  skipButton: {
+  youtubeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
+    backgroundColor: '#F5F5F5',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    gap: 6,
   },
-  skipButtonText: {
-    color: '#4CAF50',
+  youtubeButtonText: {
     fontSize: 14,
-    fontWeight: '600',
+    color: '#666',
+    fontWeight: '500',
   },
-  videoInfo: {
-    marginTop: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
+  autoPlayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  videoTitle: {
-    color: '#FFFFFF',
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 24,
+  autoPlayLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E0E0E0',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleSwitchActive: {
+    backgroundColor: '#FF4757',
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'white',
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  toggleThumbActive: {
+    alignSelf: 'flex-end',
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
+    marginBottom: 40,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
-  statValue: {
-    color: '#FFFFFF',
-    fontSize: isSmallScreen ? 18 : 20,
+  statNumber: {
+    fontSize: isSmallScreen ? 36 : 42,
     fontWeight: 'bold',
-    marginBottom: 4,
+    color: '#333',
+    marginBottom: 8,
   },
   statLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#666',
     textAlign: 'center',
+    lineHeight: 20,
   },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 8,
-  },
-  statusSection: {
-    marginTop: 16,
+  skipButton: {
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderRadius: 25,
+    paddingVertical: 16,
     alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
+  skipButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    letterSpacing: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -734,17 +630,11 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    color: '#FFFFFF',
     fontSize: 16,
+    color: '#666',
     textAlign: 'center',
     marginTop: 12,
     fontWeight: '500',
-  },
-  loadingSubtext: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
   },
   errorContainer: {
     flex: 1,
@@ -753,8 +643,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: '#FFFFFF',
     fontSize: 16,
+    color: '#666',
     textAlign: 'center',
     marginBottom: 20,
     marginTop: 12,
@@ -763,12 +653,12 @@ const styles = StyleSheet.create({
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF4757',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
     gap: 8,
-    shadowColor: '#4CAF50',
+    shadowColor: '#FF4757',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
