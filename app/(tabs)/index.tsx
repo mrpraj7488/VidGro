@@ -10,11 +10,10 @@ import {
   AppStateStatus,
   ToastAndroid,
   ScrollView,
-  Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, SkipForward, Clock, Coins, ExternalLink, Menu, Youtube } from 'lucide-react-native';
+import { Play, Pause, SkipForward, Clock, Coins, ExternalLink, Menu } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
@@ -56,7 +55,7 @@ export default function ViewTab() {
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [appState, setAppState] = useState(AppState.currentState);
-  const [autoSkip, setAutoSkip] = useState(true); // Renamed from autoPlay to autoSkip
+  const [autoPlay, setAutoPlay] = useState(true);
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
@@ -66,7 +65,6 @@ export default function ViewTab() {
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [coinUpdateInProgress, setCoinUpdateInProgress] = useState(false);
   const [coinsAwarded, setCoinsAwarded] = useState(false);
-  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -218,7 +216,7 @@ export default function ViewTab() {
         var currentTime = 0;
         var hasEarnedCoins = false;
         var hasStarted = false;
-        var autoSkipEnabled = ${autoSkip};
+        var autoSkipEnabled = ${autoPlay};
         var isTabVisible = true;
         var wasPlayingBeforeHidden = false;
         var loadingTimeoutId;
@@ -355,8 +353,8 @@ export default function ViewTab() {
           
           startProgressTracking();
           
-          // Always auto-start playback (independent of autoSkip setting)
-          if (isTabVisible) {
+          // Auto-start playback if enabled
+          if (autoPlayEnabled && isTabVisible) {
             setTimeout(function() {
               if (player && player.playVideo && isPlayerReady && !hasError) {
                 try {
@@ -401,13 +399,6 @@ export default function ViewTab() {
                 type: 'VIDEO_STARTED'
               }));
             }
-            
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'STATE_CHANGE',
-              state: state,
-              stateName: stateNames[state],
-              isPlaying: true
-            }));
           }
           
           // Handle video end with popup suppression
@@ -432,16 +423,6 @@ export default function ViewTab() {
               shouldAwardCoins: currentTime >= targetDuration,
               currentTime: currentTime,
               autoSkip: autoSkipEnabled
-            }));
-          }
-          
-          // Handle pause state
-          if (state === 2) { // PAUSED
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'STATE_CHANGE',
-              state: state,
-              stateName: stateNames[state],
-              isPlaying: false
             }));
           }
         }
@@ -658,13 +639,6 @@ export default function ViewTab() {
   useEffect(() => {
     if (currentVideo) {
       addDebugLog(`Video changed to: ${currentVideo.youtube_url}`);
-      
-      // Update current video URL for the YouTube link
-      const videoId = extractVideoId(currentVideo.youtube_url);
-      if (videoId) {
-        setCurrentVideoUrl(`https://www.youtube.com/watch?v=${videoId}`);
-      }
-      
       setCurrentTime(0);
       setIsVideoLoaded(false);
       setPlayerError(null);
@@ -858,9 +832,7 @@ export default function ViewTab() {
           break;
           
         case 'STATE_CHANGE':
-          if (data.isPlaying !== undefined) {
-            setIsPlaying(data.isPlaying);
-          } else if (data.state === 1) { // PLAYING
+          if (data.state === 1) { // PLAYING
             setIsPlaying(true);
           } else if (data.state === 2) { // PAUSED
             setIsPlaying(false);
@@ -903,17 +875,10 @@ export default function ViewTab() {
           if (!videoCompleted) {
             setVideoCompleted(true);
             setIsPlaying(false);
-            
-            // Only auto-skip if autoSkip is enabled
-            if (autoSkip) {
-              completionTimeoutRef.current = setTimeout(() => {
-                handleInstantSkip('Video completed');
-              }, 500);
-            } else {
-              // If auto-skip is disabled, just pause the video
-              pauseVideo();
-              addDebugLog('Video completed but auto-skip disabled - pausing');
-            }
+            // Move to next video instantly without showing completion message
+            completionTimeoutRef.current = setTimeout(() => {
+              handleInstantSkip('Video completed');
+            }, 500); // Brief delay for smooth transition
           }
           break;
           
@@ -983,26 +948,17 @@ export default function ViewTab() {
     handleInstantSkip('Manual skip');
   };
 
-  const toggleAutoSkip = () => {
-    const newAutoSkip = !autoSkip;
-    setAutoSkip(newAutoSkip);
-    addDebugLog(`Auto-skip toggled: ${newAutoSkip}`);
+  const toggleAutoPlay = () => {
+    const newAutoPlay = !autoPlay;
+    setAutoPlay(newAutoPlay);
+    addDebugLog(`Auto-play toggled: ${newAutoPlay}`);
     
     // Update auto-skip setting in WebView
     if (webviewRef.current) {
-      webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoSkip}); true;`);
+      webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoPlay}); true;`);
     }
   };
 
-  const openInYouTube = () => {
-    if (currentVideoUrl) {
-      if (Platform.OS === 'web') {
-        window.open(currentVideoUrl, '_blank');
-      } else {
-        Linking.openURL(currentVideoUrl);
-      }
-    }
-  };
   // Animation styles
   const progressAnimatedStyle = useAnimatedStyle(() => ({
     width: `${progressValue.value * 100}%`,
@@ -1088,7 +1044,6 @@ export default function ViewTab() {
             {/* WebView Player - Only render when not skipping */}
             {youtubeVideoId && !isSkipping && (
               <WebView
-                key={`video-${youtubeVideoId}-${Date.now()}`} // Force re-render for new videos
                 ref={webviewRef}
                 source={{ html: createHtmlContent(youtubeVideoId) }}
                 style={[styles.webview, !isVideoLoaded && styles.hidden]}
@@ -1155,29 +1110,23 @@ export default function ViewTab() {
         <View style={styles.controlsSection}>
           {/* Top Controls */}
           <View style={styles.topControls}>
-            <TouchableOpacity 
-              style={styles.youtubeContainer}
-              onPress={openInYouTube}
-              disabled={!currentVideoUrl}
-            >
-              <Youtube color="#FF0000" size={16} />
-              <Text style={[styles.youtubeLabel, !currentVideoUrl && styles.disabledText]}>
-                Watch On YouTube
-              </Text>
-            </TouchableOpacity>
-            <View style={styles.autoSkipContainer}>
-              <Text style={styles.autoSkipLabel}>Auto Skip</Text>
+            <View style={styles.autoPlayContainer}>
+              <ExternalLink color="#666" size={16} />
+              <Text style={styles.autoPlayLabel}>YouTube</Text>
+            </View>
+            <View style={styles.autoPlayContainer}>
+              <Text style={styles.autoPlayLabel}>Auto Play</Text>
               <TouchableOpacity 
-                style={[styles.autoSkipToggle, autoSkip && styles.autoSkipToggleActive]}
-                onPress={toggleAutoSkip}
+                style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
+                onPress={toggleAutoPlay}
               >
                 <View 
                   style={[
-                    styles.autoSkipThumb, 
-                    autoSkip && styles.autoSkipThumbActive,
+                    styles.autoPlayThumb, 
+                    autoPlay && styles.autoPlayThumbActive,
                     {
                       transform: [{
-                        translateX: autoSkip ? 16 : 0
+                        translateX: autoPlay ? 16 : 0
                       }]
                     }
                   ]} 
@@ -1212,21 +1161,6 @@ export default function ViewTab() {
               <Text style={styles.securityWarningText}>
                 🔒 Stay on this tab to watch videos
               </Text>
-            </View>
-          )}
-          
-          {/* Auto-skip Status */}
-          {videoCompleted && !autoSkip && (
-            <View style={styles.completionBanner}>
-              <Text style={styles.completionText}>
-                ✅ Video completed! Auto-skip is disabled.
-              </Text>
-              <TouchableOpacity 
-                style={styles.manualSkipButton}
-                onPress={handleSkipVideo}
-              >
-                <Text style={styles.manualSkipText}>Next Video</Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -1476,34 +1410,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: isSmallScreen ? 16 : 20,
   },
-  youtubeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: isSmallScreen ? 6 : 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    backgroundColor: '#F8F9FA',
-  },
-  youtubeLabel: {
-    fontSize: isSmallScreen ? 12 : 14,
-    color: '#FF0000',
-    fontWeight: '500',
-  },
-  disabledText: {
-    color: '#999',
-  },
-  autoSkipContainer: {
+  autoPlayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: isSmallScreen ? 6 : 8,
   },
-  autoSkipLabel: {
+  autoPlayLabel: {
     fontSize: isSmallScreen ? 12 : 14,
     color: '#333',
     fontWeight: '500',
   },
-  autoSkipToggle: {
+  autoPlayToggle: {
     width: isSmallScreen ? 36 : 40,
     height: isSmallScreen ? 20 : 24,
     borderRadius: isSmallScreen ? 10 : 12,
@@ -1512,10 +1429,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     position: 'relative',
   },
-  autoSkipToggleActive: {
+  autoPlayToggleActive: {
     backgroundColor: '#FF4757',
   },
-  autoSkipThumb: {
+  autoPlayThumb: {
     width: isSmallScreen ? 16 : 20,
     height: isSmallScreen ? 16 : 20,
     borderRadius: isSmallScreen ? 8 : 10,
@@ -1537,7 +1454,7 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  autoSkipThumbActive: {
+  autoPlayThumbActive: {
     // Animation handled by transform
   },
   buttonContainer: {
@@ -1612,32 +1529,6 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 11 : 12,
     textAlign: 'center',
     fontWeight: '500',
-  },
-  completionBanner: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  completionText: {
-    color: '#2ECC71',
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-  },
-  manualSkipButton: {
-    backgroundColor: '#2ECC71',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  manualSkipText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
   },
   debugSection: {
     backgroundColor: '#F0F8FF',
