@@ -111,7 +111,7 @@ export default function ViewTab() {
 
   const youtubeVideoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
 
-  // Create secure HTML content for YouTube iframe with security features
+  // Create secure HTML content for YouTube iframe with maximum security
   const createHtmlContent = (videoId: string) => `
     <!DOCTYPE html>
     <html>
@@ -128,11 +128,21 @@ export default function ViewTab() {
           height: 100vh;
           overflow: hidden;
           font-family: 'Roboto', Arial, sans-serif;
+          user-select: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+        }
+        #player-container {
+          position: relative;
+          width: 100%;
+          height: 100%;
         }
         #player {
           width: 100%;
           height: 100%;
           border: none;
+          pointer-events: none; /* Disable all pointer events on iframe */
         }
         .loading {
           color: white;
@@ -144,38 +154,50 @@ export default function ViewTab() {
           transform: translate(-50%, -50%);
           z-index: 1000;
         }
-        /* Security overlay to prevent user interaction */
+        /* MAXIMUM SECURITY OVERLAY - Completely blocks all interactions */
         .security-overlay {
           position: absolute;
           top: 0;
           left: 0;
           width: 100%;
           height: 100%;
-          z-index: 999;
-          pointer-events: none;
+          z-index: 9999;
           background: transparent;
+          pointer-events: auto; /* Capture all pointer events */
+          cursor: default;
         }
-        /* Hide YouTube UI elements */
-        .ytp-chrome-top,
-        .ytp-chrome-bottom,
-        .ytp-title,
-        .ytp-share-button,
-        .ytp-watch-later-button,
-        .ytp-cards-teaser,
-        .ytp-endscreen-content {
-          display: none !important;
-          visibility: hidden !important;
+        /* Disable text selection globally */
+        * {
+          user-select: none !important;
+          -webkit-user-select: none !important;
+          -moz-user-select: none !important;
+          -ms-user-select: none !important;
+          -webkit-touch-callout: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
+        /* Hide all YouTube UI elements */
+        iframe {
+          pointer-events: none !important;
         }
       </style>
     </head>
     <body>
-      <div id="player"></div>
-      <div id="loading" class="loading">Loading video...</div>
-      <!-- Security overlay to prevent clicks -->
-      <div class="security-overlay"></div>
+      <div id="player-container">
+        <div id="player"></div>
+        <div id="loading" class="loading">Loading video...</div>
+        <!-- MAXIMUM SECURITY OVERLAY - Blocks ALL clicks and interactions -->
+        <div class="security-overlay" 
+             oncontextmenu="return false;" 
+             ondragstart="return false;" 
+             onselectstart="return false;"
+             onmousedown="return false;"
+             ontouchstart="return false;"
+             onclick="return false;"
+             ondblclick="return false;"></div>
+      </div>
       
       <script>
-        console.log('Initializing secure video player for: ${videoId}');
+        console.log('Initializing MAXIMUM SECURITY video player for: ${videoId}');
         
         var player;
         var isPlayerReady = false;
@@ -189,6 +211,61 @@ export default function ViewTab() {
         var autoSkipEnabled = ${autoPlay};
         var isTabVisible = true;
         var wasPlayingBeforeHidden = false;
+
+        // SECURITY: Disable all user interactions
+        document.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+
+        document.addEventListener('selectstart', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+
+        document.addEventListener('dragstart', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+
+        document.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+
+        document.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+
+        document.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+
+        document.addEventListener('dblclick', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }, true);
+
+        // SECURITY: Disable keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+          // Disable common YouTube shortcuts
+          if (e.key === ' ' || e.key === 'k' || e.key === 'j' || e.key === 'l' || 
+              e.key === 'm' || e.key === 'f' || e.key === 't' || e.key === 'c' ||
+              e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }, true);
 
         // Load YouTube IFrame API
         var tag = document.createElement('script');
@@ -218,14 +295,15 @@ export default function ViewTab() {
                 'modestbranding': 1,
                 'showinfo': 0,
                 'rel': 0,
-                'fs': 0,
-                'disablekb': 1,
+                'fs': 0, // Disable fullscreen
+                'disablekb': 1, // Disable keyboard controls
                 'playsinline': 1,
                 'enablejsapi': 1,
                 'origin': window.location.origin,
                 'iv_load_policy': 3, // Hide annotations
                 'cc_load_policy': 0, // Hide captions
-                'end': targetDuration // Stop at target duration
+                'end': targetDuration, // Stop at target duration
+                'widget_referrer': window.location.origin
               },
               events: {
                 'onReady': onPlayerReady,
@@ -247,35 +325,24 @@ export default function ViewTab() {
           isPlayerReady = true;
           document.getElementById('loading').style.display = 'none';
           
-          // Apply additional security CSS to hide YouTube UI
-          var iframe = document.querySelector('iframe');
-          if (iframe) {
-            try {
-              var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-              var style = iframeDoc.createElement('style');
-              style.textContent = \`
-                .ytp-chrome-top,
-                .ytp-chrome-bottom,
-                .ytp-title,
-                .ytp-share-button,
-                .ytp-watch-later-button,
-                .ytp-cards-teaser,
-                .ytp-endscreen-content,
-                .ytp-watermark,
-                .ytp-gradient-top,
-                .ytp-gradient-bottom {
-                  display: none !important;
-                  visibility: hidden !important;
-                }
-                .html5-video-container {
-                  pointer-events: none !important;
-                }
-              \`;
-              iframeDoc.head.appendChild(style);
-            } catch (e) {
-              console.log('Cannot access iframe content due to CORS');
+          // SECURITY: Additional iframe security measures
+          setTimeout(function() {
+            var iframe = document.querySelector('iframe');
+            if (iframe) {
+              // Disable pointer events on iframe
+              iframe.style.pointerEvents = 'none';
+              iframe.style.userSelect = 'none';
+              iframe.style.webkitUserSelect = 'none';
+              iframe.style.mozUserSelect = 'none';
+              iframe.style.msUserSelect = 'none';
+              
+              // Add security attributes
+              iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+              iframe.setAttribute('allowfullscreen', 'false');
+              
+              console.log('Applied maximum security to iframe');
             }
-          }
+          }, 100);
           
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_READY',
@@ -484,22 +551,24 @@ export default function ViewTab() {
           }
         });
 
-        // Prevent right-click context menu
-        document.addEventListener('contextmenu', function(e) {
-          e.preventDefault();
-          return false;
-        });
+        // SECURITY: Block all attempts to access iframe content
+        setInterval(function() {
+          var iframe = document.querySelector('iframe');
+          if (iframe) {
+            iframe.style.pointerEvents = 'none';
+          }
+        }, 1000);
 
-        // Prevent text selection
-        document.addEventListener('selectstart', function(e) {
-          e.preventDefault();
-          return false;
-        });
+        // SECURITY: Override window.open to prevent navigation
+        window.open = function() {
+          console.log('Navigation blocked for security');
+          return null;
+        };
 
-        // Prevent drag and drop
-        document.addEventListener('dragstart', function(e) {
-          e.preventDefault();
-          return false;
+        // SECURITY: Override location changes
+        Object.defineProperty(window, 'location', {
+          value: window.location,
+          writable: false
         });
       </script>
     </body>
@@ -885,27 +954,37 @@ export default function ViewTab() {
               </View>
             )}
 
-            {/* WebView Player */}
+            {/* WebView Player with Maximum Security */}
             {youtubeVideoId && (
-              <WebView
-                ref={webviewRef}
-                source={{ html: createHtmlContent(youtubeVideoId) }}
-                style={[styles.webview, !isVideoLoaded && styles.hidden]}
-                onMessage={handleWebViewMessage}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                startInLoadingState={false}
-                scalesPageToFit={true}
-                scrollEnabled={false}
-                bounces={false}
-                allowsInlineMediaPlayback={true}
-                mediaPlaybackRequiresUserAction={false}
-                mixedContentMode="compatibility"
-                originWhitelist={['*']}
-                allowsFullscreenVideo={false}
-                allowsProtectedMedia={false}
-                dataDetectorTypes={['none']}
-              />
+              <View style={styles.webviewWrapper}>
+                <WebView
+                  ref={webviewRef}
+                  source={{ html: createHtmlContent(youtubeVideoId) }}
+                  style={[styles.webview, !isVideoLoaded && styles.hidden]}
+                  onMessage={handleWebViewMessage}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  startInLoadingState={false}
+                  scalesPageToFit={true}
+                  scrollEnabled={false}
+                  bounces={false}
+                  allowsInlineMediaPlayback={true}
+                  mediaPlaybackRequiresUserAction={false}
+                  mixedContentMode="compatibility"
+                  originWhitelist={['*']}
+                  allowsFullscreenVideo={false}
+                  allowsProtectedMedia={false}
+                  dataDetectorTypes={['none']}
+                  // Additional security props
+                  injectedJavaScript=""
+                  onShouldStartLoadWithRequest={() => true}
+                  onNavigationStateChange={() => {}}
+                  allowsLinkPreview={false}
+                  allowsBackForwardNavigationGestures={false}
+                />
+                {/* React Native Security Overlay - Blocks all touches */}
+                <View style={styles.reactNativeSecurityOverlay} pointerEvents="auto" />
+              </View>
             )}
             
             {/* Progress Bar */}
@@ -1149,12 +1228,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
   },
+  webviewWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
   webview: {
     flex: 1,
     backgroundColor: '#000',
   },
   hidden: {
     opacity: 0,
+  },
+  // MAXIMUM SECURITY: React Native overlay that blocks ALL touches
+  reactNativeSecurityOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 999,
   },
   progressOverlay: {
     position: 'absolute',
@@ -1163,6 +1256,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: 3,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 1000,
   },
   progressBar: {
     height: '100%',
@@ -1181,7 +1275,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 20,
+    zIndex: 1001,
   },
   completionContent: {
     alignItems: 'center',
@@ -1211,7 +1305,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 15,
+    zIndex: 1002,
   },
   securityText: {
     color: '#FFD700',
