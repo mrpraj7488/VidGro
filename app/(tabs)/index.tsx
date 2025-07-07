@@ -29,9 +29,9 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 480;
-// Adjust video height to match screenshot - taking up most of the screen
-const videoHeight = Math.min(screenHeight * 0.55, screenHeight - 200);
+const isSmallScreen = screenWidth < 375;
+// Adjust video height for better mobile experience
+const videoHeight = isSmallScreen ? 200 : Math.min(screenHeight * 0.35, 280);
 
 interface Video {
   id: string;
@@ -719,7 +719,7 @@ export default function ViewTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header - Removed padding */}
       <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
         <Menu color="white" size={24} />
         <Text style={styles.headerTitle}>Video Promoter</Text>
@@ -730,7 +730,7 @@ export default function ViewTab() {
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Video Player Container - Rounded corners like screenshot */}
+        {/* Video Player Container - Compact and responsive */}
         <View style={styles.videoSection}>
           <View style={styles.videoContainer}>
             {/* Loading State */}
@@ -794,12 +794,12 @@ export default function ViewTab() {
           </View>
         </View>
 
-        {/* Stats Cards - Only Remaining Time and Coins (Progress removed) */}
+        {/* Stats Cards - Compact layout */}
         <View style={styles.statsSection}>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
               <View style={styles.statIconContainer}>
-                <Timer color="#FF4757" size={20} />
+                <Timer color="#FF4757" size={18} />
               </View>
               <Text style={styles.statValue}>{Math.ceil(remainingTime)}</Text>
               <Text style={styles.statLabel}>Remaining</Text>
@@ -807,7 +807,7 @@ export default function ViewTab() {
             
             <View style={styles.statCard}>
               <Animated.View style={[styles.statIconContainer, coinAnimatedStyle]}>
-                <Coins color="#FFA726" size={20} />
+                <Coins color="#FFA726" size={18} />
               </Animated.View>
               <Text style={styles.statValue}>{coinReward}</Text>
               <Text style={styles.statLabel}>Coins</Text>
@@ -815,13 +815,13 @@ export default function ViewTab() {
           </View>
         </View>
 
-        {/* Controls Section */}
+        {/* Controls Section - Compact */}
         <View style={styles.controlsSection}>
           {/* Auto-play and Open YouTube */}
           <View style={styles.topControls}>
             <TouchableOpacity style={styles.youtubeButton} onPress={openOnYoutube}>
-              <ExternalLink color="#666" size={16} />
-              <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
+              <ExternalLink color="#666" size={14} />
+              <Text style={styles.youtubeButtonText}>YouTube</Text>
             </TouchableOpacity>
             
             <View style={styles.autoPlayContainer}>
@@ -836,7 +836,7 @@ export default function ViewTab() {
                     autoPlay && styles.autoPlayThumbActive,
                     {
                       transform: [{
-                        translateX: autoPlay ? 20 : 0
+                        translateX: autoPlay ? 16 : 0
                       }]
                     }
                   ]} 
@@ -853,14 +853,14 @@ export default function ViewTab() {
               disabled={!isVideoLoaded || loadingTimeout}
             >
               {isPlaying ? (
-                <Pause color="white" size={24} />
+                <Pause color="white" size={20} />
               ) : (
-                <Play color="white" size={24} />
+                <Play color="white" size={20} />
               )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
-              <SkipForward color="white" size={20} />
+              <SkipForward color="white" size={16} />
               <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
             </TouchableOpacity>
           </View>
@@ -880,7 +880,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 16,
+    paddingBottom: 12,
     paddingHorizontal: 16,
   },
   headerTitle: {
@@ -892,13 +892,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
   },
   coinCount: {
     color: '#FFD700',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginRight: 4,
   },
@@ -940,22 +940,22 @@ const styles = StyleSheet.create({
   },
   videoSection: {
     backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
+    marginHorizontal: 12,
+    marginTop: 12,
+    borderRadius: 12,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 4,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
@@ -963,7 +963,7 @@ const styles = StyleSheet.create({
     height: videoHeight,
     backgroundColor: '#000',
     position: 'relative',
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   videoLoadingContainer: {
@@ -979,15 +979,15 @@ const styles = StyleSheet.create({
   },
   videoLoadingText: {
     color: 'white',
-    fontSize: 14,
-    marginTop: 16,
+    fontSize: 12,
+    marginTop: 12,
     textAlign: 'center',
   },
   videoIdText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
+    fontSize: 10,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   webview: {
     flex: 1,
@@ -1001,7 +1001,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 4,
+    height: 3,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   progressBar: {
@@ -1026,100 +1026,100 @@ const styles = StyleSheet.create({
   completionContent: {
     alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    marginHorizontal: 32,
+    borderRadius: 12,
+    padding: 20,
+    marginHorizontal: 24,
   },
   completionText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#4CAF50',
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 6,
   },
   completionSubtext: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     textAlign: 'center',
   },
   titleContainer: {
-    padding: 16,
+    padding: 12,
   },
   videoTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    lineHeight: 22,
+    lineHeight: 18,
   },
   statsSection: {
-    marginHorizontal: 16,
-    marginTop: 16,
+    marginHorizontal: 12,
+    marginTop: 12,
   },
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
   },
   statCard: {
     flex: 1,
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
+    padding: 12,
     alignItems: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
+        shadowRadius: 2,
       },
       android: {
         elevation: 2,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
       },
     }),
   },
   statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#666',
     textAlign: 'center',
   },
   controlsSection: {
     backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 32,
-    borderRadius: 16,
-    padding: 20,
+    marginHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 24,
+    borderRadius: 12,
+    padding: 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 4,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
@@ -1127,36 +1127,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   youtubeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    gap: 6,
   },
   youtubeButtonText: {
     color: '#666',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
   autoPlayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   autoPlayLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#333',
     fontWeight: '500',
   },
   autoPlayToggle: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
+    width: 40,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     paddingHorizontal: 2,
@@ -1166,24 +1166,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF4757',
   },
   autoPlayThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: 'white',
     position: 'absolute',
     left: 2,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.2,
-        shadowRadius: 4,
+        shadowRadius: 2,
       },
       android: {
-        elevation: 4,
+        elevation: 2,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
       },
     }),
   },
@@ -1193,27 +1193,27 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#FF4757',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#FF4757',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 4,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
+        boxShadow: '0 2px 4px rgba(255, 71, 87, 0.3)',
       },
     }),
   },
@@ -1226,27 +1226,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6B7280',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
     ...Platform.select({
       ios: {
         shadowColor: '#6B7280',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.2,
-        shadowRadius: 4,
+        shadowRadius: 2,
       },
       android: {
         elevation: 2,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(107, 114, 128, 0.2)',
+        boxShadow: '0 1px 2px rgba(107, 114, 128, 0.2)',
       },
     }),
   },
   skipButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
 });
