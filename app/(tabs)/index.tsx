@@ -30,8 +30,8 @@ import Animated, {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
-// Make video take up most of the screen (about 70% of screen height)
-const videoHeight = Math.min(screenHeight * 0.7, screenHeight - 150);
+// Adjust video height to match screenshot - taking up most of the screen
+const videoHeight = Math.min(screenHeight * 0.55, screenHeight - 200);
 
 interface Video {
   id: string;
@@ -729,111 +729,143 @@ export default function ViewTab() {
         </Animated.View>
       </LinearGradient>
 
-      {/* Video Player Container - Much Larger Size */}
-      <View style={styles.videoSection}>
-        <View style={styles.videoContainer}>
-          {/* Loading State */}
-          {(!isVideoLoaded || loadingTimeout) && (
-            <View style={styles.videoLoadingContainer}>
-              <ActivityIndicator size="large" color="#FF4757" />
-              <Text style={styles.videoLoadingText}>
-                {loadingTimeout ? 'Video stuck, skipping...' : 'Loading video...'}
-              </Text>
-              <Text style={styles.videoIdText}>Video ID: {youtubeVideoId}</Text>
-            </View>
-          )}
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Video Player Container - Rounded corners like screenshot */}
+        <View style={styles.videoSection}>
+          <View style={styles.videoContainer}>
+            {/* Loading State */}
+            {(!isVideoLoaded || loadingTimeout) && (
+              <View style={styles.videoLoadingContainer}>
+                <ActivityIndicator size="large" color="#FF4757" />
+                <Text style={styles.videoLoadingText}>
+                  {loadingTimeout ? 'Video stuck, skipping...' : 'Loading video...'}
+                </Text>
+                <Text style={styles.videoIdText}>Video ID: {youtubeVideoId}</Text>
+              </View>
+            )}
 
-          {/* WebView Player */}
-          {youtubeVideoId && (
-            <WebView
-              ref={webviewRef}
-              source={{ html: createHtmlContent(youtubeVideoId) }}
-              style={[styles.webview, !isVideoLoaded && styles.hidden]}
-              onMessage={handleWebViewMessage}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              startInLoadingState={false}
-              scalesPageToFit={true}
-              scrollEnabled={false}
-              bounces={false}
-              allowsInlineMediaPlayback={true}
-              mediaPlaybackRequiresUserAction={false}
-              mixedContentMode="compatibility"
-              originWhitelist={['*']}
-              allowsFullscreenVideo={false}
-            />
-          )}
-          
-          {/* Progress Bar */}
-          <View style={styles.progressOverlay}>
-            <View style={styles.progressBar}>
-              <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
+            {/* WebView Player */}
+            {youtubeVideoId && (
+              <WebView
+                ref={webviewRef}
+                source={{ html: createHtmlContent(youtubeVideoId) }}
+                style={[styles.webview, !isVideoLoaded && styles.hidden]}
+                onMessage={handleWebViewMessage}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                startInLoadingState={false}
+                scalesPageToFit={true}
+                scrollEnabled={false}
+                bounces={false}
+                allowsInlineMediaPlayback={true}
+                mediaPlaybackRequiresUserAction={false}
+                mixedContentMode="compatibility"
+                originWhitelist={['*']}
+                allowsFullscreenVideo={false}
+              />
+            )}
+            
+            {/* Progress Bar */}
+            <View style={styles.progressOverlay}>
+              <View style={styles.progressBar}>
+                <Animated.View style={[styles.progressFill, progressAnimatedStyle]} />
+              </View>
+            </View>
+
+            {/* Completion Overlay */}
+            {videoCompleted && (
+              <View style={styles.completionOverlay}>
+                <View style={styles.completionContent}>
+                  <Award color="#4CAF50" size={32} />
+                  <Text style={styles.completionText}>Video Completed!</Text>
+                  <Text style={styles.completionSubtext}>
+                    {autoPlay ? 'Moving to next video...' : 'Tap skip to continue'}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Video Title */}
+          <View style={styles.titleContainer}>
+            <Text style={styles.videoTitle} numberOfLines={2} ellipsizeMode="tail">
+              {currentVideo.title}
+            </Text>
+          </View>
+        </View>
+
+        {/* Stats Cards - Only Remaining Time and Coins (Progress removed) */}
+        <View style={styles.statsSection}>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <Timer color="#FF4757" size={20} />
+              </View>
+              <Text style={styles.statValue}>{Math.ceil(remainingTime)}</Text>
+              <Text style={styles.statLabel}>Remaining</Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Animated.View style={[styles.statIconContainer, coinAnimatedStyle]}>
+                <Coins color="#FFA726" size={20} />
+              </Animated.View>
+              <Text style={styles.statValue}>{coinReward}</Text>
+              <Text style={styles.statLabel}>Coins</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Controls Section */}
+        <View style={styles.controlsSection}>
+          {/* Auto-play and Open YouTube */}
+          <View style={styles.topControls}>
+            <TouchableOpacity style={styles.youtubeButton} onPress={openOnYoutube}>
+              <ExternalLink color="#666" size={16} />
+              <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.autoPlayContainer}>
+              <Text style={styles.autoPlayLabel}>Auto Play</Text>
+              <TouchableOpacity 
+                style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
+                onPress={toggleAutoPlay}
+              >
+                <View 
+                  style={[
+                    styles.autoPlayThumb, 
+                    autoPlay && styles.autoPlayThumbActive,
+                    {
+                      transform: [{
+                        translateX: autoPlay ? 20 : 0
+                      }]
+                    }
+                  ]} 
+                />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Completion Overlay */}
-          {videoCompleted && (
-            <View style={styles.completionOverlay}>
-              <View style={styles.completionContent}>
-                <Award color="#4CAF50" size={32} />
-                <Text style={styles.completionText}>Video Completed!</Text>
-                <Text style={styles.completionSubtext}>
-                  {autoPlay ? 'Moving to next video...' : 'Tap skip to continue'}
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* Bottom Section with Stats and Controls */}
-      <View style={styles.bottomSection}>
-        {/* Open on YouTube and Auto Play Toggle */}
-        <View style={styles.topControls}>
-          <TouchableOpacity style={styles.youtubeButton} onPress={openOnYoutube}>
-            <ExternalLink color="#666" size={16} />
-            <Text style={styles.youtubeButtonText}>Open on YouTube</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.autoPlayContainer}>
-            <Text style={styles.autoPlayLabel}>Auto Play</Text>
+          {/* Play/Skip Buttons */}
+          <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
-              onPress={toggleAutoPlay}
+              style={[styles.playButton, (!isVideoLoaded || loadingTimeout) && styles.playButtonDisabled]}
+              onPress={handlePlayPause}
+              disabled={!isVideoLoaded || loadingTimeout}
             >
-              <View 
-                style={[
-                  styles.autoPlayThumb, 
-                  autoPlay && styles.autoPlayThumbActive,
-                  {
-                    transform: [{
-                      translateX: autoPlay ? 20 : 0
-                    }]
-                  }
-                ]} 
-              />
+              {isPlaying ? (
+                <Pause color="white" size={24} />
+              ) : (
+                <Play color="white" size={24} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
+              <SkipForward color="white" size={20} />
+              <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Stats - Only Remaining Time and Coins */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{formatTime(remainingTime).split(':')[1]}</Text>
-            <Text style={styles.statLabel}>Seconds to get coins</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{coinReward}</Text>
-            <Text style={styles.statLabel}>Coins will be added</Text>
-          </View>
-        </View>
-
-        {/* Skip Button */}
-        <TouchableOpacity style={styles.skipButton} onPress={handleSkipVideo}>
-          <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -850,7 +882,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingBottom: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#2C2C2C', // Dark navbar
   },
   headerTitle: {
     fontSize: 18,
@@ -866,10 +897,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   coinCount: {
-    color: '#FFD700', // Gold color for coins
+    color: '#FFD700',
     fontSize: 16,
     fontWeight: '600',
     marginRight: 4,
+  },
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -905,14 +939,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   videoSection: {
-    flex: 1,
-    backgroundColor: '#000',
-    margin: 0,
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
   videoContainer: {
-    height: videoHeight, // Much larger height (70% of screen)
+    height: videoHeight,
     backgroundColor: '#000',
     position: 'relative',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   videoLoadingContainer: {
     position: 'absolute',
@@ -958,7 +1010,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4CAF50', // Green gradient for progress
+    backgroundColor: '#4CAF50',
   },
   completionOverlay: {
     position: 'absolute',
@@ -990,10 +1042,86 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  bottomSection: {
+  titleContainer: {
+    padding: 16,
+  },
+  videoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    lineHeight: 22,
+  },
+  statsSection: {
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
     backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+      },
+    }),
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  controlsSection: {
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 32,
+    borderRadius: 16,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
   topControls: {
     flexDirection: 'row',
@@ -1062,37 +1190,63 @@ const styles = StyleSheet.create({
   autoPlayThumbActive: {
     // Animation handled by transform
   },
-  statsContainer: {
+  buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 24,
-  },
-  statItem: {
     alignItems: 'center',
+    gap: 16,
   },
-  statNumber: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+  playButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FF4757',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FF4757',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
+      },
+    }),
   },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    maxWidth: 120,
+  playButtonDisabled: {
+    opacity: 0.5,
   },
   skipButton: {
-    backgroundColor: '#E5E7EB',
-    borderRadius: 25,
-    paddingVertical: 16,
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#6B7280',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6B7280',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(107, 114, 128, 0.2)',
+      },
+    }),
   },
   skipButtonText: {
-    color: '#666',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 1,
   },
 });
