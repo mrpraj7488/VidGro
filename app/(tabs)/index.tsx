@@ -864,18 +864,12 @@ export default function ViewTab() {
           break;
           
         case 'VIDEO_COMPLETED':
-          addDebugLog(`Video completion received: ${data.reason}, shouldAwardCoins: ${data.shouldAwardCoins}, currentTime: ${data.currentTime}`);
+          addDebugLog(`Video completion received: ${data.reason}, currentTime: ${data.currentTime}, targetDuration: ${targetDuration}`);
           
-          // Award coins for natural completion if target duration reached
-          if (data.reason === 'natural_end' && data.currentTime >= targetDuration && !coinsAwarded && !coinsEarned) {
-            addDebugLog(`Video watched for ${data.currentTime}s, awarding ${coinReward} coins`);
+          // Award coins if video was watched for sufficient time and not already earned
+          if (!coinsEarned && !coinsAwarded && data.currentTime >= (targetDuration * 0.9)) {
+            addDebugLog(`Video watched for ${data.currentTime}s of ${targetDuration}s, awarding ${coinReward} coins`);
             await awardCoins(coinReward);
-          }
-          
-          // Only award coins if explicitly indicated and not already earned
-          if (data.shouldAwardCoins && !coinsEarned) {
-            addDebugLog('Video completed with coin eligibility');
-            awardCoins(coinReward);
           }
           
           if (!videoCompleted) {
