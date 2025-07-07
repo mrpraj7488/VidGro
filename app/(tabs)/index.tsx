@@ -20,6 +20,7 @@ import { Play, Pause, SkipForward, Award, Clock, DollarSign, Menu, ExternalLink,
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -64,6 +65,7 @@ export default function ViewTab() {
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [isTabFocused, setIsTabFocused] = useState(true);
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -109,7 +111,7 @@ export default function ViewTab() {
 
   const youtubeVideoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
 
-  // Create enhanced HTML content for YouTube iframe with improved completion detection
+  // Create secure HTML content for YouTube iframe with security features
   const createHtmlContent = (videoId: string) => `
     <!DOCTYPE html>
     <html>
@@ -142,14 +144,38 @@ export default function ViewTab() {
           transform: translate(-50%, -50%);
           z-index: 1000;
         }
+        /* Security overlay to prevent user interaction */
+        .security-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 999;
+          pointer-events: none;
+          background: transparent;
+        }
+        /* Hide YouTube UI elements */
+        .ytp-chrome-top,
+        .ytp-chrome-bottom,
+        .ytp-title,
+        .ytp-share-button,
+        .ytp-watch-later-button,
+        .ytp-cards-teaser,
+        .ytp-endscreen-content {
+          display: none !important;
+          visibility: hidden !important;
+        }
       </style>
     </head>
     <body>
       <div id="player"></div>
       <div id="loading" class="loading">Loading video...</div>
+      <!-- Security overlay to prevent clicks -->
+      <div class="security-overlay"></div>
       
       <script>
-        console.log('Initializing enhanced video player for: ${videoId}');
+        console.log('Initializing secure video player for: ${videoId}');
         
         var player;
         var isPlayerReady = false;
@@ -161,6 +187,8 @@ export default function ViewTab() {
         var hasEarnedCoins = false;
         var hasStarted = false;
         var autoSkipEnabled = ${autoPlay};
+        var isTabVisible = true;
+        var wasPlayingBeforeHidden = false;
 
         // Load YouTube IFrame API
         var tag = document.createElement('script');
@@ -185,16 +213,19 @@ export default function ViewTab() {
               width: '100%',
               videoId: '${videoId}',
               playerVars: {
-                'autoplay': autoPlayEnabled ? 1 : 0,
-                'controls': 1,
+                'autoplay': 0, // Always start paused for security
+                'controls': 0, // Hide all controls
                 'modestbranding': 1,
                 'showinfo': 0,
                 'rel': 0,
                 'fs': 0,
-                'disablekb': 0,
+                'disablekb': 1,
                 'playsinline': 1,
                 'enablejsapi': 1,
-                'origin': window.location.origin
+                'origin': window.location.origin,
+                'iv_load_policy': 3, // Hide annotations
+                'cc_load_policy': 0, // Hide captions
+                'end': targetDuration // Stop at target duration
               },
               events: {
                 'onReady': onPlayerReady,
@@ -216,6 +247,36 @@ export default function ViewTab() {
           isPlayerReady = true;
           document.getElementById('loading').style.display = 'none';
           
+          // Apply additional security CSS to hide YouTube UI
+          var iframe = document.querySelector('iframe');
+          if (iframe) {
+            try {
+              var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+              var style = iframeDoc.createElement('style');
+              style.textContent = \`
+                .ytp-chrome-top,
+                .ytp-chrome-bottom,
+                .ytp-title,
+                .ytp-share-button,
+                .ytp-watch-later-button,
+                .ytp-cards-teaser,
+                .ytp-endscreen-content,
+                .ytp-watermark,
+                .ytp-gradient-top,
+                .ytp-gradient-bottom {
+                  display: none !important;
+                  visibility: hidden !important;
+                }
+                .html5-video-container {
+                  pointer-events: none !important;
+                }
+              \`;
+              iframeDoc.head.appendChild(style);
+            } catch (e) {
+              console.log('Cannot access iframe content due to CORS');
+            }
+          }
+          
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'PLAYER_READY',
             videoId: '${videoId}'
@@ -224,8 +285,8 @@ export default function ViewTab() {
           // Start progress tracking immediately
           startProgressTracking();
           
-          // Auto-start playback if enabled
-          if (autoPlayEnabled) {
+          // Auto-start playback if tab is visible and enabled
+          if (autoPlayEnabled && isTabVisible) {
             setTimeout(function() {
               if (player && player.playVideo && isPlayerReady) {
                 try {
@@ -268,7 +329,7 @@ export default function ViewTab() {
             }
           }
           
-          // Handle video end - but only trigger completion if we haven't already
+          // Handle video end
           if (state === 0 && !hasCompleted) { // ENDED
             hasCompleted = true;
             console.log('Video ended naturally - triggering completion');
@@ -347,7 +408,7 @@ export default function ViewTab() {
                           autoSkip: true
                         }));
                       }
-                    }, 1000); // Wait 1 second after earning coins
+                    }, 1000);
                   } else {
                     // If auto-skip is disabled, just pause the video
                     if (player && player.pauseVideo) {
@@ -364,7 +425,7 @@ export default function ViewTab() {
 
         // Control functions
         window.playVideo = function() {
-          if (player && player.playVideo && isPlayerReady) {
+          if (player && player.playVideo && isPlayerReady && isTabVisible) {
             player.playVideo();
           }
         };
@@ -381,6 +442,29 @@ export default function ViewTab() {
           }
         };
 
+        // Tab visibility control
+        window.setTabVisibility = function(visible) {
+          isTabVisible = visible;
+          console.log('Tab visibility changed:', visible);
+          
+          if (!visible) {
+            // Tab hidden - pause video
+            if (player && player.getPlayerState && player.getPlayerState() === 1) {
+              wasPlayingBeforeHidden = true;
+              window.pauseVideo();
+            } else {
+              wasPlayingBeforeHidden = false;
+            }
+          } else {
+            // Tab visible - resume if was playing
+            if (wasPlayingBeforeHidden && autoPlayEnabled) {
+              setTimeout(function() {
+                window.playVideo();
+              }, 500);
+            }
+          }
+        };
+
         // Update auto-skip setting
         window.updateAutoSkip = function(enabled) {
           autoSkipEnabled = enabled;
@@ -392,12 +476,58 @@ export default function ViewTab() {
           if (document.hidden) {
             console.log('Page hidden, pausing video');
             window.pauseVideo();
+          } else if (isTabVisible && autoPlayEnabled) {
+            console.log('Page visible, resuming video');
+            setTimeout(function() {
+              window.playVideo();
+            }, 500);
           }
+        });
+
+        // Prevent right-click context menu
+        document.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          return false;
+        });
+
+        // Prevent text selection
+        document.addEventListener('selectstart', function(e) {
+          e.preventDefault();
+          return false;
+        });
+
+        // Prevent drag and drop
+        document.addEventListener('dragstart', function(e) {
+          e.preventDefault();
+          return false;
         });
       </script>
     </body>
     </html>
   `;
+
+  // Handle tab focus changes
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Tab focused');
+      setIsTabFocused(true);
+      
+      // Notify WebView about tab visibility
+      if (webviewRef.current) {
+        webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(true); true;');
+      }
+
+      return () => {
+        console.log('Tab unfocused');
+        setIsTabFocused(false);
+        
+        // Notify WebView about tab visibility
+        if (webviewRef.current) {
+          webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(false); true;');
+        }
+      };
+    }, [])
+  );
 
   // Handle app state changes for background playback prevention
   useEffect(() => {
@@ -407,18 +537,24 @@ export default function ViewTab() {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
         // App resumed
         console.log('App resumed');
+        if (isTabFocused && webviewRef.current) {
+          webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(true); true;');
+        }
       } else if (nextAppState.match(/inactive|background/)) {
         // App backgrounded - pause video immediately
         console.log('App backgrounded, pausing video');
         pauseVideo();
         setIsPlaying(false);
+        if (webviewRef.current) {
+          webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(false); true;');
+        }
       }
       setAppState(nextAppState);
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [appState]);
+  }, [appState, isTabFocused]);
 
   // Fetch videos on component mount
   useEffect(() => {
@@ -590,10 +726,10 @@ export default function ViewTab() {
 
   // Control functions
   const playVideo = useCallback(() => {
-    if (webviewRef.current) {
+    if (webviewRef.current && isTabFocused && appState === 'active') {
       webviewRef.current.injectJavaScript('window.playVideo && window.playVideo(); true;');
     }
-  }, []);
+  }, [isTabFocused, appState]);
 
   const pauseVideo = useCallback(() => {
     if (webviewRef.current) {
@@ -608,6 +744,11 @@ export default function ViewTab() {
   }, []);
 
   const handlePlayPause = () => {
+    if (!isTabFocused || appState !== 'active') {
+      showToast('Please stay on this tab to control video');
+      return;
+    }
+    
     if (isPlaying) {
       pauseVideo();
     } else {
@@ -762,6 +903,8 @@ export default function ViewTab() {
                 mixedContentMode="compatibility"
                 originWhitelist={['*']}
                 allowsFullscreenVideo={false}
+                allowsProtectedMedia={false}
+                dataDetectorTypes={['none']}
               />
             )}
             
@@ -782,6 +925,14 @@ export default function ViewTab() {
                     {autoPlay ? 'Moving to next video...' : 'Tap skip to continue'}
                   </Text>
                 </View>
+              </View>
+            )}
+
+            {/* Security Status Indicator */}
+            {!isTabFocused && (
+              <View style={styles.securityOverlay}>
+                <Text style={styles.securityText}>🔒 Video paused for security</Text>
+                <Text style={styles.securitySubtext}>Return to this tab to continue</Text>
               </View>
             )}
           </View>
@@ -848,9 +999,9 @@ export default function ViewTab() {
           {/* Play/Skip Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={[styles.playButton, (!isVideoLoaded || loadingTimeout) && styles.playButtonDisabled]}
+              style={[styles.playButton, (!isVideoLoaded || loadingTimeout || !isTabFocused) && styles.playButtonDisabled]}
               onPress={handlePlayPause}
-              disabled={!isVideoLoaded || loadingTimeout}
+              disabled={!isVideoLoaded || loadingTimeout || !isTabFocused}
             >
               {isPlaying ? (
                 <Pause color="white" size={20} />
@@ -864,6 +1015,15 @@ export default function ViewTab() {
               <Text style={styles.skipButtonText}>SKIP VIDEO</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Security Status */}
+          {(!isTabFocused || appState !== 'active') && (
+            <View style={styles.securityWarning}>
+              <Text style={styles.securityWarningText}>
+                🔒 Video controls disabled for security. Stay on this tab to watch videos.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -1040,6 +1200,29 @@ const styles = StyleSheet.create({
   completionSubtext: {
     fontSize: 12,
     color: '#666',
+    textAlign: 'center',
+  },
+  securityOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+  },
+  securityText: {
+    color: '#FFD700',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  securitySubtext: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
     textAlign: 'center',
   },
   titleContainer: {
@@ -1248,5 +1431,19 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '600',
+  },
+  securityWarning: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFEAA7',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  securityWarningText: {
+    color: '#856404',
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
