@@ -29,8 +29,9 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 375;
-const videoHeight = Math.min(screenWidth * 0.56, 220); // 16:9 aspect ratio, max 220px
+const isSmallScreen = screenWidth < 480;
+// Increase video height to 80-90% of screen height for better visibility
+const videoHeight = Math.min(screenHeight * 0.85, screenHeight - 200);
 
 interface Video {
   id: string;
@@ -62,6 +63,7 @@ export default function ViewTab() {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [videoCompleted, setVideoCompleted] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -69,7 +71,7 @@ export default function ViewTab() {
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Animation values - Initialize with proper default values
+  // Animation values
   const progressValue = useSharedValue(0);
   const coinBounce = useSharedValue(1);
   const loadingRotation = useSharedValue(0);
@@ -108,7 +110,7 @@ export default function ViewTab() {
 
   const youtubeVideoId = currentVideo ? extractVideoId(currentVideo.youtube_url) : null;
 
-  // Create enhanced HTML content for YouTube iframe
+  // Create enhanced HTML content for YouTube iframe with improved completion detection
   const createHtmlContent = (videoId: string) => `
     <!DOCTYPE html>
     <html>
@@ -158,6 +160,8 @@ export default function ViewTab() {
         var autoPlayEnabled = ${autoPlay};
         var currentTime = 0;
         var hasEarnedCoins = false;
+        var hasStarted = false;
+        var autoSkipEnabled = ${autoPlay};
 
         // Load YouTube IFrame API
         var tag = document.createElement('script');
@@ -182,7 +186,7 @@ export default function ViewTab() {
               width: '100%',
               videoId: '${videoId}',
               playerVars: {
-                'autoplay': 0,
+                'autoplay': autoPlayEnabled ? 1 : 0,
                 'controls': 1,
                 'modestbranding': 1,
                 'showinfo': 0,
@@ -218,8 +222,22 @@ export default function ViewTab() {
             videoId: '${videoId}'
           }));
           
-          // Start progress tracking
+          // Start progress tracking immediately
           startProgressTracking();
+          
+          // Auto-start playback if enabled
+          if (autoPlayEnabled) {
+            setTimeout(function() {
+              if (player && player.playVideo && isPlayerReady) {
+                try {
+                  console.log('Starting auto-playback');
+                  player.playVideo();
+                } catch (error) {
+                  console.error('Error starting playback:', error);
+                }
+              }
+            }, 1000);
+          }
         }
 
         function onPlayerStateChange(event) {
@@ -241,7 +259,17 @@ export default function ViewTab() {
             stateName: stateNames[state] || 'UNKNOWN'
           }));
           
-          // Handle video end
+          if (state === 1) { // PLAYING
+            if (!hasStarted) {
+              hasStarted = true;
+              console.log('Video playback started');
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'VIDEO_STARTED'
+              }));
+            }
+          }
+          
+          // Handle video end - but only trigger completion if we haven't already
           if (state === 0 && !hasCompleted) { // ENDED
             hasCompleted = true;
             console.log('Video ended naturally - triggering completion');
@@ -249,7 +277,7 @@ export default function ViewTab() {
               type: 'VIDEO_COMPLETED',
               reason: 'natural_end',
               currentTime: currentTime,
-              autoSkip: autoPlayEnabled
+              autoSkip: autoSkipEnabled
             }));
           }
         }
@@ -276,6 +304,8 @@ export default function ViewTab() {
             clearInterval(progressInterval);
           }
           
+          console.log('Starting progress tracking');
+          
           progressInterval = setInterval(function() {
             if (player && player.getCurrentTime && isPlayerReady && !hasCompleted) {
               try {
@@ -289,7 +319,7 @@ export default function ViewTab() {
                   targetDuration: targetDuration
                 }));
                 
-                // Check for coin earning completion
+                // Check for completion based on target duration
                 if (currentTime >= targetDuration && !hasEarnedCoins) {
                   hasEarnedCoins = true;
                   console.log('Target duration reached, awarding coins');
@@ -299,12 +329,18 @@ export default function ViewTab() {
                     coinsEarned: ${coinReward}
                   }));
                   
-                  // Auto-complete after earning coins if auto-play is enabled
-                  if (autoPlayEnabled) {
+                  // Stop the video and trigger completion if auto-skip is enabled
+                  if (autoSkipEnabled) {
                     setTimeout(function() {
                       if (!hasCompleted) {
                         hasCompleted = true;
                         console.log('Auto-completing after earning coins');
+                        
+                        // Stop the video
+                        if (player && player.stopVideo) {
+                          player.stopVideo();
+                        }
+                        
                         window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                           type: 'VIDEO_COMPLETED',
                           reason: 'target_reached',
@@ -312,7 +348,12 @@ export default function ViewTab() {
                           autoSkip: true
                         }));
                       }
-                    }, 2000); // Wait 2 seconds after earning coins
+                    }, 1000); // Wait 1 second after earning coins
+                  } else {
+                    // If auto-skip is disabled, just pause the video
+                    if (player && player.pauseVideo) {
+                      player.pauseVideo();
+                    }
                   }
                 }
               } catch (error) {
@@ -341,6 +382,12 @@ export default function ViewTab() {
           }
         };
 
+        // Update auto-skip setting
+        window.updateAutoSkip = function(enabled) {
+          autoSkipEnabled = enabled;
+          console.log('Auto-skip updated:', enabled);
+        };
+
         // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
           if (document.hidden) {
@@ -359,7 +406,7 @@ export default function ViewTab() {
       console.log('App state changed:', appState, '->', nextAppState);
       
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        // App resumed - can resume playback if it was playing
+        // App resumed
         console.log('App resumed');
       } else if (nextAppState.match(/inactive|background/)) {
         // App backgrounded - pause video immediately
@@ -392,15 +439,8 @@ export default function ViewTab() {
       setVideoCompleted(false);
       setCoinsEarned(false);
       setIsPlaying(false);
+      setHasStarted(false);
       progressValue.value = 0;
-      
-      // Start loading animation
-      loadingRotation.value = withTiming(360, {
-        duration: 1000,
-        easing: Easing.linear,
-      }, () => {
-        loadingRotation.value = 0;
-      });
       
       // Clear all intervals and timeouts
       if (progressIntervalRef.current) {
@@ -426,7 +466,7 @@ export default function ViewTab() {
           showToast('Video stuck, skipping...');
           handleSkipVideo();
         }
-      }, 5000);
+      }, 10000);
     }
   }, [currentVideo]);
 
@@ -445,6 +485,11 @@ export default function ViewTab() {
             clearTimeout(loadingTimeoutRef.current);
             loadingTimeoutRef.current = null;
           }
+          break;
+          
+        case 'VIDEO_STARTED':
+          setHasStarted(true);
+          setIsPlaying(true);
           break;
           
         case 'STATE_CHANGE':
@@ -590,8 +635,15 @@ export default function ViewTab() {
   };
 
   const toggleAutoPlay = () => {
-    setAutoPlay(!autoPlay);
-    showToast(`Auto-play ${!autoPlay ? 'enabled' : 'disabled'}`);
+    const newAutoPlay = !autoPlay;
+    setAutoPlay(newAutoPlay);
+    
+    // Update the WebView's auto-skip setting
+    if (webviewRef.current) {
+      webviewRef.current.injectJavaScript(`window.updateAutoSkip && window.updateAutoSkip(${newAutoPlay}); true;`);
+    }
+    
+    showToast(`Auto-skip ${newAutoPlay ? 'enabled' : 'disabled'}`);
   };
 
   const openOnYoutube = () => {
@@ -613,17 +665,12 @@ export default function ViewTab() {
     transform: [{ scale: coinBounce.value }],
   }));
 
-  const loadingAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${loadingRotation.value}deg` }],
-  }));
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progressPercentage = Math.round((currentTime / targetDuration) * 100);
   const remainingTime = Math.max(0, targetDuration - currentTime);
 
   if (isLoading && videoQueue.length === 0) {
@@ -684,15 +731,13 @@ export default function ViewTab() {
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Video Player Container */}
+        {/* Video Player Container - Increased size */}
         <View style={styles.videoSection}>
           <View style={styles.videoContainer}>
             {/* Loading State */}
             {(!isVideoLoaded || loadingTimeout) && (
               <View style={styles.videoLoadingContainer}>
-                <Animated.View style={[styles.loadingSpinner, loadingAnimatedStyle]}>
-                  <View style={styles.loadingRing} />
-                </Animated.View>
+                <ActivityIndicator size="large" color="#FF4757" />
                 <Text style={styles.videoLoadingText}>
                   {loadingTimeout ? 'Video stuck, skipping...' : 'Loading video...'}
                 </Text>
@@ -742,7 +787,7 @@ export default function ViewTab() {
             )}
           </View>
 
-          {/* Video Title */}
+          {/* Video Title - Bold white with shadow */}
           <View style={styles.titleContainer}>
             <Text style={styles.videoTitle} numberOfLines={2} ellipsizeMode="tail">
               {currentVideo.title}
@@ -750,7 +795,7 @@ export default function ViewTab() {
           </View>
         </View>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Removed Progress, kept only Remaining and Coins */}
         <View style={styles.statsSection}>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
@@ -759,14 +804,6 @@ export default function ViewTab() {
               </View>
               <Text style={styles.statValue}>{formatTime(remainingTime)}</Text>
               <Text style={styles.statLabel}>Remaining</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <View style={styles.statIconContainer}>
-                <Clock color="#4ECDC4" size={20} />
-              </View>
-              <Text style={styles.statValue}>{progressPercentage}%</Text>
-              <Text style={styles.statLabel}>Progress</Text>
             </View>
             
             <View style={styles.statCard}>
@@ -789,7 +826,7 @@ export default function ViewTab() {
             </TouchableOpacity>
             
             <View style={styles.autoPlayContainer}>
-              <Text style={styles.autoPlayLabel}>Auto Play</Text>
+              <Text style={styles.autoPlayLabel}>Auto Skip</Text>
               <TouchableOpacity 
                 style={[styles.autoPlayToggle, autoPlay && styles.autoPlayToggleActive]}
                 onPress={toggleAutoPlay}
@@ -846,6 +883,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 50 : 40,
     paddingBottom: 16,
     paddingHorizontal: 16,
+    backgroundColor: '#2C2C2C', // Dark navbar
   },
   headerTitle: {
     fontSize: 18,
@@ -861,7 +899,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   coinCount: {
-    color: '#FFD700',
+    color: '#FFD700', // Gold color for coins
     fontSize: 16,
     fontWeight: '600',
     marginRight: 4,
@@ -924,7 +962,7 @@ const styles = StyleSheet.create({
     }),
   },
   videoContainer: {
-    height: videoHeight,
+    height: videoHeight, // Increased height (80-90% of screen)
     backgroundColor: '#000',
     position: 'relative',
   },
@@ -939,27 +977,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     zIndex: 10,
   },
-  loadingSpinner: {
-    marginBottom: 16,
-  },
-  loadingRing: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 71, 87, 0.3)',
-    borderTopColor: '#FF4757',
-  },
   videoLoadingText: {
     color: 'white',
     fontSize: 14,
-    marginBottom: 8,
+    marginTop: 16,
     textAlign: 'center',
   },
   videoIdText: {
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 12,
     textAlign: 'center',
+    marginTop: 8,
   },
   webview: {
     flex: 1,
@@ -982,7 +1010,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#4CAF50', // Green gradient for progress
   },
   completionOverlay: {
     position: 'absolute',
@@ -1015,13 +1043,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   titleContainer: {
+    flex: 1,
     padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   videoTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
+    color: '#FFFFFF', // Bold white color
     lineHeight: 22,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'android' ? 'Roboto' : 'System',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)', // Subtle shadow
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    paddingHorizontal: 5,
   },
   statsSection: {
     marginHorizontal: 16,
@@ -1029,7 +1066,7 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around', // Balanced spacing for 2 items
     gap: 12,
   },
   statCard: {
@@ -1168,9 +1205,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 40, // Circular play/pause button (40px)
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#FF4757',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1201,6 +1238,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
+    height: 30, // Rectangular skip button (30px height)
+    minWidth: 80, // Minimum width (80px)
     ...Platform.select({
       ios: {
         shadowColor: '#6B7280',
