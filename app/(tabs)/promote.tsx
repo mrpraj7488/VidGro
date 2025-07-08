@@ -15,19 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { 
-  TrendingUp, 
-  Eye, 
-  Clock, 
-  DollarSign, 
-  Play, 
-  CheckCircle, 
-  AlertCircle,
-  Crown,
-  ChevronDown,
-  Link as LinkIcon,
-  Loader
-} from 'lucide-react-native';
+import { TrendingUp, Eye, Clock, DollarSign, Play, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Crown, ChevronDown, Link as LinkIcon, Loader } from 'lucide-react-native';
 
 interface VideoData {
   title: string;
