@@ -15,19 +15,7 @@ import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { 
-  Link, 
-  Eye, 
-  Clock, 
-  Coins, 
-  Crown, 
-  CheckCircle, 
-  AlertCircle, 
-  ChevronDown,
-  Play,
-  TrendingUp,
-  Sparkles
-} from 'lucide-react-native';
+import { Link, Eye, Clock, Coins, Crown, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, Play, TrendingUp, Sparkles } from 'lucide-react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
