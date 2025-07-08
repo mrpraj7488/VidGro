@@ -14,18 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { 
-  TrendingUp, 
-  Eye, 
-  Clock, 
-  DollarSign, 
-  Crown, 
-  CheckCircle, 
-  AlertCircle,
-  Link,
-  Play,
-  ChevronDown
-} from 'lucide-react-native';
+import { TrendingUp, Eye, Clock, DollarSign, Crown, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Link, Play, ChevronDown } from 'lucide-react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
