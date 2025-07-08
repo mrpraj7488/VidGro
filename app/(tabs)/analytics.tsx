@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,18 +9,42 @@ import {
   Platform,
   Alert,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Video, Coins, ChevronDown, ChevronUp, CreditCard as Edit3, Trash2, RotateCcw, Eye, Clock, TrendingUp, Activity, Menu, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { 
+  Video, 
+  Coins, 
+  ChevronDown, 
+  ChevronUp, 
+  Edit3, 
+  Trash2, 
+  RotateCcw, 
+  Eye, 
+  Clock, 
+  TrendingUp, 
+  Activity, 
+  Menu, 
+  AlertTriangle, 
+  CheckCircle,
+  Play,
+  Pause,
+  Timer,
+  BarChart3,
+  DollarSign
+} from 'lucide-react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
   withTiming,
   withSpring,
-  Easing
+  Easing,
+  withSequence
 } from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
@@ -29,7 +53,7 @@ interface AnalyticsData {
   totalVideosPromoted: number;
   totalCoinsEarned: number;
   recentActivities: any[];
-  promotedVideos: any[];
+  promotedVideos: PromotedVideo[];
 }
 
 interface PromotedVideo {
@@ -43,9 +67,10 @@ interface PromotedVideo {
   status: 'active' | 'paused' | 'completed' | 'on_hold';
   created_at: string;
   updated_at: string;
+  hold_until?: string;
   total_watch_time: number;
   engagement_rate: number;
-  hold_until?: string;
+  video_views?: any[];
 }
 
 interface VideoAnalytics {
@@ -53,10 +78,15 @@ interface VideoAnalytics {
   totalWatchTime: number;
   engagementRate: number;
   averageWatchTime: number;
+  completionRate: number;
+  coinsEarned: number;
+  viewsRemaining: number;
+  estimatedCompletion: string;
 }
 
 export default function AnalyticsTab() {
   const { user, profile, refreshProfile } = useAuth();
+  const { clearQueue } = useVideoStore();
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalVideosPromoted: 0,
     totalCoinsEarned: 0,
@@ -64,69 +94,92 @@ export default function AnalyticsTab() {
     promotedVideos: [],
   });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showMoreVideos, setShowMoreVideos] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<PromotedVideo | null>(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [videoAnalytics, setVideoAnalytics] = useState<VideoAnalytics | null>(null);
+  const [holdTimers, setHoldTimers] = useState<{[key: string]: number}>({});
 
   // Animation values
   const videosHeight = useSharedValue(0);
   const activitiesHeight = useSharedValue(0);
   const coinBounce = useSharedValue(1);
+  const refreshRotation = useSharedValue(0);
 
-  useEffect(() => {
-    if (user) {
-      fetchAnalytics();
-      // Set up real-time updates for video status changes
-      const interval = setInterval(checkVideoHoldStatus, 60000); // Check every minute
-      return () => clearInterval(interval);
-    }
-  }, [user]);
+  // Auto-refresh and real-time updates
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchAnalytics();
+        const interval = setInterval(() => {
+          checkVideoHoldStatus();
+          updateHoldTimers();
+        }, 30000); // Check every 30 seconds
+        
+        return () => clearInterval(interval);
+      }
+    }, [user])
+  );
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (isRefresh = false) => {
     if (!user) return;
 
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+        refreshRotation.value = withTiming(360, { duration: 1000 });
+      } else {
+        setLoading(true);
+      }
 
-      // Fetch promoted videos with analytics
+      // Fetch promoted videos with detailed analytics
       const { data: promotedVideos, error: videosError } = await supabase
         .from('videos')
         .select(`
           *,
-          video_views(watched_duration, completed, created_at)
+          video_views(
+            id,
+            watched_duration,
+            completed,
+            coins_earned,
+            created_at
+          )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (videosError) throw videosError;
 
-      // Calculate analytics for each video
+      // Calculate comprehensive analytics for each video
       const videosWithAnalytics = promotedVideos?.map(video => {
         const views = video.video_views || [];
         const totalWatchTime = views.reduce((sum: number, view: any) => sum + view.watched_duration, 0);
         const completedViews = views.filter((view: any) => view.completed).length;
-        const engagementRate = video.views_count > 0 ? (completedViews / video.views_count) * 100 : 0;
+        const totalViews = views.length;
+        const engagementRate = totalViews > 0 ? (completedViews / totalViews) * 100 : 0;
+        const coinsEarned = views.reduce((sum: number, view: any) => sum + view.coins_earned, 0);
 
         return {
           ...video,
           total_watch_time: totalWatchTime,
           engagement_rate: engagementRate,
+          video_views: views,
         };
       }) || [];
 
-      // Fetch coin transactions for recent activities
+      // Fetch all coin transactions for comprehensive activity tracking
       const { data: transactions, error: transactionsError } = await supabase
         .from('coin_transactions')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (transactionsError) throw transactionsError;
 
-      // Calculate totals
+      // Calculate comprehensive totals
       const totalVideosPromoted = videosWithAnalytics.length;
       const totalCoinsEarned = transactions
         ?.filter(t => t.amount > 0)
@@ -139,10 +192,24 @@ export default function AnalyticsTab() {
         promotedVideos: videosWithAnalytics,
       });
 
+      // Update hold timers for videos on hold
+      const holdVideos = videosWithAnalytics.filter(v => v.status === 'on_hold');
+      const newHoldTimers: {[key: string]: number} = {};
+      holdVideos.forEach(video => {
+        const holdUntil = new Date(video.hold_until || video.created_at);
+        holdUntil.setMinutes(holdUntil.getMinutes() + 10);
+        const remainingMs = holdUntil.getTime() - new Date().getTime();
+        newHoldTimers[video.id] = Math.max(0, Math.floor(remainingMs / 1000));
+      });
+      setHoldTimers(newHoldTimers);
+
     } catch (error) {
       console.error('Error fetching analytics:', error);
+      Alert.alert('Error', 'Failed to load analytics data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      refreshRotation.value = 0;
     }
   };
 
@@ -150,126 +217,181 @@ export default function AnalyticsTab() {
     if (!user) return;
 
     try {
-      const { data: heldVideos, error } = await supabase
-        .from('videos')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'on_hold');
-
+      // Call the database function to release videos from hold
+      const { data, error } = await supabase.rpc('release_videos_from_hold');
+      
       if (error) throw error;
-
-      for (const video of heldVideos || []) {
-        const holdUntil = new Date(video.hold_until || video.created_at);
-        holdUntil.setMinutes(holdUntil.getMinutes() + 10);
-
-        if (new Date() >= holdUntil) {
-          // Release video to queue
-          await supabase
-            .from('videos')
-            .update({ 
-              status: 'active',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', video.id);
-
-          console.log(`Video ${video.youtube_url} released to queue after 10-minute hold`);
-        }
+      
+      if (data > 0) {
+        console.log(`Released ${data} videos from hold to queue`);
+        // Refresh analytics to show updated status
+        fetchAnalytics();
+        // Clear video queue to force refresh with new videos
+        clearQueue();
       }
-
-      // Refresh analytics to show updated status
-      fetchAnalytics();
     } catch (error) {
       console.error('Error checking video hold status:', error);
     }
   };
 
+  const updateHoldTimers = () => {
+    setHoldTimers(prev => {
+      const updated = { ...prev };
+      let hasChanges = false;
+      
+      Object.keys(updated).forEach(videoId => {
+        if (updated[videoId] > 0) {
+          updated[videoId] -= 30; // Decrease by 30 seconds
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? updated : prev;
+    });
+  };
+
   const handleEditVideo = async (video: PromotedVideo) => {
     setSelectedVideo(video);
     
-    // Fetch detailed analytics for this video
-    const { data: views, error } = await supabase
-      .from('video_views')
-      .select('*')
-      .eq('video_id', video.id);
-
-    if (!error && views) {
-      const totalViews = views.length;
-      const totalWatchTime = views.reduce((sum, view) => sum + view.watched_duration, 0);
-      const completedViews = views.filter(view => view.completed).length;
-      const engagementRate = totalViews > 0 ? (completedViews / totalViews) * 100 : 0;
-      const averageWatchTime = totalViews > 0 ? totalWatchTime / totalViews : 0;
-
-      setVideoAnalytics({
-        totalViews,
-        totalWatchTime,
-        engagementRate,
-        averageWatchTime,
-      });
+    // Calculate comprehensive analytics for this video
+    const views = video.video_views || [];
+    const totalViews = views.length;
+    const completedViews = views.filter((view: any) => view.completed).length;
+    const totalWatchTime = views.reduce((sum: number, view: any) => sum + view.watched_duration, 0);
+    const coinsEarned = views.reduce((sum: number, view: any) => sum + view.coins_earned, 0);
+    const engagementRate = totalViews > 0 ? (completedViews / totalViews) * 100 : 0;
+    const completionRate = video.target_views > 0 ? (video.views_count / video.target_views) * 100 : 0;
+    const averageWatchTime = totalViews > 0 ? totalWatchTime / totalViews : 0;
+    const viewsRemaining = Math.max(0, video.target_views - video.views_count);
+    
+    // Estimate completion time based on current rate
+    let estimatedCompletion = 'Unknown';
+    if (video.views_count > 0 && viewsRemaining > 0) {
+      const daysSinceCreated = (new Date().getTime() - new Date(video.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const viewsPerDay = video.views_count / Math.max(daysSinceCreated, 1);
+      const daysToComplete = viewsRemaining / Math.max(viewsPerDay, 1);
+      
+      if (daysToComplete < 1) {
+        estimatedCompletion = `${Math.ceil(daysToComplete * 24)} hours`;
+      } else if (daysToComplete < 7) {
+        estimatedCompletion = `${Math.ceil(daysToComplete)} days`;
+      } else {
+        estimatedCompletion = `${Math.ceil(daysToComplete / 7)} weeks`;
+      }
     }
+
+    setVideoAnalytics({
+      totalViews,
+      totalWatchTime,
+      engagementRate,
+      averageWatchTime,
+      completionRate,
+      coinsEarned,
+      viewsRemaining,
+      estimatedCompletion,
+    });
 
     setShowVideoModal(true);
   };
 
   const handleDeleteVideo = async (video: PromotedVideo) => {
-    const createdAt = new Date(video.created_at);
-    const now = new Date();
-    const minutesSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60);
-    
-    const isWithin10Minutes = minutesSinceCreation <= 10;
-    const refundPercentage = isWithin10Minutes ? 100 : 80;
-    const refundAmount = Math.floor((video.coin_cost * refundPercentage) / 100);
+    try {
+      // Use the enhanced database function for deletion with automatic refund
+      const { data: refundInfo, error: refundError } = await supabase
+        .rpc('calculate_video_refund', { video_uuid: video.id });
 
-    const message = isWithin10Minutes 
-      ? `Delete video and restore 100% coins (₡${refundAmount})?`
-      : `Deleting video after 10 minutes: ${refundPercentage}% coins (₡${refundAmount}) will be restored. Confirm?`;
+      if (refundError) throw refundError;
 
+      const refund = refundInfo[0];
+      const message = refund.is_within_10_minutes 
+        ? `Delete video and restore 100% coins (₡${refund.refund_amount})?`
+        : `Deleting video after 10 minutes: ${refund.refund_percentage}% coins (₡${refund.refund_amount}) will be restored. Confirm?`;
+
+      Alert.alert(
+        'Delete Video',
+        message,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // Use the enhanced deletion function
+                const { data: success, error: deleteError } = await supabase
+                  .rpc('delete_video_with_refund', {
+                    video_uuid: video.id,
+                    user_uuid: user.id
+                  });
+
+                if (deleteError) throw deleteError;
+
+                if (success) {
+                  // Refresh data
+                  await refreshProfile();
+                  await fetchAnalytics();
+                  setShowVideoModal(false);
+
+                  // Clear video queue to remove deleted video
+                  clearQueue();
+
+                  // Animate coin update
+                  coinBounce.value = withSequence(
+                    withSpring(1.3, { damping: 15, stiffness: 150 }),
+                    withSpring(1, { damping: 15, stiffness: 150 })
+                  );
+
+                  Alert.alert('Success', `Video deleted and ₡${refund.refund_amount} coins restored!`);
+                } else {
+                  throw new Error('Failed to delete video');
+                }
+              } catch (error) {
+                console.error('Error deleting video:', error);
+                Alert.alert('Error', 'Failed to delete video. Please try again.');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error calculating refund:', error);
+      Alert.alert('Error', 'Failed to calculate refund. Please try again.');
+    }
+  };
+
+  const handleExtendVideo = async (video: PromotedVideo) => {
     Alert.alert(
-      'Delete Video',
-      message,
+      'Extend Video Promotion',
+      'Reset views and extend promotion for this video? This will clear all existing views and restart the promotion.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: 'Extend',
           onPress: async () => {
             try {
-              // Delete video
-              const { error: deleteError } = await supabase
-                .from('videos')
-                .delete()
-                .eq('id', video.id);
-
-              if (deleteError) throw deleteError;
-
-              // Refund coins
-              const { error: refundError } = await supabase
-                .rpc('update_user_coins', {
-                  user_uuid: user.id,
-                  coin_amount: refundAmount,
-                  transaction_type_param: 'admin_adjustment',
-                  description_param: `Refund for deleted video: ${video.title} (${refundPercentage}%)`,
-                  reference_uuid: video.id
+              // Use the enhanced extension function
+              const { data: success, error } = await supabase
+                .rpc('extend_video_promotion', {
+                  video_uuid: video.id,
+                  user_uuid: user.id
                 });
 
-              if (refundError) throw refundError;
+              if (error) throw error;
 
-              // Refresh data
-              await refreshProfile();
-              await fetchAnalytics();
-              setShowVideoModal(false);
-
-              // Animate coin update
-              coinBounce.value = withSpring(1.2, {
-                damping: 15,
-                stiffness: 150,
-              }, () => {
-                coinBounce.value = withSpring(1);
-              });
-
-              Alert.alert('Success', `Video deleted and ₡${refundAmount} coins restored!`);
+              if (success) {
+                await fetchAnalytics();
+                setShowVideoModal(false);
+                
+                // Clear video queue to refresh with extended video
+                clearQueue();
+                
+                Alert.alert('Success', 'Video promotion extended successfully!');
+              } else {
+                throw new Error('Failed to extend video promotion');
+              }
             } catch (error) {
-              console.error('Error deleting video:', error);
-              Alert.alert('Error', 'Failed to delete video. Please try again.');
+              console.error('Error extending video:', error);
+              Alert.alert('Error', 'Failed to extend video promotion.');
             }
           }
         }
@@ -277,40 +399,40 @@ export default function AnalyticsTab() {
     );
   };
 
-  const handleExtendVideo = async (video: PromotedVideo) => {
+  const handlePauseResumeVideo = async (video: PromotedVideo) => {
+    const newStatus = video.status === 'active' ? 'paused' : 'active';
+    const action = newStatus === 'active' ? 'Resume' : 'Pause';
+    
     Alert.alert(
-      'Extend Video Promotion',
-      'Reset views and extend promotion for this video?',
+      `${action} Video`,
+      `${action} promotion for this video?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Extend',
+          text: action,
           onPress: async () => {
             try {
-              // Reset video stats and set to active
               const { error } = await supabase
                 .from('videos')
-                .update({
-                  views_count: 0,
-                  status: 'active',
+                .update({ 
+                  status: newStatus,
                   updated_at: new Date().toISOString()
                 })
-                .eq('id', video.id);
+                .eq('id', video.id)
+                .eq('user_id', user.id);
 
               if (error) throw error;
 
-              // Clear existing views for this video
-              await supabase
-                .from('video_views')
-                .delete()
-                .eq('video_id', video.id);
-
               await fetchAnalytics();
               setShowVideoModal(false);
-              Alert.alert('Success', 'Video promotion extended successfully!');
+              
+              // Clear video queue to refresh status
+              clearQueue();
+              
+              Alert.alert('Success', `Video ${action.toLowerCase()}d successfully!`);
             } catch (error) {
-              console.error('Error extending video:', error);
-              Alert.alert('Error', 'Failed to extend video promotion.');
+              console.error(`Error ${action.toLowerCase()}ing video:`, error);
+              Alert.alert('Error', `Failed to ${action.toLowerCase()} video.`);
             }
           }
         }
@@ -357,6 +479,12 @@ export default function AnalyticsTab() {
     }
   };
 
+  const formatHoldTimer = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return '#2ECC71';
@@ -377,6 +505,16 @@ export default function AnalyticsTab() {
     }
   };
 
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'video_watch': return <Eye color="#4ECDC4" size={16} />;
+      case 'video_promotion': return <Video color="#FF4757" size={16} />;
+      case 'purchase': return <DollarSign color="#FFA726" size={16} />;
+      case 'admin_adjustment': return <BarChart3 color="#9B59B6" size={16} />;
+      default: return <Activity color="#666" size={16} />;
+    }
+  };
+
   const videosAnimatedStyle = useAnimatedStyle(() => ({
     opacity: videosHeight.value,
     transform: [{ scaleY: videosHeight.value }],
@@ -389,6 +527,10 @@ export default function AnalyticsTab() {
 
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinBounce.value }],
+  }));
+
+  const refreshAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${refreshRotation.value}deg` }],
   }));
 
   const displayedVideos = showMoreVideos ? analytics.promotedVideos : analytics.promotedVideos.slice(0, 4);
@@ -409,7 +551,18 @@ export default function AnalyticsTab() {
         </Animated.View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchAnalytics(true)}
+            tintColor="#F48FB1"
+            colors={['#F48FB1']}
+          />
+        }
+      >
         {/* Primary Metrics */}
         <View style={styles.metricsSection}>
           <View style={styles.metricCard}>
@@ -431,7 +584,15 @@ export default function AnalyticsTab() {
 
         {/* Promoted Videos Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Promoted Videos</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Promoted Videos</Text>
+            <TouchableOpacity onPress={() => fetchAnalytics(true)}>
+              <Animated.View style={refreshAnimatedStyle}>
+                <RotateCcw color="#F48FB1" size={20} />
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+          
           <View style={styles.videosList}>
             {displayedVideos.map((video, index) => (
               <View key={video.id} style={styles.videoItem}>
@@ -446,10 +607,20 @@ export default function AnalyticsTab() {
                     <Text style={styles.videoDate}>
                       {formatDate(video.created_at)}
                     </Text>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(video.status) }]}>
-                      <Text style={styles.statusText}>
-                        {getStatusText(video.status)}
-                      </Text>
+                    <View style={styles.videoStatusContainer}>
+                      {video.status === 'on_hold' && holdTimers[video.id] && (
+                        <View style={styles.holdTimer}>
+                          <Timer color="#E74C3C" size={12} />
+                          <Text style={styles.holdTimerText}>
+                            {formatHoldTimer(holdTimers[video.id])}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(video.status) }]}>
+                        <Text style={styles.statusText}>
+                          {getStatusText(video.status)}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -468,7 +639,7 @@ export default function AnalyticsTab() {
                 onPress={toggleVideosExpansion}
               >
                 <Text style={styles.viewMoreText}>
-                  {showMoreVideos ? 'View Less' : 'View More'}
+                  {showMoreVideos ? 'View Less' : `View More (${analytics.promotedVideos.length - 4})`}
                 </Text>
                 {showMoreVideos ? (
                   <ChevronUp color="#F48FB1" size={20} />
@@ -497,7 +668,7 @@ export default function AnalyticsTab() {
             {displayedActivities.map((activity) => (
               <View key={activity.id} style={styles.activityItem}>
                 <View style={styles.activityIcon}>
-                  <Activity color="#F48FB1" size={16} />
+                  {getActivityIcon(activity.transaction_type)}
                 </View>
                 <View style={styles.activityContent}>
                   <Text style={styles.activityDescription} numberOfLines={2}>
@@ -522,7 +693,7 @@ export default function AnalyticsTab() {
                 onPress={toggleActivitiesExpansion}
               >
                 <Text style={styles.viewMoreText}>
-                  {showMoreActivities ? 'View Less' : 'View More'}
+                  {showMoreActivities ? 'View Less' : `View More (${analytics.recentActivities.length - 3})`}
                 </Text>
                 {showMoreActivities ? (
                   <ChevronUp color="#F48FB1" size={20} />
@@ -545,7 +716,7 @@ export default function AnalyticsTab() {
         </View>
       </ScrollView>
 
-      {/* Video Details Modal */}
+      {/* Enhanced Video Details Modal */}
       <Modal
         visible={showVideoModal}
         animationType="slide"
@@ -563,18 +734,18 @@ export default function AnalyticsTab() {
             </TouchableOpacity>
           </View>
           
-          {selectedVideo && (
+          {selectedVideo && videoAnalytics && (
             <ScrollView style={styles.modalContent}>
               <Text style={styles.videoTitleModal} numberOfLines={3}>
                 {selectedVideo.title}
               </Text>
               
-              {/* Analytics Cards */}
+              {/* Comprehensive Analytics Grid */}
               <View style={styles.analyticsGrid}>
                 <View style={styles.analyticsCard}>
                   <Eye color="#3498DB" size={24} />
                   <Text style={styles.analyticsValue}>
-                    {videoAnalytics?.totalViews || 0}
+                    {videoAnalytics.totalViews}
                   </Text>
                   <Text style={styles.analyticsLabel}>Total Views</Text>
                 </View>
@@ -582,7 +753,7 @@ export default function AnalyticsTab() {
                 <View style={styles.analyticsCard}>
                   <Clock color="#F39C12" size={24} />
                   <Text style={styles.analyticsValue}>
-                    {formatDuration(videoAnalytics?.totalWatchTime || 0)}
+                    {formatDuration(videoAnalytics.totalWatchTime)}
                   </Text>
                   <Text style={styles.analyticsLabel}>Watch Time</Text>
                 </View>
@@ -590,7 +761,7 @@ export default function AnalyticsTab() {
                 <View style={styles.analyticsCard}>
                   <TrendingUp color="#2ECC71" size={24} />
                   <Text style={styles.analyticsValue}>
-                    {(videoAnalytics?.engagementRate || 0).toFixed(1)}%
+                    {videoAnalytics.engagementRate.toFixed(1)}%
                   </Text>
                   <Text style={styles.analyticsLabel}>Engagement</Text>
                 </View>
@@ -598,14 +769,63 @@ export default function AnalyticsTab() {
                 <View style={styles.analyticsCard}>
                   <Activity color="#E74C3C" size={24} />
                   <Text style={styles.analyticsValue}>
-                    {formatDuration(videoAnalytics?.averageWatchTime || 0)}
+                    {formatDuration(videoAnalytics.averageWatchTime)}
                   </Text>
                   <Text style={styles.analyticsLabel}>Avg. Watch</Text>
+                </View>
+                
+                <View style={styles.analyticsCard}>
+                  <BarChart3 color="#9B59B6" size={24} />
+                  <Text style={styles.analyticsValue}>
+                    {videoAnalytics.completionRate.toFixed(1)}%
+                  </Text>
+                  <Text style={styles.analyticsLabel}>Completion</Text>
+                </View>
+                
+                <View style={styles.analyticsCard}>
+                  <Coins color="#FFA726" size={24} />
+                  <Text style={styles.analyticsValue}>
+                    ₡{videoAnalytics.coinsEarned}
+                  </Text>
+                  <Text style={styles.analyticsLabel}>Earned</Text>
+                </View>
+              </View>
+
+              {/* Progress Information */}
+              <View style={styles.progressSection}>
+                <Text style={styles.progressTitle}>Progress Information</Text>
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressLabel}>Views Remaining:</Text>
+                  <Text style={styles.progressValue}>{videoAnalytics.viewsRemaining}</Text>
+                </View>
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressLabel}>Estimated Completion:</Text>
+                  <Text style={styles.progressValue}>{videoAnalytics.estimatedCompletion}</Text>
                 </View>
               </View>
               
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
+                {selectedVideo.status === 'active' && (
+                  <TouchableOpacity 
+                    style={[styles.actionButton, styles.pauseButton]}
+                    onPress={() => handlePauseResumeVideo(selectedVideo)}
+                  >
+                    <Pause color="white" size={20} />
+                    <Text style={styles.actionButtonText}>Pause Promotion</Text>
+                  </TouchableOpacity>
+                )}
+
+                {selectedVideo.status === 'paused' && (
+                  <TouchableOpacity 
+                    style={[styles.actionButton, styles.resumeButton]}
+                    onPress={() => handlePauseResumeVideo(selectedVideo)}
+                  >
+                    <Play color="white" size={20} />
+                    <Text style={styles.actionButtonText}>Resume Promotion</Text>
+                  </TouchableOpacity>
+                )}
+                
                 {selectedVideo.status === 'completed' && (
                   <TouchableOpacity 
                     style={[styles.actionButton, styles.extendButton]}
@@ -625,7 +845,7 @@ export default function AnalyticsTab() {
                 </TouchableOpacity>
               </View>
               
-              {/* Status Info */}
+              {/* Enhanced Status Info */}
               <View style={styles.statusInfo}>
                 <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(selectedVideo.status) }]} />
                 <Text style={styles.statusInfoText}>
@@ -633,11 +853,20 @@ export default function AnalyticsTab() {
                 </Text>
               </View>
               
-              {selectedVideo.status === 'on_hold' && (
+              {selectedVideo.status === 'on_hold' && holdTimers[selectedVideo.id] && (
                 <View style={styles.holdInfo}>
                   <AlertTriangle color="#F39C12" size={20} />
                   <Text style={styles.holdInfoText}>
-                    Video is on hold for 10 minutes before entering the view queue
+                    Video is on hold for {formatHoldTimer(holdTimers[selectedVideo.id])} before entering the view queue
+                  </Text>
+                </View>
+              )}
+
+              {selectedVideo.status === 'completed' && (
+                <View style={styles.completedInfo}>
+                  <CheckCircle color="#2ECC71" size={20} />
+                  <Text style={styles.completedInfoText}>
+                    Video has reached its target views and is no longer in the queue
                   </Text>
                 </View>
               )}
@@ -734,11 +963,16 @@ const styles = StyleSheet.create({
   section: {
     margin: 16,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
   },
   videosList: {
     backgroundColor: 'white',
@@ -788,6 +1022,25 @@ const styles = StyleSheet.create({
   videoDate: {
     fontSize: 11,
     color: '#999',
+  },
+  videoStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  holdTimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 4,
+  },
+  holdTimerText: {
+    fontSize: 10,
+    color: '#E74C3C',
+    fontWeight: '600',
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -954,6 +1207,33 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
+  progressSection: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  progressTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  progressItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  progressValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
   actionButtons: {
     gap: 12,
     marginBottom: 24,
@@ -966,8 +1246,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
-  extendButton: {
+  pauseButton: {
+    backgroundColor: '#F39C12',
+  },
+  resumeButton: {
     backgroundColor: '#2ECC71',
+  },
+  extendButton: {
+    backgroundColor: '#3498DB',
   },
   deleteButton: {
     backgroundColor: '#E74C3C',
@@ -1008,6 +1294,20 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#F57C00',
+    lineHeight: 20,
+  },
+  completedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#E8F5E8',
+    borderRadius: 12,
+    gap: 12,
+  },
+  completedInfoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#2E7D32',
     lineHeight: 20,
   },
 });
