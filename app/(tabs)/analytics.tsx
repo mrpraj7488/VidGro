@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Video, Coins, ChevronDown, ChevronUp, CreditCard as Edit3, Trash2, RotateCcw, Eye, Clock, TrendingUp, Activity, Menu, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Play, Pause, Timer, ChartBar as BarChart3, DollarSign } from 'lucide-react-native';
+import { Video, Coins, ChevronDown, ChevronUp, Edit3, Trash2, RotateCcw, Eye, Clock, TrendingUp, Activity, Menu, AlertTriangle, CheckCircle, Play, Pause, Timer, BarChart3, DollarSign } from 'lucide-react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -50,6 +50,8 @@ interface PromotedVideo {
   hold_until?: string;
   total_watch_time: number;
   engagement_rate: number;
+  completion_rate: number;
+  average_watch_time: number;
   video_views?: any[];
 }
 
@@ -62,6 +64,10 @@ interface VideoAnalytics {
   coinsEarned: number;
   viewsRemaining: number;
   estimatedCompletion: string;
+  minutesSinceCreation: number;
+  canDelete: boolean;
+  refundPercentage: number;
+  refundAmount: number;
 }
 
 export default function AnalyticsTab() {
@@ -140,11 +146,15 @@ export default function AnalyticsTab() {
         const totalViews = views.length;
         const engagementRate = totalViews > 0 ? (completedViews / totalViews) * 100 : 0;
         const coinsEarned = views.reduce((sum: number, view: any) => sum + view.coins_earned, 0);
+        const completionRate = video.target_views > 0 ? (video.views_count / video.target_views) * 100 : 0;
+        const averageWatchTime = totalViews > 0 ? totalWatchTime / totalViews : 0;
 
         return {
           ...video,
           total_watch_time: totalWatchTime,
           engagement_rate: engagementRate,
+          completion_rate: completionRate,
+          average_watch_time: averageWatchTime,
           video_views: views,
         };
       }) || [];
@@ -230,10 +240,7 @@ export default function AnalyticsTab() {
     });
   };
 
-  const handleEditVideo = async (video: PromotedVideo) => {
-    setSelectedVideo(video);
-    
-    // Calculate comprehensive analytics for this video
+  const calculateVideoAnalytics = (video: PromotedVideo): VideoAnalytics => {
     const views = video.video_views || [];
     const totalViews = views.length;
     const completedViews = views.filter((view: any) => view.completed).length;
@@ -244,10 +251,20 @@ export default function AnalyticsTab() {
     const averageWatchTime = totalViews > 0 ? totalWatchTime / totalViews : 0;
     const viewsRemaining = Math.max(0, video.target_views - video.views_count);
     
+    // Calculate time since creation
+    const createdTime = new Date(video.created_at);
+    const now = new Date();
+    const minutesSinceCreation = Math.floor((now.getTime() - createdTime.getTime()) / (1000 * 60));
+    
+    // Calculate refund information
+    const isWithin10Minutes = minutesSinceCreation <= 10;
+    const refundPercentage = isWithin10Minutes ? 100 : 80;
+    const refundAmount = Math.floor((video.coin_cost * refundPercentage) / 100);
+    
     // Estimate completion time based on current rate
     let estimatedCompletion = 'Unknown';
     if (video.views_count > 0 && viewsRemaining > 0) {
-      const daysSinceCreated = (new Date().getTime() - new Date(video.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const daysSinceCreated = (now.getTime() - createdTime.getTime()) / (1000 * 60 * 60 * 24);
       const viewsPerDay = video.views_count / Math.max(daysSinceCreated, 1);
       const daysToComplete = viewsRemaining / Math.max(viewsPerDay, 1);
       
@@ -260,7 +277,7 @@ export default function AnalyticsTab() {
       }
     }
 
-    setVideoAnalytics({
+    return {
       totalViews,
       totalWatchTime,
       engagementRate,
@@ -269,74 +286,76 @@ export default function AnalyticsTab() {
       coinsEarned,
       viewsRemaining,
       estimatedCompletion,
-    });
+      minutesSinceCreation,
+      canDelete: true,
+      refundPercentage,
+      refundAmount,
+    };
+  };
 
+  const handleEditVideo = async (video: PromotedVideo) => {
+    setSelectedVideo(video);
+    const analytics = calculateVideoAnalytics(video);
+    setVideoAnalytics(analytics);
     setShowVideoModal(true);
   };
 
   const handleDeleteVideo = async (video: PromotedVideo) => {
-    try {
-      // Use the enhanced database function for deletion with automatic refund
-      const { data: refundInfo, error: refundError } = await supabase
-        .rpc('calculate_video_refund', { video_uuid: video.id });
+    if (!videoAnalytics) return;
 
-      if (refundError) throw refundError;
+    const { refundPercentage, refundAmount, minutesSinceCreation } = videoAnalytics;
+    const isWithin10Minutes = minutesSinceCreation <= 10;
+    
+    const message = isWithin10Minutes 
+      ? `Delete video and restore 100% coins (₡${refundAmount})?`
+      : `Deleting video after 10 minutes: ${refundPercentage}% coins (₡${refundAmount}) will be restored. Confirm?`;
 
-      const refund = refundInfo[0];
-      const message = refund.is_within_10_minutes 
-        ? `Delete video and restore 100% coins (₡${refund.refund_amount})?`
-        : `Deleting video after 10 minutes: ${refund.refund_percentage}% coins (₡${refund.refund_amount}) will be restored. Confirm?`;
+    Alert.alert(
+      'Delete Video',
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Use the enhanced deletion function
+              const { data: success, error: deleteError } = await supabase
+                .rpc('delete_video_with_refund', {
+                  video_uuid: video.id,
+                  user_uuid: user.id
+                });
 
-      Alert.alert(
-        'Delete Video',
-        message,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                // Use the enhanced deletion function
-                const { data: success, error: deleteError } = await supabase
-                  .rpc('delete_video_with_refund', {
-                    video_uuid: video.id,
-                    user_uuid: user.id
-                  });
+              if (deleteError) throw deleteError;
 
-                if (deleteError) throw deleteError;
+              if (success) {
+                // Refresh data
+                await refreshProfile();
+                await fetchAnalytics();
+                setShowVideoModal(false);
 
-                if (success) {
-                  // Refresh data
-                  await refreshProfile();
-                  await fetchAnalytics();
-                  setShowVideoModal(false);
+                // Clear video queue to remove deleted video
+                clearQueue();
 
-                  // Clear video queue to remove deleted video
-                  clearQueue();
+                // Animate coin update
+                coinBounce.value = withSequence(
+                  withSpring(1.3, { damping: 15, stiffness: 150 }),
+                  withSpring(1, { damping: 15, stiffness: 150 })
+                );
 
-                  // Animate coin update
-                  coinBounce.value = withSequence(
-                    withSpring(1.3, { damping: 15, stiffness: 150 }),
-                    withSpring(1, { damping: 15, stiffness: 150 })
-                  );
-
-                  Alert.alert('Success', `Video deleted and ₡${refund.refund_amount} coins restored!`);
-                } else {
-                  throw new Error('Failed to delete video');
-                }
-              } catch (error) {
-                console.error('Error deleting video:', error);
-                Alert.alert('Error', 'Failed to delete video. Please try again.');
+                Alert.alert('Success', `Video deleted and ₡${refundAmount} coins restored!`);
+              } else {
+                throw new Error('Failed to delete video');
               }
+            } catch (error) {
+              console.error('Error deleting video:', error);
+              Alert.alert('Error', 'Failed to delete video. Please try again.');
             }
           }
-        ]
-      );
-    } catch (error) {
-      console.error('Error calculating refund:', error);
-      Alert.alert('Error', 'Failed to calculate refund. Please try again.');
-    }
+        }
+      ]
+    );
   };
 
   const handleExtendVideo = async (video: PromotedVideo) => {
@@ -480,7 +499,7 @@ export default function AnalyticsTab() {
       case 'active': return 'ACTIVE';
       case 'completed': return 'COMPLETED';
       case 'paused': return 'PAUSED';
-      case 'on_hold': return 'ON HOLD';
+      case 'on_hold': return 'PENDING';
       default: return status.toUpperCase();
     }
   };
@@ -782,6 +801,14 @@ export default function AnalyticsTab() {
                   <Text style={styles.progressLabel}>Estimated Completion:</Text>
                   <Text style={styles.progressValue}>{videoAnalytics.estimatedCompletion}</Text>
                 </View>
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressLabel}>Time Since Creation:</Text>
+                  <Text style={styles.progressValue}>{videoAnalytics.minutesSinceCreation} minutes</Text>
+                </View>
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressLabel}>Deletion Refund:</Text>
+                  <Text style={styles.progressValue}>₡{videoAnalytics.refundAmount} ({videoAnalytics.refundPercentage}%)</Text>
+                </View>
               </View>
               
               {/* Action Buttons */}
@@ -837,7 +864,7 @@ export default function AnalyticsTab() {
                 <View style={styles.holdInfo}>
                   <AlertTriangle color="#F39C12" size={20} />
                   <Text style={styles.holdInfoText}>
-                    Video is on hold for {formatHoldTimer(holdTimers[selectedVideo.id])} before entering the view queue
+                    Video is pending for {formatHoldTimer(holdTimers[selectedVideo.id])} before entering the view queue
                   </Text>
                 </View>
               )}
