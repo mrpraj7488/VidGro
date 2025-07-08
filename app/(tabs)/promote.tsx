@@ -11,14 +11,16 @@ import {
   Platform,
   ToastAndroid,
   Dimensions,
+  Modal,
+  Animated,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Link, Type, Clock, DollarSign, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause } from 'lucide-react-native';
+import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Coins } from 'lucide-react-native';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 
 interface VideoData {
@@ -32,12 +34,157 @@ interface VideoData {
   isLive?: boolean;
 }
 
+interface DropdownOption {
+  label: string;
+  value: number;
+}
+
+const VIEW_OPTIONS: DropdownOption[] = [
+  { label: '35 views', value: 35 },
+  { label: '50 views', value: 50 },
+  { label: '100 views', value: 100 },
+  { label: '200 views', value: 200 },
+  { label: '300 views', value: 300 },
+  { label: '400 views', value: 400 },
+  { label: '500 views', value: 500 },
+  { label: '750 views', value: 750 },
+  { label: '1000 views', value: 1000 },
+];
+
+const DURATION_OPTIONS: DropdownOption[] = [
+  { label: '45 seconds', value: 45 },
+  { label: '60 seconds', value: 60 },
+  { label: '90 seconds', value: 90 },
+  { label: '120 seconds', value: 120 },
+  { label: '150 seconds', value: 150 },
+  { label: '180 seconds', value: 180 },
+  { label: '240 seconds', value: 240 },
+  { label: '300 seconds', value: 300 },
+  { label: '360 seconds', value: 360 },
+  { label: '420 seconds', value: 420 },
+  { label: '480 seconds', value: 480 },
+  { label: '540 seconds', value: 540 },
+];
+
+interface FuturisticDropdownProps {
+  options: DropdownOption[];
+  selectedValue: number | null;
+  onSelect: (value: number) => void;
+  placeholder: string;
+  visible: boolean;
+  onClose: () => void;
+}
+
+const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
+  options,
+  selectedValue,
+  onSelect,
+  placeholder,
+  visible,
+  onClose,
+}) => {
+  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: screenHeight,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleSelect = (value: number) => {
+    onSelect(value);
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
+        <TouchableOpacity style={styles.dropdownBackdrop} onPress={onClose} />
+        <Animated.View 
+          style={[
+            styles.dropdownContainer,
+            { transform: [{ translateY: slideAnim }] }
+          ]}
+        >
+          <LinearGradient
+            colors={['#FF4757', '#FF6B8A', '#FFA726']}
+            style={styles.dropdownHeader}
+          >
+            <Text style={styles.dropdownTitle}>{placeholder}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+          
+          <ScrollView 
+            style={styles.dropdownScrollView}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+          >
+            {options.map((option, index) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.dropdownOption,
+                  selectedValue === option.value && styles.dropdownOptionSelected,
+                  index === options.length - 1 && styles.dropdownOptionLast
+                ]}
+                onPress={() => handleSelect(option.value)}
+              >
+                <Text style={[
+                  styles.dropdownOptionText,
+                  selectedValue === option.value && styles.dropdownOptionTextSelected
+                ]}>
+                  {option.label}
+                </Text>
+                {selectedValue === option.value && (
+                  <CheckCircle color="#FF4757" size={20} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [title, setTitle] = useState('');
-  const [userSetDuration, setUserSetDuration] = useState('');
-  const [targetViews, setTargetViews] = useState('');
+  const [userSetDuration, setUserSetDuration] = useState<number | null>(null);
+  const [targetViews, setTargetViews] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingVideo, setFetchingVideo] = useState(false);
   const [videoData, setVideoData] = useState<VideoData | null>(null);
@@ -49,6 +196,10 @@ export default function PromoteTab() {
   const [testingPlayback, setTestingPlayback] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  // Dropdown states
+  const [showViewsDropdown, setShowViewsDropdown] = useState(false);
+  const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   
   const webviewRef = useRef<WebView>(null);
   const maxRetries = 2;
@@ -591,8 +742,8 @@ export default function PromoteTab() {
   };
 
   const calculateCosts = () => {
-    const durationSeconds = parseInt(userSetDuration) || 0;
-    const views = parseInt(targetViews) || 0;
+    const durationSeconds = userSetDuration || 0;
+    const views = targetViews || 0;
     
     // Enhanced cost calculation: 1 coin per 10 seconds per view
     const costPerView = Math.ceil(durationSeconds / 10);
@@ -610,13 +761,11 @@ export default function PromoteTab() {
   };
 
   const validateDuration = () => {
-    const userDuration = parseInt(userSetDuration);
-    
-    if (isNaN(userDuration) || userDuration < 10) {
+    if (!userSetDuration || userSetDuration < 10) {
       return 'Duration must be at least 10 seconds';
     }
     
-    if (userDuration > 600) {
+    if (userSetDuration > 600) {
       return 'Duration must be less than 600 seconds (10 minutes)';
     }
     
@@ -641,8 +790,7 @@ export default function PromoteTab() {
       return;
     }
 
-    const durationSeconds = parseInt(userSetDuration);
-    const views = parseInt(targetViews);
+    const views = targetViews;
 
     if (isNaN(views) || views < 1 || views > 1000) {
       setError('Target views must be between 1 and 1000');
@@ -655,7 +803,7 @@ export default function PromoteTab() {
     }
 
     if (!profile || profile.coins < totalCost) {
-      setError(`You need ${totalCost} coins to promote this video. You have ${profile?.coins || 0} coins.`);
+      setError(`You need ₡${totalCost} coins to promote this video. You have ₡${profile?.coins || 0} coins.`);
       return;
     }
 
@@ -695,7 +843,7 @@ export default function PromoteTab() {
         userId: user.id,
         totalCost,
         title,
-        duration: durationSeconds,
+        duration: userSetDuration,
         targetViews: views,
         videoId: videoData.id,
         embeddable: videoData.embeddable
@@ -726,8 +874,8 @@ export default function PromoteTab() {
         user_id: user.id,
         youtube_url: videoData.id, // Store only the video ID
         title,
-        description: `Embed URL: ${videoData.embedUrl} | Original URL: ${videoData.originalUrl} | Auto-detected title: ${videoData.autoDetectedTitle || 'N/A'} | User-set duration: ${durationSeconds}s | Video ID: ${videoData.id}`,
-        duration_seconds: durationSeconds,
+        description: `Embed URL: ${videoData.embedUrl} | Original URL: ${videoData.originalUrl} | Auto-detected title: ${videoData.autoDetectedTitle || 'N/A'} | User-set duration: ${userSetDuration}s | Video ID: ${videoData.id}`,
+        duration_seconds: userSetDuration,
         coin_cost: totalCost,
         coin_reward: rewardPerView,
         target_views: views,
@@ -754,7 +902,7 @@ export default function PromoteTab() {
       await refreshProfile();
 
       // Show success toast
-      showToast(`Video promoted successfully! ${totalCost} coins deducted.`);
+      showToast(`Video promoted successfully! ₡${totalCost} coins deducted.`);
       
       // Reset form
       resetForm();
@@ -770,8 +918,8 @@ export default function PromoteTab() {
   const resetForm = () => {
     setYoutubeUrl('');
     setTitle('');
-    setUserSetDuration('');
-    setTargetViews('');
+    setUserSetDuration(null);
+    setTargetViews(null);
     setVideoData(null);
     setError(null);
     setShowIframe(false);
@@ -795,16 +943,41 @@ export default function PromoteTab() {
     }
   };
 
+  const openDropdown = (type: 'views' | 'duration') => {
+    if (type === 'views') {
+      setShowDurationDropdown(false);
+      setShowViewsDropdown(true);
+    } else {
+      setShowViewsDropdown(false);
+      setShowDurationDropdown(true);
+    }
+  };
+
+  const closeDropdowns = () => {
+    setShowViewsDropdown(false);
+    setShowDurationDropdown(false);
+  };
+
+  const getSelectedViewsLabel = () => {
+    const option = VIEW_OPTIONS.find(opt => opt.value === targetViews);
+    return option ? option.label : 'Select views';
+  };
+
+  const getSelectedDurationLabel = () => {
+    const option = DURATION_OPTIONS.find(opt => opt.value === userSetDuration);
+    return option ? option.label : 'Select duration';
+  };
+
   return (
     <View style={styles.container}>
-      {/* Header with adjusted padding */}
+      {/* Header with coin icon */}
       <LinearGradient
         colors={['#FF4757', '#FF6B8A']}
         style={styles.header}
       >
         <Text style={styles.headerTitle}>Promote Your Video</Text>
         <View style={styles.coinDisplay}>
-          <DollarSign color="white" size={20} />
+          <Coins color="#FFD700" size={20} />
           <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
         </View>
       </LinearGradient>
@@ -964,40 +1137,40 @@ export default function PromoteTab() {
               )}
             </View>
 
-            {/* User-Set Duration */}
+            {/* Number of Views Dropdown */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Set Duration (seconds) *</Text>
-              <View style={styles.inputContainer}>
-                <Clock color="#666" size={20} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., 120"
-                  value={userSetDuration}
-                  onChangeText={setUserSetDuration}
-                  keyboardType="numeric"
-                  maxLength={3}
-                />
-              </View>
-              <Text style={styles.helperText}>
-                Minimum 10 seconds, Maximum 600 seconds (10 minutes)
-              </Text>
+              <Text style={styles.label}>Number of Views *</Text>
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                onPress={() => openDropdown('views')}
+              >
+                <Eye color="#666" size={20} style={styles.inputIcon} />
+                <Text style={[
+                  styles.dropdownTriggerText,
+                  targetViews && styles.dropdownTriggerTextSelected
+                ]}>
+                  {getSelectedViewsLabel()}
+                </Text>
+                <ChevronDown color="#666" size={20} />
+              </TouchableOpacity>
             </View>
 
-            {/* Target Views */}
+            {/* Duration Dropdown */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Target Views *</Text>
-              <View style={styles.inputContainer}>
-                <Eye color="#666" size={20} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., 100"
-                  value={targetViews}
-                  onChangeText={setTargetViews}
-                  keyboardType="numeric"
-                  maxLength={4}
-                />
-              </View>
-              <Text style={styles.helperText}>Maximum 1000 views per promotion</Text>
+              <Text style={styles.label}>Set Duration (seconds) *</Text>
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                onPress={() => openDropdown('duration')}
+              >
+                <Clock color="#666" size={20} style={styles.inputIcon} />
+                <Text style={[
+                  styles.dropdownTriggerText,
+                  userSetDuration && styles.dropdownTriggerTextSelected
+                ]}>
+                  {getSelectedDurationLabel()}
+                </Text>
+                <ChevronDown color="#666" size={20} />
+              </TouchableOpacity>
             </View>
 
             {/* Cost Calculation */}
@@ -1006,15 +1179,15 @@ export default function PromoteTab() {
                 <Text style={styles.costTitle}>Promotion Cost</Text>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Cost per view:</Text>
-                  <Text style={styles.costValue}>{Math.ceil(parseInt(userSetDuration) / 10)} coins</Text>
+                  <Text style={styles.costValue}>₡{Math.ceil(userSetDuration / 10)}</Text>
                 </View>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Total Cost:</Text>
-                  <Text style={styles.costValue}>{totalCost} coins</Text>
+                  <Text style={styles.costValue}>₡{totalCost}</Text>
                 </View>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Reward per view:</Text>
-                  <Text style={styles.costValue}>{rewardPerView} coins</Text>
+                  <Text style={styles.costValue}>₡{rewardPerView}</Text>
                 </View>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Your balance:</Text>
@@ -1022,7 +1195,7 @@ export default function PromoteTab() {
                     styles.costValue, 
                     (profile?.coins || 0) < totalCost && styles.insufficientBalance
                   ]}>
-                    {profile?.coins || 0} coins
+                    ₡{profile?.coins || 0}
                   </Text>
                 </View>
                 {videoData && videoData.embeddable && (
@@ -1066,6 +1239,25 @@ export default function PromoteTab() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Futuristic Dropdowns */}
+      <FuturisticDropdown
+        options={VIEW_OPTIONS}
+        selectedValue={targetViews}
+        onSelect={setTargetViews}
+        placeholder="Select Number of Views"
+        visible={showViewsDropdown}
+        onClose={closeDropdowns}
+      />
+
+      <FuturisticDropdown
+        options={DURATION_OPTIONS}
+        selectedValue={userSetDuration}
+        onSelect={setUserSetDuration}
+        placeholder="Select Duration (seconds)"
+        visible={showDurationDropdown}
+        onClose={closeDropdowns}
+      />
     </View>
   );
 }
@@ -1179,6 +1371,104 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 4,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+      },
+    }),
+  },
+  dropdownTriggerText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#999',
+  },
+  dropdownTriggerTextSelected: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  dropdownBackdrop: {
+    flex: 1,
+  },
+  dropdownContainer: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: screenHeight * 0.7,
+    overflow: 'hidden',
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dropdownScrollView: {
+    maxHeight: screenHeight * 0.5,
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownOptionSelected: {
+    backgroundColor: '#FFF8F8',
+  },
+  dropdownOptionLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownOptionText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  dropdownOptionTextSelected: {
+    color: '#FF4757',
+    fontWeight: '600',
   },
   iframeSection: {
     backgroundColor: 'white',
