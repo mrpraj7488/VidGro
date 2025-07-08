@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Video, Coins, ChevronDown, ChevronUp, Edit3, Trash2, RotateCcw, Eye, Clock, TrendingUp, Activity, Menu, AlertTriangle, CheckCircle, Play, Pause, Timer, BarChart3, DollarSign } from 'lucide-react-native';
+import { Video, Coins, ChevronDown, ChevronUp, CreditCard as Edit3, Trash2, RotateCcw, Eye, Clock, TrendingUp, Activity, Menu, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Play, Pause, Timer, ChartBar as BarChart3, DollarSign } from 'lucide-react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
