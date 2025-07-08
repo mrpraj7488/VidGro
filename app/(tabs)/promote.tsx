@@ -1016,32 +1016,6 @@ export default function PromoteTab() {
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* 10-Minute Hold Information */}
-          <View style={styles.holdInfoCard}>
-            <View style={styles.holdInfoHeader}>
-              <Clock color="#FF4757" size={20} />
-              <Text style={styles.holdInfoTitle}>10-Minute Hold Period</Text>
-            </View>
-            <Text style={styles.holdInfoText}>
-              New videos are held for 10 minutes before entering the view queue. This gives you time to make changes or delete if needed.
-            </Text>
-            <View style={styles.holdStatusFlow}>
-              <View style={styles.holdStatusItem}>
-                <Text style={styles.holdStatusLabel}>PENDING</Text>
-                <Text style={styles.holdStatusTime}>0-10 min</Text>
-              </View>
-              <Text style={styles.holdStatusArrow}>→</Text>
-              <View style={styles.holdStatusItem}>
-                <Text style={styles.holdStatusLabel}>ACTIVE</Text>
-                <Text style={styles.holdStatusTime}>In queue</Text>
-              </View>
-              <Text style={styles.holdStatusArrow}>→</Text>
-              <View style={styles.holdStatusItem}>
-                <Text style={styles.holdStatusLabel}>COMPLETED</Text>
-                <Text style={styles.holdStatusTime}>Target reached</Text>
-              </View>
-            </View>
-          </View>
 
           {/* Error Display */}
           {error && (
