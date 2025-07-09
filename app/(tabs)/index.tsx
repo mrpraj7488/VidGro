@@ -1042,7 +1042,7 @@ export default function ViewTab() {
         <View style={styles.controlsSection}>
           {/* Top Controls */}
           <View style={styles.topControls}>
-            <TouchableOpacity style={styles.youtubeButton} onPress={openYouTubeVideo}>
+            <TouchableOpacity style={styles.autoPlayContainer} onPress={openYouTubeVideo}>
               <ExternalLink color="#FF4757" size={16} />
               <Text style={styles.youtubeLabel}>Watch On YouTube</Text>
             </TouchableOpacity>
@@ -1335,17 +1335,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: isSmallScreen ? 16 : 20,
-  },
-  youtubeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF5F5',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF4757',
-    gap: isSmallScreen ? 6 : 8,
   },
   autoPlayContainer: {
     flexDirection: 'row',
