@@ -55,7 +55,7 @@ export default function ViewTab() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [watchTime, setWatchTime] = useState(0);
   const [securityPauseActive, setSecurityPauseActive] = useState(false);
-  const [lastSecurityPause, setLastSecurityPause] = useState(0);
+  const lastSecurityPauseRef = useRef(0);
   const [retryCount, setRetryCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -197,12 +197,12 @@ export default function ViewTab() {
     const now = Date.now();
     
     // Prevent multiple simultaneous security pauses and add cooldown
-    if (securityPauseActive || (now - lastSecurityPause < 5000)) {
+    if (securityPauseActive || (now - lastSecurityPauseRef.current < 5000)) {
       console.log('🔒 Security pause already active or in cooldown, skipping');
       return;
     }
 
-    setLastSecurityPause(now);
+    lastSecurityPauseRef.current = now;
     setSecurityPauseActive(true);
     setIsPlaying(false);
     
@@ -214,7 +214,7 @@ export default function ViewTab() {
       setIsPlaying(true);
       console.log('▶️ Security pause ended, resuming playback at', new Date().toLocaleTimeString());
     }, 3000);
-  }, [securityPauseActive, lastSecurityPause]);
+  }, [securityPauseActive]);
 
   const handlePlayPause = useCallback(() => {
     // Prevent play/pause during security pause
