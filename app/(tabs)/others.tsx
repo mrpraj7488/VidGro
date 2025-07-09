@@ -163,7 +163,7 @@ export default function OthersTab() {
           
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile?.coins || 0}</Text>
+              <Text style={styles.statValue}>🪙{profile?.coins || 0}</Text>
               <Text style={styles.statLabel}>Coins</Text>
             </View>
             <View style={styles.statDivider} />

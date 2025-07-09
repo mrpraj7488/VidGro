@@ -365,9 +365,9 @@ export default function AnalyticsTab() {
           </View>
           
           <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: '#2ECC71' }]}>
+            <Animated.View style={[styles.metricIcon, { backgroundColor: '#2ECC71' }, coinAnimatedStyle]}>
               <Text style={styles.coinIcon}>🪙</Text>
-            </View>
+            </Animated.View>
             <Text style={styles.metricValue}>🪙{analytics.totalCoinsEarned}</Text>
             <Text style={styles.metricLabel}>Coins Earned</Text>
           </View>

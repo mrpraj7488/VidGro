@@ -345,7 +345,7 @@ export default function BuyCoinsScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Buy Coins</Text>
         <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-          <Coins color="#F48FB1" size={isVerySmallScreen ? 18 : 20} />
+          <Text style={styles.coinEmoji}>🪙</Text>
           <Text style={styles.coinCount}>{profile?.coins?.toLocaleString() || '0'}</Text>
         </Animated.View>
       </LinearGradient>
@@ -486,11 +486,14 @@ const styles = StyleSheet.create({
     paddingVertical: isVerySmallScreen ? 4 : 6,
     borderRadius: 20,
   },
+  coinEmoji: {
+    fontSize: isVerySmallScreen ? 16 : 18,
+    marginRight: 4,
+  },
   coinCount: {
-    color: '#F48FB1',
+    color: 'white',
     fontSize: isVerySmallScreen ? 12 : 14,
     fontWeight: 'bold',
-    marginLeft: 4,
   },
   scrollView: {
     flex: 1,

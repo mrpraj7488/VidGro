@@ -1094,7 +1094,6 @@ const styles = StyleSheet.create({
   },
   coinEmoji: {
     fontSize: 18,
-    color: '#FFA726',
   },
   scrollView: {
     flex: 1,
