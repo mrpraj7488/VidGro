@@ -149,9 +149,18 @@ export default function EditVideoScreen() {
         
         // Calculate hold timer if video is on hold
         if (video.status === 'on_hold') {
-          const holdUntil = new Date(video.hold_until || video.created_at);
-          holdUntil.setMinutes(holdUntil.getMinutes() + 10);
-          const remainingMs = holdUntil.getTime() - new Date().getTime();
+          let holdUntilTime: Date;
+          
+          if (video.hold_until) {
+            // Use the exact hold_until timestamp from database
+            holdUntilTime = new Date(video.hold_until);
+          } else {
+            // Fallback: calculate exactly 10 minutes from creation
+            holdUntilTime = new Date(video.created_at);
+            holdUntilTime.setMinutes(holdUntilTime.getMinutes() + 10);
+          }
+          
+          const remainingMs = holdUntilTime.getTime() - new Date().getTime();
           setHoldTimer(Math.max(0, Math.floor(remainingMs / 1000)));
         }
         
@@ -170,6 +179,19 @@ export default function EditVideoScreen() {
         setHoldTimer(prev => {
           if (prev <= 1) {
             clearInterval(interval);
+            // Add error handling when timer reaches 0
+            setTimeout(() => {
+              // Refresh the video data to get updated status
+              if (params.videoData) {
+                try {
+                  const video = JSON.parse(params.videoData as string);
+                  // You might want to refetch video data here
+                  console.log('Hold period completed for video:', video.youtube_url);
+                } catch (error) {
+                  console.error('Error handling timer completion:', error);
+                }
+              }
+            }, 100);
             return 0;
           }
           return prev - 1;

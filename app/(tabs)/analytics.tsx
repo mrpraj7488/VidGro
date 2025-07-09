@@ -168,9 +168,18 @@ export default function AnalyticsTab() {
       const holdVideos = videosWithAnalytics.filter(v => v.status === 'on_hold');
       const newHoldTimers: {[key: string]: number} = {};
       holdVideos.forEach(video => {
-        const holdUntil = new Date(video.hold_until || video.created_at);
-        holdUntil.setMinutes(holdUntil.getMinutes() + 10);
-        const remainingMs = holdUntil.getTime() - new Date().getTime();
+        let holdUntilTime: Date;
+        
+        if (video.hold_until) {
+          // Use the exact hold_until timestamp from database
+          holdUntilTime = new Date(video.hold_until);
+        } else {
+          // Fallback: calculate exactly 10 minutes from creation
+          holdUntilTime = new Date(video.created_at);
+          holdUntilTime.setMinutes(holdUntilTime.getMinutes() + 10);
+        }
+        
+        const remainingMs = holdUntilTime.getTime() - new Date().getTime();
         newHoldTimers[video.id] = Math.max(0, Math.floor(remainingMs / 1000));
       });
       setHoldTimers(newHoldTimers);
@@ -221,7 +230,11 @@ export default function AnalyticsTab() {
       
       Object.keys(updated).forEach(videoId => {
         if (updated[videoId] > 0) {
-          updated[videoId] -= 30; // Decrease by 30 seconds
+          updated[videoId] = Math.max(0, updated[videoId] - 30); // Decrease by 30 seconds, don't go below 0
+          hasChanges = true;
+        } else if (updated[videoId] === 0) {
+          // Remove completed timers
+          delete updated[videoId];
           hasChanges = true;
         }
       });
