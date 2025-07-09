@@ -1088,8 +1088,7 @@ export default function PromoteTab() {
                         onPress={detectTitleManually}
                         disabled={!iframeLoaded}
                       >
-                        <Type color="#FF4757" size={16} />
-                        <Text style={styles.controlButtonText}>Get Title</Text>
+                        
                       </TouchableOpacity>
                     </View>
                     
