@@ -405,7 +405,6 @@ import {
   Immediate,
   Gradual,
   Sudden,
-  Smooth,
   Abrupt,
   Gentle,
   Harsh,
