@@ -774,14 +774,14 @@ const styles = StyleSheet.create({
   buyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4ECDC4',
+    backgroundColor: '#800080',
     paddingHorizontal: isVerySmallScreen ? 16 : 20,
     paddingVertical: isVerySmallScreen ? 10 : 12,
     borderRadius: 25,
     gap: 6,
   },
   popularBuyButton: {
-    backgroundColor: '#FF4757',
+    backgroundColor: '#800080',
   },
   loadingButton: {
     opacity: 0.6,

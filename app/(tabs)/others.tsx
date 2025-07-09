@@ -9,7 +9,6 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
 import { 
@@ -32,6 +31,7 @@ import {
   Coins,
   Menu
 } from 'lucide-react-native';
+import GlobalHeader from '@/components/GlobalHeader';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -84,45 +84,6 @@ export default function OthersTab() {
     Alert.alert('Rate Us', 'Thank you for using VidGro!');
   };
 
-  const handleReferFriend = () => {
-    if (profile?.referral_code) {
-      Alert.alert(
-        'Refer a Friend',
-        `Share your referral code: ${profile.referral_code}`
-      );
-    }
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: () => signOut()
-        },
-      ]
-    );
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. Are you sure you want to delete your account?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => Alert.alert('Account Deletion', 'Account deletion feature coming soon')
-        },
-      ]
-    );
-  };
-
   const handleCleanup = () => {
     Alert.alert('App Cleanup', 'App cleanup feature coming soon!');
   };
@@ -141,7 +102,7 @@ export default function OthersTab() {
       title: 'Buy Coins',
       subtitle: 'Get more coins instantly',
       icon: <DollarSign color="white" size={24} />,
-      color: '#FF4757',
+      color: '#800080',
       onPress: handleBuyCoins,
       featured: true,
     },
@@ -172,122 +133,9 @@ export default function OthersTab() {
     },
   ];
 
-  const menuSections: MenuSection[] = [
-    {
-      title: 'Account',
-      items: [
-        {
-          id: 'refer-friend',
-          title: 'Refer a Friend',
-          subtitle: 'Share and earn rewards',
-          icon: <Share2 color="#FF4757" size={20} />,
-          onPress: handleReferFriend,
-        },
-        {
-          id: 'rate-us',
-          title: 'Rate Us',
-          subtitle: 'Help us improve',
-          icon: <Star color="#FFA726" size={20} />,
-          onPress: handleRateUs,
-        },
-      ],
-    },
-    {
-      title: 'Settings',
-      items: [
-        {
-          id: 'languages',
-          title: 'Languages',
-          subtitle: 'Change app language',
-          icon: <Globe color="#4ECDC4" size={20} />,
-          onPress: () => Alert.alert('Languages', 'Language selection coming soon'),
-        },
-        {
-          id: 'configure-ads',
-          title: 'Configure Ads',
-          subtitle: 'Manage ad preferences',
-          icon: <Settings color="#9B59B6" size={20} />,
-          onPress: () => Alert.alert('Configure Ads', 'Ad configuration options'),
-        },
-        {
-          id: 'app-cleanup',
-          title: 'App Cleanup',
-          subtitle: 'Clear cache & optimize',
-          icon: <RefreshCw color="#2ECC71" size={20} />,
-          onPress: handleCleanup,
-        },
-      ],
-    },
-    {
-      title: 'Legal',
-      items: [
-        {
-          id: 'consent',
-          title: 'Consent',
-          subtitle: 'User consent information',
-          icon: <FileText color="#6C7B7F" size={20} />,
-          onPress: () => Alert.alert('Consent', 'User consent information'),
-        },
-        {
-          id: 'privacy-policy',
-          title: 'Privacy Policy',
-          subtitle: 'How we protect your data',
-          icon: <Shield color="#6C7B7F" size={20} />,
-          onPress: () => Alert.alert('Privacy Policy', 'Privacy policy information'),
-        },
-      ],
-    },
-    {
-      title: 'Support',
-      items: [
-        {
-          id: 'contact-us',
-          title: 'Contact Us',
-          subtitle: 'Get help and support',
-          icon: <MessageCircle color="#3498DB" size={20} />,
-          onPress: () => Alert.alert('Contact Us', 'support@vidgro.com'),
-        },
-      ],
-    },
-    {
-      title: 'Account Actions',
-      items: [
-        {
-          id: 'logout',
-          title: 'Log Out',
-          subtitle: 'Sign out of your account',
-          icon: <LogOut color="#E74C3C" size={20} />,
-          onPress: handleLogout,
-          destructive: true,
-        },
-        {
-          id: 'delete-account',
-          title: 'Delete Account',
-          subtitle: 'Permanently delete account',
-          icon: <Trash2 color="#E74C3C" size={20} />,
-          onPress: handleDeleteAccount,
-          destructive: true,
-        },
-      ],
-    },
-  ];
-
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#FF4757', '#FF6B8A']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <Menu color="white" size={24} />
-          <Text style={styles.headerTitle}>More</Text>
-          <View style={styles.coinDisplay}>
-            <Coins color="#FFD700" size={isSmallScreen ? 18 : 20} />
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-          </View>
-        </View>
-      </LinearGradient>
+      <GlobalHeader title="More" showCoinDisplay={true} />
 
       <ScrollView 
         style={styles.scrollView} 
@@ -351,49 +199,14 @@ export default function OthersTab() {
           </View>
         </View>
 
-        {/* Menu Sections */}
-        {menuSections.map((section) => (
-          <View key={section.title} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.menuCard}>
-              {section.items.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.menuItem,
-                    index === section.items.length - 1 && styles.menuItemLast
-                  ]}
-                  onPress={item.onPress}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuItemLeft}>
-                    <View style={[
-                      styles.menuItemIcon,
-                      item.destructive && styles.destructiveIcon
-                    ]}>
-                      {item.icon}
-                    </View>
-                    <View style={styles.menuItemContent}>
-                      <Text style={[
-                        styles.menuItemTitle,
-                        item.destructive && styles.destructiveText
-                      ]}>
-                        {item.title}
-                      </Text>
-                      {item.subtitle && (
-                        <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
-                      )}
-                    </View>
-                  </View>
-                  <ChevronRight 
-                    color={item.destructive ? "#E74C3C" : "#C7C7CC"} 
-                    size={16} 
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
+        {/* Note about menu functions */}
+        <View style={styles.menuNote}>
+          <Text style={styles.menuNoteTitle}>Menu Functions</Text>
+          <Text style={styles.menuNoteText}>
+            All menu functions (Refer Friend, Privacy Policy, Settings, etc.) are now available 
+            in the 3-dot menu at the top right of every screen.
+          </Text>
+        </View>
 
         {/* App Info */}
         <View style={styles.appInfo}>
@@ -409,35 +222,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
-  },
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 20,
-    paddingHorizontal: 16,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  coinDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: isSmallScreen ? 10 : 12,
-    paddingVertical: isSmallScreen ? 6 : 8,
-    borderRadius: 20,
-  },
-  coinCount: {
-    color: '#FFD700',
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: 'bold',
-    marginLeft: 4,
   },
   scrollView: {
     flex: 1,
@@ -595,10 +379,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
   },
-  menuCard: {
+  menuNote: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    overflow: 'hidden',
+    padding: isSmallScreen ? 16 : 20,
+    marginBottom: 16,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#800080',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -614,50 +402,16 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: isSmallScreen ? 16 : 20,
-    paddingVertical: isSmallScreen ? 14 : 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+  menuNoteTitle: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: '600',
+    color: '#800080',
+    marginBottom: 8,
   },
-  menuItemLast: {
-    borderBottomWidth: 0,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuItemIcon: {
-    width: isSmallScreen ? 36 : 40,
-    height: isSmallScreen ? 36 : 40,
-    borderRadius: isSmallScreen ? 18 : 20,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  destructiveIcon: {
-    backgroundColor: '#FFE5E5',
-  },
-  menuItemContent: {
-    flex: 1,
-  },
-  menuItemTitle: {
-    fontSize: isSmallScreen ? 15 : 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 2,
-  },
-  destructiveText: {
-    color: '#E74C3C',
-  },
-  menuItemSubtitle: {
-    fontSize: isSmallScreen ? 12 : 13,
+  menuNoteText: {
+    fontSize: isSmallScreen ? 13 : 14,
     color: '#666',
+    lineHeight: 20,
   },
   appInfo: {
     alignItems: 'center',

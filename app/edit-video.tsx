@@ -846,7 +846,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E74C3C',
   },
   repromoteButton: {
-    backgroundColor: '#3498DB',
+    backgroundColor: '#800080',
     marginTop: 16,
   },
   buttonDisabled: {

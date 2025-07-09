@@ -10,12 +10,12 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
 import { Video, ChevronDown, ChevronUp, CreditCard as Edit3, RotateCcw, Eye, Clock, TrendingUp, Activity, Menu, Timer, Play, Pause, ChartBar as BarChart3, DollarSign } from 'lucide-react-native';
+import GlobalHeader from '@/components/GlobalHeader';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -340,17 +340,7 @@ export default function AnalyticsTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#2C2C2C', '#3A3A3A']}
-        style={styles.header}
-      >
-        <Menu color="white" size={24} />
-        <Text style={styles.headerTitle}>Analytics</Text>
-        <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-          <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
-        </Animated.View>
-      </LinearGradient>
+      <GlobalHeader title="Analytics" showCoinDisplay={true} />
 
       <ScrollView 
         style={styles.scrollView} 
@@ -359,8 +349,8 @@ export default function AnalyticsTab() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchAnalytics(true)}
-            tintColor="#F48FB1"
-            colors={['#F48FB1']}
+            tintColor="#800080"
+            colors={['#800080']}
           />
         }
       >
@@ -389,7 +379,7 @@ export default function AnalyticsTab() {
             <Text style={styles.sectionTitle}>Promoted Videos</Text>
             <TouchableOpacity onPress={() => fetchAnalytics(true)}>
               <Animated.View style={refreshAnimatedStyle}>
-                <RotateCcw color="#F48FB1" size={20} />
+                <RotateCcw color="#800080" size={20} />
               </Animated.View>
             </TouchableOpacity>
           </View>
@@ -435,7 +425,7 @@ export default function AnalyticsTab() {
                   style={styles.editButton}
                   onPress={() => handleEditVideo(video)}
                 >
-                  <Edit3 color="#F48FB1" size={20} />
+                  <Edit3 color="#800080" size={20} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -449,9 +439,9 @@ export default function AnalyticsTab() {
                   {showMoreVideos ? 'View Less' : `View More (${analytics.promotedVideos.length - 4})`}
                 </Text>
                 {showMoreVideos ? (
-                  <ChevronUp color="#F48FB1" size={20} />
+                  <ChevronUp color="#800080" size={20} />
                 ) : (
-                  <ChevronDown color="#F48FB1" size={20} />
+                  <ChevronDown color="#800080" size={20} />
                 )}
               </TouchableOpacity>
             )}
@@ -503,9 +493,9 @@ export default function AnalyticsTab() {
                   {showMoreActivities ? 'View Less' : `View More (${analytics.recentActivities.length - 3})`}
                 </Text>
                 {showMoreActivities ? (
-                  <ChevronUp color="#F48FB1" size={20} />
+                  <ChevronUp color="#800080" size={20} />
                 ) : (
-                  <ChevronDown color="#F48FB1" size={20} />
+                  <ChevronDown color="#800080" size={20} />
                 )}
               </TouchableOpacity>
             )}
@@ -530,32 +520,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-  },
-  headerTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: '600',
-    color: 'white',
-  },
-  coinDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(244, 143, 177, 0.2)',
-    paddingHorizontal: isSmallScreen ? 10 : 12,
-    paddingVertical: isSmallScreen ? 6 : 8,
-    borderRadius: 20,
-  },
-  coinCount: {
-    color: '#F48FB1',
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: 'bold',
   },
   scrollView: {
     flex: 1,
@@ -730,7 +694,7 @@ const styles = StyleSheet.create({
   },
   viewMoreText: {
     fontSize: 14,
-    color: '#F48FB1',
+    color: '#800080',
     fontWeight: '500',
     marginRight: 8,
   },

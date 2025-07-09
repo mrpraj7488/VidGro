@@ -12,12 +12,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Play, Pause, SkipForward, Clock, Coins, ExternalLink, Menu } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
+import GlobalHeader from '@/components/GlobalHeader';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -943,14 +943,7 @@ export default function ViewTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header with VidGro branding */}
-      <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
-        <Menu color="white" size={24} />
-        <Text style={styles.headerTitle}>VidGro</Text>
-        <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-          <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
-        </Animated.View>
-      </LinearGradient>
+      <GlobalHeader title="VidGro" showCoinDisplay={true} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Video Player Container */}
@@ -1109,36 +1102,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    minHeight: Platform.OS === 'ios' ? 100 : 90,
-  },
-  headerTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: 'white',
-    letterSpacing: 0.5,
-  },
-  coinDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: isSmallScreen ? 10 : 12,
-    paddingVertical: isSmallScreen ? 6 : 8,
-    borderRadius: 20,
-    minWidth: isSmallScreen ? 70 : 80,
-    justifyContent: 'center',
-  },
-  coinCount: {
-    color: '#FFD700',
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: 'bold',
   },
   coinEmoji: {
     fontSize: 18,
@@ -1397,12 +1360,12 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 56 : 64,
     height: isSmallScreen ? 56 : 64,
     borderRadius: isSmallScreen ? 28 : 32,
-    backgroundColor: '#FF4757',
+    backgroundColor: '#800080',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#FF4757',
+        shadowColor: '#800080',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -1411,7 +1374,7 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
+        boxShadow: '0 4px 8px rgba(128, 0, 128, 0.3)',
       },
     }),
   },
