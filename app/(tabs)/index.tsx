@@ -910,8 +910,7 @@ export default function ViewTab() {
           <Menu color="white" size={24} />
           <Text style={styles.headerTitle}>VidGro</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-            <Coins color="#FFD700" size={20} />
+            <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
           </Animated.View>
         </LinearGradient>
         
@@ -930,8 +929,7 @@ export default function ViewTab() {
           <Menu color="white" size={24} />
           <Text style={styles.headerTitle}>VidGro</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-            <Coins color="#FFD700" size={20} />
+            <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
           </Animated.View>
         </LinearGradient>
         
@@ -951,7 +949,6 @@ export default function ViewTab() {
         <Text style={styles.headerTitle}>VidGro</Text>
         <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
           <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
-          <Coins color="#FFD700" size={isSmallScreen ? 18 : 20} />
         </Animated.View>
       </LinearGradient>
 
@@ -1033,7 +1030,7 @@ export default function ViewTab() {
             
             <View style={styles.statCard}>
               <Animated.View style={[styles.statIconContainer, coinAnimatedStyle]}>
-                <Coins color="#FFA726" size={18} />
+                <Text style={styles.coinEmoji}>🪙</Text>
               </Animated.View>
               <Text style={styles.statValue}>{coinReward}</Text>
               <Text style={styles.statLabel}>🪙Coins</Text>
@@ -1142,7 +1139,10 @@ const styles = StyleSheet.create({
     color: '#FFD700',
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
-    marginRight: isSmallScreen ? 4 : 6,
+  },
+  coinEmoji: {
+    fontSize: 18,
+    color: '#FFA726',
   },
   scrollView: {
     flex: 1,
