@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Crown } from 'lucide-react-native';
+import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Crown, DollarSign } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -139,7 +139,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
           ]}
         >
           <LinearGradient
-            colors={['#800080', '#9B59B6']}
+            colors={['#800080', '#9B59B6', '#A569BD']}
             style={styles.dropdownHeader}
           >
             <Text style={styles.dropdownTitle}>{placeholder}</Text>
@@ -653,26 +653,6 @@ export default function PromoteTab() {
             }
           }
           
-          // Manual control functions
-          window.testPlayback = function() {
-            if (player && player.playVideo && isPlayerReady && !hasError) {
-              try {
-                console.log('Manual playback test triggered');
-                player.playVideo();
-              } catch (error) {
-                console.error('Error in manual playback:', error);
-              }
-            }
-          };
-          
-          window.detectTitle = function() {
-            try {
-              detectTitle();
-            } catch (error) {
-              console.error('Error in manual title detection:', error);
-            }
-          };
-          
           // Handle page errors
           window.onerror = function(msg, url, lineNo, columnNo, error) {
             console.error('Page error:', msg);
@@ -950,18 +930,6 @@ export default function PromoteTab() {
     setLoadingTimeout(false);
   };
 
-  const testPlaybackManually = () => {
-    if (webviewRef.current) {
-      webviewRef.current.injectJavaScript('window.testPlayback && window.testPlayback(); true;');
-    }
-  };
-
-  const detectTitleManually = () => {
-    if (webviewRef.current) {
-      webviewRef.current.injectJavaScript('window.detectTitle && window.detectTitle(); true;');
-    }
-  };
-
   const openDropdown = (type: 'views' | 'duration') => {
     if (type === 'views') {
       setShowDurationDropdown(false);
@@ -1062,27 +1030,6 @@ export default function PromoteTab() {
                 
                 {showIframe && (
                   <View style={styles.iframeContainer}>
-                    <View style={styles.iframeControls}>
-                      <TouchableOpacity
-                        style={styles.controlButton}
-                        onPress={testPlaybackManually}
-                        disabled={testingPlayback || !iframeLoaded}
-                      >
-                        <Play color="#800080" size={16} />
-                        <Text style={styles.controlButtonText}>
-                          {testingPlayback ? 'Testing...' : 'Test Play'}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.controlButton}
-                        onPress={detectTitleManually}
-                        disabled={!iframeLoaded}
-                      >
-                        <Type color="#800080" size={16} />
-                        <Text style={styles.controlButtonText}>Get Title</Text>
-                      </TouchableOpacity>
-                    </View>
-                  
                     <View style={styles.webviewContainer}>
                       <WebView
                         ref={webviewRef}
@@ -1296,7 +1243,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF4757',
+    borderLeftColor: '#800080',
   },
   errorIcon: {
     marginRight: 8,
@@ -1496,25 +1443,6 @@ const styles = StyleSheet.create({
   iframeContainer: {
     padding: 16,
   },
-  iframeControls: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  controlButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  controlButtonText: {
-    fontSize: 12,
-    color: '#800080',
-    fontWeight: '500',
-  },
   webviewContainer: {
     height: isSmallScreen ? 180 : 220,
     borderRadius: 8,
@@ -1624,7 +1552,7 @@ const styles = StyleSheet.create({
     color: '#800080',
   },
   insufficientBalance: {
-    color: '#FF4757',
+    color: '#800080',
   },
   vipPrompt: {
     flexDirection: 'row',
