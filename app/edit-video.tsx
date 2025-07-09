@@ -8,14 +8,15 @@ import {
   Alert,
   Platform,
   Dimensions,
-  TextInput,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown, Check } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -34,16 +35,91 @@ interface VideoData {
   target_views: number;
   coin_reward: number;
   coin_cost: number;
-  status: 'active' | 'paused' | 'completed' | 'on_hold';
+  status: 'active' | 'paused' | 'completed' | 'on_hold' | 'repromoted';
   created_at: string;
   updated_at: string;
   hold_until?: string;
   duration_seconds: number;
   video_views?: any[];
+  repromoted_at?: string;
 }
 
 const VIEW_OPTIONS = [10, 25, 50, 100, 200, 500];
 const DURATION_OPTIONS = [30, 45, 60, 90, 120];
+
+interface DropdownProps {
+  visible: boolean;
+  onClose: () => void;
+  options: number[];
+  selectedValue: number;
+  onSelect: (value: number) => void;
+  label: string;
+  suffix: string;
+}
+
+const SmoothDropdown: React.FC<DropdownProps> = ({
+  visible,
+  onClose,
+  options,
+  selectedValue,
+  onSelect,
+  label,
+  suffix,
+}) => {
+  const handleSelect = (value: number) => {
+    onSelect(value);
+    onClose();
+  };
+
+  const renderItem = ({ item }: { item: number }) => (
+    <TouchableOpacity
+      style={[
+        styles.dropdownItem,
+        item === selectedValue && styles.selectedDropdownItem
+      ]}
+      onPress={() => handleSelect(item)}
+    >
+      <Text style={[
+        styles.dropdownItemText,
+        item === selectedValue && styles.selectedDropdownItemText
+      ]}>
+        {item} {suffix}
+      </Text>
+      {item === selectedValue && (
+        <Check color="#3498DB" size={16} />
+      )}
+    </TouchableOpacity>
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={styles.dropdownModal}>
+          <View style={styles.dropdownHeader}>
+            <Text style={styles.dropdownTitle}>{label}</Text>
+          </View>
+          <FlatList
+            data={options}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.toString()}
+            style={styles.dropdownList}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+          />
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
 
 export default function EditVideoScreen() {
   const { user, profile, refreshProfile } = useAuth();
@@ -221,7 +297,7 @@ export default function EditVideoScreen() {
 
       if (clearViewsError) throw clearViewsError;
 
-      // Update video with new promotion settings - set to active immediately
+      // Update video with new promotion settings - set to repromoted status
       const { error: updateError } = await supabase
         .from('videos')
         .update({
@@ -229,9 +305,9 @@ export default function EditVideoScreen() {
           target_views: selectedViews,
           duration_seconds: selectedDuration,
           coin_cost: coinCost,
-          coin_reward: 3, // Fixed reward per view
-          status: 'active', // Set to active immediately, no hold period
+          status: 'repromoted', // Set status to repromoted
           updated_at: new Date().toISOString(),
+          repromoted_at: new Date().toISOString(), // Track when it was repromoted
           hold_until: null // Clear any hold period
         })
         .eq('id', videoData.id)
@@ -268,6 +344,7 @@ export default function EditVideoScreen() {
       case 'completed': return '#3498DB';
       case 'paused': return '#E74C3C';
       case 'on_hold': return '#F39C12';
+      case 'repromoted': return '#9B59B6';
       default: return '#95A5A6';
     }
   };
@@ -278,6 +355,7 @@ export default function EditVideoScreen() {
       case 'completed': return 'COMPLETED';
       case 'paused': return 'PAUSED';
       case 'on_hold': return 'PENDING';
+      case 'repromoted': return 'REPROMOTED';
       default: return status.toUpperCase();
     }
   };
@@ -318,6 +396,11 @@ export default function EditVideoScreen() {
             </View>
             <Text style={styles.videoId}>ID: {videoData.youtube_url}</Text>
           </View>
+          {videoData.status === 'repromoted' && videoData.repromoted_at && (
+            <Text style={styles.repromoteInfo}>
+              Repromoted on {new Date(videoData.repromoted_at).toLocaleDateString()}
+            </Text>
+          )}
         </View>
 
         {/* Pending Status Timeline */}
@@ -405,28 +488,11 @@ export default function EditVideoScreen() {
                   <Text style={styles.optionLabel}>Target Views</Text>
                   <TouchableOpacity 
                     style={styles.dropdown}
-                    onPress={() => setShowViewsDropdown(!showViewsDropdown)}
+                    onPress={() => setShowViewsDropdown(true)}
                   >
                     <Text style={styles.dropdownText}>{selectedViews} views</Text>
                     <ChevronDown color="#666" size={16} />
                   </TouchableOpacity>
-                  
-                  {showViewsDropdown && (
-                    <View style={styles.dropdownMenu}>
-                      {VIEW_OPTIONS.map((views) => (
-                        <TouchableOpacity
-                          key={views}
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setSelectedViews(views);
-                            setShowViewsDropdown(false);
-                          }}
-                        >
-                          <Text style={styles.dropdownItemText}>{views} views</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
                 </View>
 
                 {/* Duration Selection */}
@@ -434,28 +500,11 @@ export default function EditVideoScreen() {
                   <Text style={styles.optionLabel}>Watch Duration</Text>
                   <TouchableOpacity 
                     style={styles.dropdown}
-                    onPress={() => setShowDurationDropdown(!showDurationDropdown)}
+                    onPress={() => setShowDurationDropdown(true)}
                   >
                     <Text style={styles.dropdownText}>{selectedDuration} seconds</Text>
                     <ChevronDown color="#666" size={16} />
                   </TouchableOpacity>
-                  
-                  {showDurationDropdown && (
-                    <View style={styles.dropdownMenu}>
-                      {DURATION_OPTIONS.map((duration) => (
-                        <TouchableOpacity
-                          key={duration}
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setSelectedDuration(duration);
-                            setShowDurationDropdown(false);
-                          }}
-                        >
-                          <Text style={styles.dropdownItemText}>{duration} seconds</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
                 </View>
 
                 {/* Cost Display */}
@@ -489,40 +538,28 @@ export default function EditVideoScreen() {
             )}
           </View>
         </View>
-
-        {/* Status Information */}
-        <View style={styles.statusInfoSection}>
-          <Text style={styles.sectionTitle}>Status Information</Text>
-          <View style={styles.statusInfoCard}>
-            {videoData.status === 'on_hold' && (
-              <View style={styles.statusMessage}>
-                <Timer color="#F39C12" size={20} />
-                <Text style={styles.statusMessageText}>
-                  Video is pending and will enter the queue after the 10-minute hold period.
-                </Text>
-              </View>
-            )}
-
-            {videoData.status === 'active' && (
-              <View style={styles.statusMessage}>
-                <Play color="#2ECC71" size={20} />
-                <Text style={styles.statusMessageText}>
-                  Video is active and available in the view queue for users to watch.
-                </Text>
-              </View>
-            )}
-
-            {videoData.status === 'completed' && (
-              <View style={styles.statusMessage}>
-                <Eye color="#3498DB" size={20} />
-                <Text style={styles.statusMessageText}>
-                  Video has reached its target views and is no longer in the queue.
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
       </ScrollView>
+
+      {/* Smooth Dropdowns */}
+      <SmoothDropdown
+        visible={showViewsDropdown}
+        onClose={() => setShowViewsDropdown(false)}
+        options={VIEW_OPTIONS}
+        selectedValue={selectedViews}
+        onSelect={setSelectedViews}
+        label="Select Target Views"
+        suffix="views"
+      />
+
+      <SmoothDropdown
+        visible={showDurationDropdown}
+        onClose={() => setShowDurationDropdown(false)}
+        options={DURATION_OPTIONS}
+        selectedValue={selectedDuration}
+        onSelect={setSelectedDuration}
+        label="Select Watch Duration"
+        suffix="seconds"
+      />
     </View>
   );
 }
@@ -612,6 +649,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontFamily: 'monospace',
+  },
+  repromoteInfo: {
+    fontSize: 12,
+    color: '#9B59B6',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   pendingCard: {
     backgroundColor: '#FFF8E1',
@@ -795,23 +838,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
-  dropdownMenu: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    maxHeight: 200,
-  },
-  dropdownItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    color: '#333',
-  },
   costDisplay: {
     backgroundColor: '#F0F8FF',
     borderRadius: 8,
@@ -824,38 +850,64 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#3498DB',
   },
-  statusInfoSection: {
-    margin: 16,
-    marginBottom: 32,
+  // Modal Dropdown Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  statusInfoCard: {
+  dropdownModal: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    width: screenWidth * 0.8,
+    maxHeight: screenWidth * 0.8,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 3,
+        elevation: 8,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.25)',
       },
     }),
   },
-  statusMessage: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+  dropdownHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
-  statusMessageText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  dropdownList: {
+    maxHeight: screenWidth * 0.6,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F9FA',
+  },
+  selectedDropdownItem: {
+    backgroundColor: '#F0F8FF',
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedDropdownItemText: {
+    color: '#3498DB',
+    fontWeight: '600',
   },
 });

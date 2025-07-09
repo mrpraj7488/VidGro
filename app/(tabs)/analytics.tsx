@@ -278,6 +278,7 @@ export default function AnalyticsTab() {
       case 'completed': return '#3498DB';
       case 'paused': return '#E74C3C';
       case 'on_hold': return '#F39C12';
+      case 'repromoted': return '#9B59B6';
       default: return '#95A5A6';
     }
   };
@@ -288,6 +289,7 @@ export default function AnalyticsTab() {
       case 'completed': return 'COMPLETED';
       case 'paused': return 'PAUSED';
       case 'on_hold': return 'PENDING';
+      case 'repromoted': return 'REPROMOTED';
       default: return status.toUpperCase();
     }
   };
@@ -387,7 +389,7 @@ export default function AnalyticsTab() {
                     {video.title}
                   </Text>
                   <Text style={styles.videoStats}>
-                    {video.views_count}/{video.target_views} views • 🪙{video.coin_reward}/view
+                    {video.views_count}/{video.target_views} views
                   </Text>
                   <View style={styles.videoMeta}>
                     <Text style={styles.videoDate}>
@@ -400,6 +402,12 @@ export default function AnalyticsTab() {
                           <Text style={styles.holdTimerText}>
                             {formatHoldTimer(holdTimers[video.id])}
                           </Text>
+                        </View>
+                      )}
+                      {video.status === 'repromoted' && (
+                        <View style={styles.repromoteIndicator}>
+                          <Play color="#9B59B6" size={12} />
+                          <Text style={styles.repromoteText}>REPROMOTED</Text>
                         </View>
                       )}
                       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(video.status) }]}>
@@ -669,6 +677,20 @@ const styles = StyleSheet.create({
   holdTimerText: {
     fontSize: 10,
     color: '#F39C12',
+    fontWeight: '600',
+  },
+  repromoteIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3E5F5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 4,
+  },
+  repromoteText: {
+    fontSize: 9,
+    color: '#9B59B6',
     fontWeight: '600',
   },
   statusBadge: {
