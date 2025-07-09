@@ -1093,7 +1093,6 @@ export default function PromoteTab() {
                         <Text style={styles.controlButtonText}>Get Title</Text>
                       </TouchableOpacity>
                     </View>
-                    
                     <View style={styles.webviewContainer}>
                       <WebView
                         ref={webviewRef}
