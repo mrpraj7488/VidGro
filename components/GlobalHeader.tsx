@@ -12,19 +12,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  MoreVertical,
-  Share2,
-  Shield,
-  FileText,
-  Globe,
-  Settings,
-  MessageCircle,
-  LogOut,
-  Trash2,
-  User,
-  Coins,
-} from 'lucide-react-native';
+import { MoveVertical as MoreVertical, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User, Coins } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
