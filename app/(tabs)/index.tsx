@@ -10,7 +10,6 @@ import {
   AppStateStatus,
   ToastAndroid,
   ScrollView,
-  BackHandler,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -65,9 +64,6 @@ export default function ViewTab() {
   const [isSkipping, setIsSkipping] = useState(false);
   const [coinUpdateInProgress, setCoinUpdateInProgress] = useState(false);
   const [coinsAwarded, setCoinsAwarded] = useState(false);
-  const [isBackgroundPaused, setIsBackgroundPaused] = useState(false);
-  const [securityViolations, setSecurityViolations] = useState(0);
-  const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -75,8 +71,6 @@ export default function ViewTab() {
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const skipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const securityCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation values
   const progressValue = useSharedValue(0);
@@ -87,8 +81,6 @@ export default function ViewTab() {
   const coinReward = 3; // 3 coins per video
   const maxRetries = 1;
   const loadingTimeoutDuration = 3000;
-  const MAX_SECURITY_VIOLATIONS = 3;
-  const INTERACTION_TIMEOUT = 60000; // 1 minute of inactivity
 
   // Calculate remaining time for UI display
   const remainingTime = Math.max(0, targetDuration - currentTime);
@@ -122,77 +114,12 @@ export default function ViewTab() {
     }
   }, []);
 
-  // Enhanced security check function
-  const performSecurityCheck = useCallback(() => {
-    const now = Date.now();
-    const timeSinceLastInteraction = now - lastInteractionTime;
-    
-    // Check for suspicious inactivity
-    if (timeSinceLastInteraction > INTERACTION_TIMEOUT && isPlaying) {
-      console.log('🔒 Security: Suspicious inactivity detected, pausing video');
-      pauseVideo();
-      setSecurityViolations(prev => prev + 1);
-      
-      if (securityViolations >= MAX_SECURITY_VIOLATIONS) {
-        console.log('🚨 Security: Maximum violations reached, skipping video');
-        handleInstantSkip('Security violation - excessive inactivity');
-      }
-    }
-    
-    // Check app state consistency
-    if (appState !== 'active' && isPlaying) {
-      console.log('🔒 Security: App not active but video playing, forcing pause');
-      pauseVideo();
-      setIsBackgroundPaused(true);
-    }
-    
-    // Check tab focus consistency
-    if (!isTabFocused && isPlaying) {
-      console.log('🔒 Security: Tab not focused but video playing, forcing pause');
-      pauseVideo();
-    }
-  }, [lastInteractionTime, isPlaying, appState, isTabFocused, securityViolations]);
-
-  // Start security monitoring
-  useEffect(() => {
-    if (currentVideo && isVideoLoaded) {
-      securityCheckIntervalRef.current = setInterval(performSecurityCheck, 5000); // Check every 5 seconds
-      
-      return () => {
-        if (securityCheckIntervalRef.current) {
-          clearInterval(securityCheckIntervalRef.current);
-        }
-      };
-    }
-  }, [currentVideo, isVideoLoaded, performSecurityCheck]);
-
-  // Track user interactions for security
-  const trackInteraction = useCallback(() => {
-    setLastInteractionTime(Date.now());
-    setSecurityViolations(0); // Reset violations on interaction
-  }, []);
-
-  // Enhanced back handler for security
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (isPlaying) {
-        console.log('🔒 Security: Back button pressed, pausing video');
-        pauseVideo();
-        setIsBackgroundPaused(true);
-      }
-      return false; // Allow default back behavior
-    });
-
-    return () => backHandler.remove();
-  }, [isPlaying]);
-
   // Create HTML content for YouTube iframe with enhanced popup suppression
   const createHtmlContent = (videoId: string) => `
     <!DOCTYPE html>
     <html>
     <head>
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://www.youtube.com https://youtube.com; script-src 'self' 'unsafe-inline' https://www.youtube.com; frame-src https://www.youtube.com; style-src 'self' 'unsafe-inline';">
       <style>
         body {
           margin: 0;
@@ -208,21 +135,17 @@ export default function ViewTab() {
           -webkit-user-select: none;
           -moz-user-select: none;
           -ms-user-select: none;
-          -webkit-touch-callout: none;
-          -webkit-tap-highlight-color: transparent;
         }
         #player-container {
           position: relative;
           width: 100%;
           height: 100%;
-          isolation: isolate;
         }
         #player {
           width: 100%;
           height: 100%;
           border: none;
           pointer-events: none;
-          sandbox: allow-scripts allow-same-origin;
         }
         .loading {
           color: white;
@@ -234,17 +157,16 @@ export default function ViewTab() {
           transform: translate(-50%, -50%);
           z-index: 1000;
         }
-        .security-overlay, .interaction-blocker {
+        .security-overlay {
           position: absolute;
           top: 0;
           left: 0;
           width: 100%;
           height: 100%;
-          z-index: 10000;
+          z-index: 9999;
           background: transparent;
           pointer-events: auto;
           cursor: default;
-          touch-action: none;
         }
         * {
           user-select: none !important;
@@ -253,30 +175,9 @@ export default function ViewTab() {
           -ms-user-select: none !important;
           -webkit-touch-callout: none !important;
           -webkit-tap-highlight-color: transparent !important;
-          -webkit-user-drag: none !important;
-          -khtml-user-drag: none !important;
-          -moz-user-drag: none !important;
-          -o-user-drag: none !important;
-          user-drag: none !important;
         }
         iframe {
           pointer-events: none !important;
-          -webkit-user-select: none !important;
-          -moz-user-select: none !important;
-          -ms-user-select: none !important;
-        }
-        .security-warning {
-          position: fixed;
-          top: 10px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: rgba(255, 0, 0, 0.8);
-          color: white;
-          padding: 8px 16px;
-          border-radius: 4px;
-          font-size: 12px;
-          z-index: 10001;
-          display: none;
         }
       </style>
     </head>
@@ -284,22 +185,14 @@ export default function ViewTab() {
       <div id="player-container">
         <div id="player"></div>
         <div id="loading" class="loading">Loading video...</div>
-        <div class="security-warning" id="security-warning">Security violation detected</div>
-        <div class="security-overlay interaction-blocker" 
+        <div class="security-overlay" 
              oncontextmenu="return false;" 
              ondragstart="return false;" 
              onselectstart="return false;"
              onmousedown="return false;"
              ontouchstart="return false;"
              onclick="return false;"
-             ondblclick="return false;"
-             onkeydown="return false;"
-             onkeyup="return false;"
-             onkeypress="return false;"
-             onfocus="this.blur(); return false;"
-             oncut="return false;"
-             oncopy="return false;"
-             onpaste="return false;"></div>
+             ondblclick="return false;"></div>
       </div>
       
       <script>
@@ -320,66 +213,6 @@ export default function ViewTab() {
         var hasError = false;
         var debugMode = false; // Debug mode disabled
         var popupSuppressed = false;
-        var securityViolations = 0;
-        var lastInteractionTime = Date.now();
-        var isSecurityLocked = false;
-        var maxSecurityViolations = ${MAX_SECURITY_VIOLATIONS};
-        
-        // Enhanced security monitoring
-        function checkSecurity() {
-          var now = Date.now();
-          var timeSinceInteraction = now - lastInteractionTime;
-          
-          // Check for suspicious activity
-          if (timeSinceInteraction > 60000 && player && player.getPlayerState && player.getPlayerState() === 1) {
-            securityViolations++;
-            showSecurityWarning();
-            
-            if (securityViolations >= maxSecurityViolations) {
-              isSecurityLocked = true;
-              window.pauseVideo();
-              
-              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'SECURITY_VIOLATION',
-                reason: 'Excessive inactivity',
-                violations: securityViolations
-              }));
-            }
-          }
-          
-          // Check document visibility
-          if (document.hidden && player && player.getPlayerState && player.getPlayerState() === 1) {
-            window.pauseVideo();
-            
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'BACKGROUND_PAUSE',
-              reason: 'Document hidden'
-            }));
-          }
-        }
-        
-        function showSecurityWarning() {
-          var warning = document.getElementById('security-warning');
-          if (warning) {
-            warning.style.display = 'block';
-            setTimeout(function() {
-              warning.style.display = 'none';
-            }, 3000);
-          }
-        }
-        
-        function trackInteraction() {
-          lastInteractionTime = Date.now();
-          securityViolations = Math.max(0, securityViolations - 1);
-          
-          window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'USER_INTERACTION',
-            timestamp: lastInteractionTime
-          }));
-        }
-        
-        // Start security monitoring
-        setInterval(checkSecurity, 5000);
         
         // Set loading timeout
         loadingTimeoutId = setTimeout(function() {
@@ -441,9 +274,7 @@ export default function ViewTab() {
                 'iv_load_policy': 3,
                 'cc_load_policy': 0,
                 'end': targetDuration,
-                'widget_referrer': window.location.origin,
-                'html5': 1,
-                'wmode': 'opaque'
+                'widget_referrer': window.location.origin
               },
               events: {
                 'onReady': onPlayerReady,
@@ -475,16 +306,14 @@ export default function ViewTab() {
           if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
           document.getElementById('loading').style.display = 'none';
           
-          // Apply enhanced security to iframe
+          // Apply security to iframe
           setTimeout(function() {
             var iframe = document.querySelector('iframe');
             if (iframe) {
               iframe.style.pointerEvents = 'none';
               iframe.style.userSelect = 'none';
-              iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+              iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
               iframe.setAttribute('allowfullscreen', 'false');
-              iframe.setAttribute('allow', 'autoplay; encrypted-media');
-              iframe.style.isolation = 'isolate';
             }
           }, 100);
           
@@ -510,7 +339,7 @@ export default function ViewTab() {
         }
 
         function onPlayerStateChange(event) {
-          if (hasError || hasTimedOut || isSecurityLocked) {
+          if (hasError || hasTimedOut) {
             return;
           }
           
@@ -524,9 +353,6 @@ export default function ViewTab() {
             '5': 'CUED'
           };
           
-          // Track interaction on state change
-          trackInteraction();
-          
           window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'STATE_CHANGE',
             state: state,
@@ -538,15 +364,6 @@ export default function ViewTab() {
               hasStarted = true;
               window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'VIDEO_STARTED'
-              }));
-            }
-            
-            // Additional security check on play
-            if (!isTabVisible || document.hidden) {
-              player.pauseVideo();
-              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'SECURITY_PAUSE',
-                reason: 'Tab not visible or document hidden'
               }));
             }
           }
@@ -605,7 +422,7 @@ export default function ViewTab() {
           }
           
           progressInterval = setInterval(function() {
-            if (player && player.getCurrentTime && isPlayerReady && !hasCompleted && !isSecurityLocked) {
+            if (player && player.getCurrentTime && isPlayerReady && !hasCompleted) {
               try {
                 currentTime = player.getCurrentTime();
                 var progress = Math.min(currentTime / targetDuration, 1) * 100;
@@ -655,30 +472,27 @@ export default function ViewTab() {
           }, 1000);
         }
 
-        // Enhanced control functions with security checks
+        // Control functions
         window.playVideo = function() {
-          if (player && player.playVideo && isPlayerReady && isTabVisible && !isSecurityLocked && !document.hidden) {
-            trackInteraction();
+          if (player && player.playVideo && isPlayerReady && isTabVisible) {
             player.playVideo();
           }
         };
 
         window.pauseVideo = function() {
           if (player && player.pauseVideo && isPlayerReady) {
-            trackInteraction();
             player.pauseVideo();
           }
         };
 
         window.stopVideo = function() {
           if (player && player.stopVideo && isPlayerReady) {
-            trackInteraction();
             player.stopVideo();
             popupSuppressed = true;
           }
         };
 
-        // Enhanced tab visibility control
+        // Tab visibility control
         window.setTabVisibility = function(visible) {
           isTabVisible = visible;
           
@@ -690,7 +504,7 @@ export default function ViewTab() {
               wasPlayingBeforeHidden = false;
             }
           } else {
-            if (wasPlayingBeforeHidden && autoPlayEnabled && !isSecurityLocked) {
+            if (wasPlayingBeforeHidden && autoPlayEnabled) {
               setTimeout(function() {
                 window.playVideo();
               }, 500);
@@ -703,15 +517,10 @@ export default function ViewTab() {
           autoSkipEnabled = enabled;
         };
 
-        // Enhanced page visibility handling
+        // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
           if (document.hidden) {
             window.pauseVideo();
-            
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'DOCUMENT_HIDDEN',
-              timestamp: Date.now()
-            }));
           } else if (isTabVisible && autoPlayEnabled) {
             setTimeout(function() {
               window.playVideo();
@@ -719,7 +528,7 @@ export default function ViewTab() {
           }
         });
 
-        // Enhanced security: Block all navigation and interactions
+        // Security: Block navigation
         window.open = function() {
           return null;
         };
@@ -728,53 +537,15 @@ export default function ViewTab() {
           value: window.location,
           writable: false
         });
-        
-        // Block additional security risks
-        window.alert = function() { return false; };
-        window.confirm = function() { return false; };
-        window.prompt = function() { return null; };
-        
-        // Prevent iframe breakout attempts
-        if (window.top !== window.self) {
-          try {
-            window.top.location = window.self.location;
-          } catch (e) {
-            // Expected to fail, this is good
-          }
-        }
-        
-        // Additional event blocking
-        document.addEventListener('keydown', function(e) {
-          // Block F12, Ctrl+Shift+I, Ctrl+U, etc.
-          if (e.keyCode === 123 || 
-              (e.ctrlKey && e.shiftKey && e.keyCode === 73) ||
-              (e.ctrlKey && e.keyCode === 85)) {
-            e.preventDefault();
-            return false;
-          }
-          trackInteraction();
-        });
-        
-        document.addEventListener('contextmenu', function(e) {
-          e.preventDefault();
-          return false;
-        });
-        
-        // Track mouse/touch interactions
-        document.addEventListener('mousedown', trackInteraction);
-        document.addEventListener('touchstart', trackInteraction);
-        document.addEventListener('click', trackInteraction);
       </script>
     </body>
     </html>
   `;
 
-  // Handle tab focus changes with enhanced security
+  // Handle tab focus changes
   useFocusEffect(
     useCallback(() => {
       setIsTabFocused(true);
-      setIsBackgroundPaused(false);
-      trackInteraction();
       
       if (webviewRef.current) {
         webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(true); true;');
@@ -783,34 +554,23 @@ export default function ViewTab() {
       return () => {
         setIsTabFocused(false);
         
-        // Force pause when tab loses focus
-        if (isPlaying) {
-          pauseVideo();
-          setIsBackgroundPaused(true);
-        }
-        
         if (webviewRef.current) {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(false); true;');
         }
       };
-    }, [isPlaying])
+    }, [])
   );
 
-  // Enhanced app state change handling
+  // Handle app state changes
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      console.log('🔒 App state change:', appState, '->', nextAppState);
-      
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        if (isTabFocused && webviewRef.current && !isBackgroundPaused) {
+        if (isTabFocused && webviewRef.current) {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(true); true;');
-          trackInteraction();
         }
       } else if (nextAppState.match(/inactive|background/)) {
-        console.log('🔒 App going to background, forcing pause');
         pauseVideo();
         setIsPlaying(false);
-        setIsBackgroundPaused(true);
         if (webviewRef.current) {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(false); true;');
         }
@@ -820,7 +580,7 @@ export default function ViewTab() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [appState, isTabFocused, isBackgroundPaused]);
+  }, [appState, isTabFocused]);
 
   // Reset states when video changes
   useEffect(() => {
@@ -837,13 +597,10 @@ export default function ViewTab() {
       setRetryCount(0);
       setIsSkipping(false);
       setCoinsAwarded(false);
-      setIsBackgroundPaused(false);
-      setSecurityViolations(0);
-      setLastInteractionTime(Date.now());
       progressValue.value = 0;
       
       // Clear all timeouts
-      [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef, securityCheckIntervalRef, interactionTimeoutRef].forEach(ref => {
+      [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef].forEach(ref => {
         if (ref.current) {
           clearTimeout(ref.current);
           ref.current = null;
@@ -871,10 +628,9 @@ export default function ViewTab() {
     if (isSkipping) return;
     
     setIsSkipping(true);
-    console.log('⏭️ Instant skip:', reason);
     
     // Clear all timeouts
-    [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef, securityCheckIntervalRef, interactionTimeoutRef].forEach(ref => {
+    [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef].forEach(ref => {
       if (ref.current) {
         clearTimeout(ref.current);
         ref.current = null;
@@ -889,8 +645,6 @@ export default function ViewTab() {
     setVideoCompleted(false);
     setCoinsEarned(false);
     setHasStarted(false);
-    setIsBackgroundPaused(false);
-    setSecurityViolations(0);
     progressValue.value = 0;
     
     // Move to next video instantly
@@ -996,37 +750,15 @@ export default function ViewTab() {
     }
   }, [user, currentVideo, coinsEarned, coinUpdateInProgress, refreshProfile, profile?.coins]);
 
-  // Enhanced WebView message handler with security features
+  // WebView message handler with enhanced coin logic
   const handleWebViewMessage = useCallback(async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       
       switch (data.type) {
-        case 'USER_INTERACTION':
-          trackInteraction();
-          break;
-          
-        case 'SECURITY_VIOLATION':
-          console.log('🚨 Security violation:', data.reason);
-          setSecurityViolations(prev => prev + 1);
-          if (data.violations >= MAX_SECURITY_VIOLATIONS) {
-            handleInstantSkip('Security violation - ' + data.reason);
-          }
-          break;
-          
-        case 'BACKGROUND_PAUSE':
-        case 'DOCUMENT_HIDDEN':
-        case 'SECURITY_PAUSE':
-          console.log('🔒 Security pause:', data.reason);
-          setIsPlaying(false);
-          setIsBackgroundPaused(true);
-          break;
-          
         case 'PLAYER_READY_SUCCESS':
           setIsVideoLoaded(true);
           setPlayerError(null);
-          setSecurityViolations(0);
-          trackInteraction();
           if (loadingTimeoutRef.current) {
             clearTimeout(loadingTimeoutRef.current);
             loadingTimeoutRef.current = null;
@@ -1036,15 +768,11 @@ export default function ViewTab() {
         case 'VIDEO_STARTED':
           setHasStarted(true);
           setIsPlaying(true);
-          setIsBackgroundPaused(false);
-          trackInteraction();
           break;
           
         case 'STATE_CHANGE':
-          trackInteraction();
           if (data.state === 1) { // PLAYING
             setIsPlaying(true);
-            setIsBackgroundPaused(false);
           } else if (data.state === 2) { // PAUSED
             setIsPlaying(false);
           } else if (data.state === 0) { // ENDED
@@ -1057,7 +785,6 @@ export default function ViewTab() {
           
         case 'PROGRESS_UPDATE':
           setCurrentTime(data.currentTime);
-          trackInteraction();
           const progress = Math.min(data.currentTime / targetDuration, 1);
           progressValue.value = withTiming(progress, {
             duration: 300,
@@ -1067,7 +794,6 @@ export default function ViewTab() {
           
         case 'COINS_EARNED':
           if (!coinsEarned) {
-            trackInteraction();
             awardCoins(data.coinsEarned);
           }
           break;
@@ -1081,7 +807,6 @@ export default function ViewTab() {
           if (!videoCompleted) {
             setVideoCompleted(true);
             setIsPlaying(false);
-            setIsBackgroundPaused(false);
             // Move to next video instantly without showing completion message
             completionTimeoutRef.current = setTimeout(() => {
               handleInstantSkip('Video completed');
@@ -1119,28 +844,24 @@ export default function ViewTab() {
     } catch (error) {
       handleInstantSkip('Message parse error');
     }
-  }, [coinsEarned, targetDuration, videoCompleted, retryCount, maxRetries, handleInstantSkip, awardCoins, trackInteraction]);
+  }, [coinsEarned, targetDuration, videoCompleted, retryCount, maxRetries, handleInstantSkip, awardCoins]);
 
   const pauseVideo = useCallback(() => {
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript('window.pauseVideo && window.pauseVideo(); true;');
     }
-    trackInteraction();
   }, []);
 
   const playVideo = useCallback(() => {
-    if (webviewRef.current && isTabFocused && appState === 'active' && !isBackgroundPaused) {
+    if (webviewRef.current && isTabFocused && appState === 'active') {
       webviewRef.current.injectJavaScript('window.playVideo && window.playVideo(); true;');
     }
-    trackInteraction();
-  }, [isTabFocused, appState, isBackgroundPaused]);
+  }, [isTabFocused, appState]);
 
   const handlePlayPause = () => {
-    if (!isTabFocused || appState !== 'active' || isBackgroundPaused) {
+    if (!isTabFocused || appState !== 'active') {
       return;
     }
-    
-    trackInteraction();
     
     if (isPlaying) {
       pauseVideo();
@@ -1150,14 +871,12 @@ export default function ViewTab() {
   };
 
   const handleSkipVideo = () => {
-    trackInteraction();
     handleInstantSkip('Manual skip');
   };
 
   const toggleAutoPlay = () => {
     const newAutoPlay = !autoPlay;
     setAutoPlay(newAutoPlay);
-    trackInteraction();
     
     // Update auto-skip setting in WebView
     if (webviewRef.current) {
@@ -1168,7 +887,6 @@ export default function ViewTab() {
   const openYouTubeVideo = () => {
     if (!currentVideo) return;
     
-    trackInteraction();
     const youtubeUrl = `https://www.youtube.com/watch?v=${currentVideo.youtube_url}`;
     
     if (Platform.OS === 'web') {
@@ -1226,7 +944,7 @@ export default function ViewTab() {
   }
 
   return (
-    <View style={styles.container} onTouchStart={trackInteraction}>
+    <View style={styles.container}>
       {/* Header with VidGro branding */}
       <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
         <Menu color="white" size={24} />
@@ -1283,9 +1001,6 @@ export default function ViewTab() {
                 onNavigationStateChange={() => {}}
                 allowsLinkPreview={false}
                 allowsBackForwardNavigationGestures={false}
-                onLoadStart={() => trackInteraction()}
-                onLoadEnd={() => trackInteraction()}
-                onError={() => handleInstantSkip('WebView error')}
               />
             )}
             
@@ -1360,11 +1075,11 @@ export default function ViewTab() {
             <TouchableOpacity 
               style={[
                 styles.playButton, 
-                (!isVideoLoaded || !isTabFocused || isBackgroundPaused) && styles.playButtonDisabled,
+                (!isVideoLoaded || !isTabFocused) && styles.playButtonDisabled,
                 !isPlaying && styles.playButtonPaused
               ]}
               onPress={handlePlayPause}
-              disabled={!isVideoLoaded || !isTabFocused || isBackgroundPaused}
+              disabled={!isVideoLoaded || !isTabFocused}
             >
               {isPlaying ? (
                 <Pause color="white" size={20} />
@@ -1380,19 +1095,10 @@ export default function ViewTab() {
           </View>
 
           {/* Security Status */}
-          {(!isTabFocused || appState !== 'active' || isBackgroundPaused) && (
+          {(!isTabFocused || appState !== 'active') && (
             <View style={styles.securityWarning}>
               <Text style={styles.securityWarningText}>
-                🔒 {isBackgroundPaused ? 'Video paused - return to continue' : 'Stay on this tab to watch videos'}
-              </Text>
-            </View>
-          )}
-          
-          {/* Security Violations Warning */}
-          {securityViolations > 0 && (
-            <View style={[styles.securityWarning, styles.violationWarning]}>
-              <Text style={styles.securityWarningText}>
-                ⚠️ Security violations: {securityViolations}/{MAX_SECURITY_VIOLATIONS}
+                🔒 Stay on this tab to watch videos
               </Text>
             </View>
           )}
@@ -1751,10 +1457,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: isSmallScreen ? 12 : 16,
     marginTop: isSmallScreen ? 12 : 16,
-  },
-  violationWarning: {
-    backgroundColor: '#FFE5E5',
-    borderColor: '#FF9999',
   },
   securityWarningText: {
     color: '#856404',
