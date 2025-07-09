@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import { DollarSign, Crown, Zap } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { DollarSign, Crown, Zap, ShoppingCart } from 'lucide-react-native';
 
 interface CoinPackage {
   id: string;
@@ -15,43 +16,34 @@ interface CoinPurchaseProps {
 }
 
 const coinPackages: CoinPackage[] = [
-  { id: 'starter', coins: 100, price: '$0.99' },
-  { id: 'basic', coins: 500, price: '$4.99', bonus: 50 },
-  { id: 'popular', coins: 1200, price: '$9.99', bonus: 200, popular: true },
-  { id: 'premium', coins: 2500, price: '$19.99', bonus: 500 },
-  { id: 'ultimate', coins: 5500, price: '$39.99', bonus: 1500 },
+  { id: 'starter', coins: 3000, price: '₹74.00' },
+  { id: 'basic', coins: 10000, price: '₹215.00', bonus: 500 },
+  { id: 'popular', coins: 17000, price: '₹370.00', bonus: 1000, popular: true },
+  { id: 'premium', coins: 40000, price: '₹800.00', bonus: 2000 },
+  { id: 'ultimate', coins: 90000, price: '₹1600.00', bonus: 5000 },
+  { id: 'supreme', coins: 200000, price: '₹3550.00', bonus: 15000 },
 ];
 
 export default function CoinPurchase({ onPurchase }: CoinPurchaseProps) {
   const [loading, setLoading] = useState<string | null>(null);
 
   const handlePurchase = async (pkg: CoinPackage) => {
-    setLoading(pkg.id);
-    
-    try {
-      // Simulate purchase process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const totalCoins = pkg.coins + (pkg.bonus || 0);
-      onPurchase?.(pkg.id, totalCoins);
-      
-      Alert.alert(
-        'Purchase Successful!',
-        `You received ${totalCoins} coins!`,
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      Alert.alert('Purchase Failed', 'Please try again later.');
-    } finally {
-      setLoading(null);
-    }
+    // Navigate to the dedicated buy coins screen
+    router.push('/buy-coins');
   };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>Buy Coins</Text>
-        <Text style={styles.subtitle}>Choose a package to get started</Text>
+        <Text style={styles.title}>Quick Purchase</Text>
+        <Text style={styles.subtitle}>Or view all packages</Text>
+        <TouchableOpacity 
+          style={styles.viewAllButton}
+          onPress={() => router.push('/buy-coins')}
+        >
+          <ShoppingCart color="#FF4757" size={16} />
+          <Text style={styles.viewAllText}>View All Packages</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.packagesContainer}>
@@ -66,8 +58,8 @@ export default function CoinPurchase({ onPurchase }: CoinPurchaseProps) {
             onPress={() => handlePurchase(pkg)}
             disabled={loading !== null}
           >
-            {pkg.popular && (
-              <View style={styles.popularBadge}>
+            <Text style={styles.purchaseButtonText}>
+              {loading === pkg.id ? 'Processing...' : 'Quick Buy'}
                 <Crown color="white" size={16} />
                 <Text style={styles.popularText}>POPULAR</Text>
               </View>
@@ -240,5 +232,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     textAlign: 'center',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#FF4757',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#FF4757',
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  purchaseButtonText: {
+    backgroundColor: '#4ECDC4',
+    color: 'white',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    fontSize: 14,
+    fontWeight: '600',
+    overflow: 'hidden',
   },
 });

@@ -65,7 +65,7 @@ export default function OthersTab() {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleBuyCoins = () => {
-    Alert.alert('Buy Coins', 'Coin purchase feature coming soon!');
+    router.push('/buy-coins');
   };
 
   const handleBecomeVIP = () => {
