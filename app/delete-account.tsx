@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Trash2, AlertTriangle, Shield, Clock } from 'lucide-react-native';
+import { ArrowLeft, Trash2, TriangleAlert as AlertTriangle, Shield, Clock } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,

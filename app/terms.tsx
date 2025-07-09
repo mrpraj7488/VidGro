@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, FileText, Scale, AlertTriangle, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, FileText, Scale, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
