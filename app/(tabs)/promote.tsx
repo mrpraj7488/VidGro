@@ -1012,34 +1012,6 @@ export default function PromoteTab() {
         </View>
       </LinearGradient>
 
-      {/* Hold Period Information Card */}
-      <View style={styles.holdInfoCard}>
-        <Text style={styles.holdInfoTitle}>📋 Promotion Process</Text>
-        <Text style={styles.holdInfoText}>
-          After promotion, your video will be held for 10 minutes before entering the view queue.
-        </Text>
-        <View style={styles.statusFlow}>
-          <View style={styles.statusStep}>
-            <View style={[styles.statusDot, { backgroundColor: '#F39C12' }]} />
-            <Text style={styles.statusStepText}>PENDING (0-10 min)</Text>
-          </View>
-          <View style={styles.statusArrow}>
-            <Text style={styles.statusArrowText}>→</Text>
-          </View>
-          <View style={styles.statusStep}>
-            <View style={[styles.statusDot, { backgroundColor: '#2ECC71' }]} />
-            <Text style={styles.statusStepText}>ACTIVE (In Queue)</Text>
-          </View>
-          <View style={styles.statusArrow}>
-            <Text style={styles.statusArrowText}>→</Text>
-          </View>
-          <View style={styles.statusStep}>
-            <View style={[styles.statusDot, { backgroundColor: '#3498DB' }]} />
-            <Text style={styles.statusStepText}>COMPLETED</Text>
-          </View>
-        </View>
-      </View>
-
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
