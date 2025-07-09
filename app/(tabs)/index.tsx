@@ -11,11 +11,10 @@ import {
   ToastAndroid,
   ScrollView,
   BackHandler,
-  Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, SkipForward, Clock, ExternalLink, Menu } from 'lucide-react-native';
+import { Play, Pause, SkipForward, Clock, Coins, ExternalLink, Menu } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
@@ -53,11 +52,6 @@ export default function ViewTab() {
 
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
-  const [watchTime, setWatchTime] = useState(0);
-  const [securityPauseActive, setSecurityPauseActive] = useState(false);
-  const lastSecurityPauseRef = useRef(0);
-  const [retryCount, setRetryCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
@@ -67,6 +61,7 @@ export default function ViewTab() {
   const [coinsEarned, setCoinsEarned] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [isTabFocused, setIsTabFocused] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const [isSkipping, setIsSkipping] = useState(false);
   const [coinUpdateInProgress, setCoinUpdateInProgress] = useState(false);
   const [coinsAwarded, setCoinsAwarded] = useState(false);
@@ -82,8 +77,6 @@ export default function ViewTab() {
   const skipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const securityCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const securityPauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isSecurityPausedRef = useRef(false);
 
   // Animation values
   const progressValue = useSharedValue(0);
@@ -192,98 +185,6 @@ export default function ViewTab() {
 
     return () => backHandler.remove();
   }, [isPlaying]);
-
-  const triggerSecurityPause = useCallback(() => {
-    const now = Date.now();
-    
-    // Prevent multiple simultaneous security pauses and add cooldown
-    if (securityPauseActive || (now - lastSecurityPauseRef.current < 5000)) {
-      console.log('🔒 Security pause already active or in cooldown, skipping');
-      return;
-    }
-
-    lastSecurityPauseRef.current = now;
-    setSecurityPauseActive(true);
-    setIsPlaying(false);
-    
-    console.log('🔒 Security pause triggered at', new Date().toLocaleTimeString());
-    
-    // Auto-resume after 3 seconds
-    setTimeout(() => {
-      setSecurityPauseActive(false);
-      setIsPlaying(true);
-      console.log('▶️ Security pause ended, resuming playback at', new Date().toLocaleTimeString());
-    }, 3000);
-  }, [securityPauseActive]);
-
-  const handlePlayPause = useCallback(() => {
-    // Prevent play/pause during security pause
-    if (securityPauseActive) {
-      return;
-    }
-    
-    setIsPlaying(!isPlaying);
-  }, [isPlaying, securityPauseActive]);
-
-  const handleVideoEnd = useCallback(async () => {
-    if (!currentVideo || !user) return;
-
-    // Only award coins if video was watched for sufficient time
-    if (watchTime >= 30) {
-      try {
-        const success = await supabase.rpc('complete_video_view', {
-          user_uuid: user.id,
-          video_uuid: currentVideo.id,
-          watch_duration: Math.floor(watchTime)
-        });
-
-        if (success) {
-          await refreshProfile();
-        }
-      } catch (error) {
-        console.error('Error completing video view:', error);
-      }
-    }
-
-    // Move to next video
-    moveToNextVideo();
-  }, [currentVideo, user, watchTime, refreshProfile, moveToNextVideo]);
-
-  // Watch time tracking
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isPlaying && !securityPauseActive && currentVideo) {
-      interval = setInterval(() => {
-        setWatchTime(prevTime => prevTime + 1);
-      }, 1000);
-    }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isPlaying, securityPauseActive]);
-
-  // Security pause trigger (every 30-45 seconds)
-  useEffect(() => {
-    if (!isPlaying || securityPauseActive) return;
-
-    const randomDelay = Math.random() * 15000 + 30000; // 30-45 seconds
-    const timeout = setTimeout(() => {
-      triggerSecurityPause();
-    }, randomDelay);
-
-    return () => clearTimeout(timeout);
-  }, [isPlaying, securityPauseActive, triggerSecurityPause]);
-
-  // Auto-fetch videos when queue is empty
-  useEffect(() => {
-    if (user && videoQueue.length === 0) {
-      fetchVideos(user.id);
-    }
-  }, [user, videoQueue.length, fetchVideos]);
 
   // Create HTML content for YouTube iframe with enhanced popup suppression
   const createHtmlContent = (videoId: string) => `
@@ -895,42 +796,21 @@ export default function ViewTab() {
     }, [isPlaying])
   );
 
-  // Enhanced app state change handling with fixed security pause logic
+  // Enhanced app state change handling
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       console.log('🔒 App state change:', appState, '->', nextAppState);
       
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        // Clear security pause timeout when returning to active
-        if (securityPauseTimeoutRef.current) {
-          clearTimeout(securityPauseTimeoutRef.current);
-          securityPauseTimeoutRef.current = null;
-        }
-        
-        // Reset security pause flag after a delay
-        setTimeout(() => {
-          isSecurityPausedRef.current = false;
-        }, 500);
-        
         if (isTabFocused && webviewRef.current && !isBackgroundPaused) {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(true); true;');
           trackInteraction();
         }
       } else if (nextAppState.match(/inactive|background/)) {
         console.log('🔒 App going to background, forcing pause');
-        
-        // Set security pause flag immediately
-        isSecurityPausedRef.current = true;
-        
-        // Set timeout to prevent immediate resume
-        securityPauseTimeoutRef.current = setTimeout(() => {
-          isSecurityPausedRef.current = false;
-        }, 2000); // 2 second delay
-        
         pauseVideo();
         setIsPlaying(false);
         setIsBackgroundPaused(true);
-        
         if (webviewRef.current) {
           webviewRef.current.injectJavaScript('window.setTabVisibility && window.setTabVisibility(false); true;');
         }
@@ -963,15 +843,12 @@ export default function ViewTab() {
       progressValue.value = 0;
       
       // Clear all timeouts
-      [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef, securityCheckIntervalRef, interactionTimeoutRef, securityPauseTimeoutRef].forEach(ref => {
+      [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef, securityCheckIntervalRef, interactionTimeoutRef].forEach(ref => {
         if (ref.current) {
           clearTimeout(ref.current);
           ref.current = null;
         }
       });
-      
-      // Reset security pause flag
-      isSecurityPausedRef.current = false;
       
       // Set loading timeout for instant skip
       loadingTimeoutRef.current = setTimeout(() => {
@@ -982,6 +859,13 @@ export default function ViewTab() {
     }
   }, [currentVideo]);
 
+  // Fetch videos on component mount
+  useEffect(() => {
+    if (user && videoQueue.length === 0) {
+      fetchVideos(user.id);
+    }
+  }, [user, videoQueue.length, fetchVideos]);
+
   // Instant skip function for seamless experience
   const handleInstantSkip = useCallback((reason: string = 'Video unavailable') => {
     if (isSkipping) return;
@@ -990,7 +874,7 @@ export default function ViewTab() {
     console.log('⏭️ Instant skip:', reason);
     
     // Clear all timeouts
-    [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef, securityCheckIntervalRef, interactionTimeoutRef, securityPauseTimeoutRef].forEach(ref => {
+    [loadingTimeoutRef, completionTimeoutRef, skipTimeoutRef, securityCheckIntervalRef, interactionTimeoutRef].forEach(ref => {
       if (ref.current) {
         clearTimeout(ref.current);
         ref.current = null;
@@ -1008,7 +892,6 @@ export default function ViewTab() {
     setIsBackgroundPaused(false);
     setSecurityViolations(0);
     progressValue.value = 0;
-    isSecurityPausedRef.current = false;
     
     // Move to next video instantly
     skipTimeoutRef.current = setTimeout(() => {
@@ -1239,12 +1122,6 @@ export default function ViewTab() {
   }, [coinsEarned, targetDuration, videoCompleted, retryCount, maxRetries, handleInstantSkip, awardCoins, trackInteraction]);
 
   const pauseVideo = useCallback(() => {
-    // Don't pause if security pause is active
-    if (isSecurityPausedRef.current) {
-      console.log('🔒 Security pause: Pause blocked');
-      return;
-    }
-    
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript('window.pauseVideo && window.pauseVideo(); true;');
     }
@@ -1252,17 +1129,25 @@ export default function ViewTab() {
   }, []);
 
   const playVideo = useCallback(() => {
-    // Don't play if security pause is active
-    if (isSecurityPausedRef.current) {
-      console.log('🔒 Security pause: Play blocked');
-      return;
-    }
-    
     if (webviewRef.current && isTabFocused && appState === 'active' && !isBackgroundPaused) {
       webviewRef.current.injectJavaScript('window.playVideo && window.playVideo(); true;');
     }
     trackInteraction();
   }, [isTabFocused, appState, isBackgroundPaused]);
+
+  const handlePlayPause = () => {
+    if (!isTabFocused || appState !== 'active' || isBackgroundPaused) {
+      return;
+    }
+    
+    trackInteraction();
+    
+    if (isPlaying) {
+      pauseVideo();
+    } else {
+      playVideo();
+    }
+  };
 
   const handleSkipVideo = () => {
     trackInteraction();
@@ -1288,10 +1173,6 @@ export default function ViewTab() {
     
     if (Platform.OS === 'web') {
       window.open(youtubeUrl, '_blank');
-    } else {
-      Linking.openURL(youtubeUrl).catch(err => {
-        console.error('Failed to open YouTube:', err);
-      });
     }
   };
 
@@ -1311,7 +1192,8 @@ export default function ViewTab() {
           <Menu color="white" size={24} />
           <Text style={styles.headerTitle}>VidGro</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-            <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
+            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+            <Coins color="#FFD700" size={20} />
           </Animated.View>
         </LinearGradient>
         
@@ -1330,7 +1212,8 @@ export default function ViewTab() {
           <Menu color="white" size={24} />
           <Text style={styles.headerTitle}>VidGro</Text>
           <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-            <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
+            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+            <Coins color="#FFD700" size={20} />
           </Animated.View>
         </LinearGradient>
         
@@ -1349,7 +1232,8 @@ export default function ViewTab() {
         <Menu color="white" size={24} />
         <Text style={styles.headerTitle}>VidGro</Text>
         <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-          <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
+          <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+          <Coins color="#FFD700" size={isSmallScreen ? 18 : 20} />
         </Animated.View>
       </LinearGradient>
 
@@ -1434,7 +1318,7 @@ export default function ViewTab() {
             
             <View style={styles.statCard}>
               <Animated.View style={[styles.statIconContainer, coinAnimatedStyle]}>
-                <Text style={styles.coinIcon}>🪙</Text>
+                <Coins color="#FFA726" size={18} />
               </Animated.View>
               <Text style={styles.statValue}>{coinReward}</Text>
               <Text style={styles.statLabel}>Coins</Text>
@@ -1446,7 +1330,7 @@ export default function ViewTab() {
         <View style={styles.controlsSection}>
           {/* Top Controls */}
           <View style={styles.topControls}>
-            <TouchableOpacity style={styles.youtubeContainer} onPress={openYouTubeVideo}>
+            <TouchableOpacity style={styles.autoPlayContainer} onPress={openYouTubeVideo}>
               <ExternalLink color="#FF4757" size={16} />
               <Text style={styles.youtubeLabel}>YouTube</Text>
             </TouchableOpacity>
@@ -1476,11 +1360,11 @@ export default function ViewTab() {
             <TouchableOpacity 
               style={[
                 styles.playButton, 
-                (!isVideoLoaded || !isTabFocused || isBackgroundPaused || isSecurityPausedRef.current) && styles.playButtonDisabled,
+                (!isVideoLoaded || !isTabFocused || isBackgroundPaused) && styles.playButtonDisabled,
                 !isPlaying && styles.playButtonPaused
               ]}
               onPress={handlePlayPause}
-              disabled={!isVideoLoaded || !isTabFocused || isBackgroundPaused || isSecurityPausedRef.current}
+              disabled={!isVideoLoaded || !isTabFocused || isBackgroundPaused}
             >
               {isPlaying ? (
                 <Pause color="white" size={20} />
@@ -1496,10 +1380,10 @@ export default function ViewTab() {
           </View>
 
           {/* Security Status */}
-          {(!isTabFocused || appState !== 'active' || isBackgroundPaused || isSecurityPausedRef.current) && (
+          {(!isTabFocused || appState !== 'active' || isBackgroundPaused) && (
             <View style={styles.securityWarning}>
               <Text style={styles.securityWarningText}>
-                🔒 {isBackgroundPaused || isSecurityPausedRef.current ? 'Video paused - return to continue' : 'Stay on this tab to watch videos'}
+                🔒 {isBackgroundPaused ? 'Video paused - return to continue' : 'Stay on this tab to watch videos'}
               </Text>
             </View>
           )}
@@ -1552,6 +1436,7 @@ const styles = StyleSheet.create({
     color: '#FFD700',
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
+    marginRight: isSmallScreen ? 4 : 6,
   },
   scrollView: {
     flex: 1,
@@ -1705,9 +1590,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: isSmallScreen ? 8 : 12,
   },
-  coinIcon: {
-    fontSize: 18,
-  },
   statValue: {
     fontSize: isSmallScreen ? 24 : 28,
     fontWeight: 'bold',
@@ -1748,7 +1630,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: isSmallScreen ? 16 : 20,
   },
-  youtubeContainer: {
+  autoPlayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: isSmallScreen ? 6 : 8,
@@ -1757,11 +1639,6 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 12 : 14,
     color: '#FF4757',
     fontWeight: '500',
-  },
-  autoPlayContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: isSmallScreen ? 6 : 8,
   },
   autoPlayLabel: {
     fontSize: isSmallScreen ? 12 : 14,
