@@ -13,11 +13,12 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { MoveVertical as MoreVertical, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User, Coins } from 'lucide-react-native';
+import { Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -42,22 +43,21 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
   
   // Animation values
   const coinBounce = useSharedValue(1);
-  const menuScale = useSharedValue(0);
+  const slideX = useSharedValue(-screenWidth);
 
   const handleMenuPress = () => {
     setMenuVisible(true);
-    menuScale.value = withSpring(1, {
-      damping: 15,
+    slideX.value = withSpring(0, {
+      damping: 20,
       stiffness: 150,
     });
   };
 
   const handleCloseMenu = () => {
-    menuScale.value = withSpring(0, {
-      damping: 15,
-      stiffness: 150,
+    slideX.value = withTiming(-screenWidth, {
+      duration: 300,
     });
-    setTimeout(() => setMenuVisible(false), 200);
+    setTimeout(() => setMenuVisible(false), 300);
   };
 
   const handleLogout = () => {
@@ -149,60 +149,61 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
     transform: [{ scale: coinBounce.value }],
   }));
 
-  const menuAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: menuScale.value }],
-    opacity: menuScale.value,
+  const slideAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideX.value }],
   }));
 
   return (
     <>
       <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
         <View style={styles.headerContent}>
+          {/* Left Section - Menu + Title */}
           <View style={styles.leftSection}>
-            <Text style={styles.headerTitle}>{title}</Text>
-          </View>
-          
-          <View style={styles.rightSection}>
-            {showCoinDisplay && (
-              <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-                <Coins color="#FFD700" size={isSmallScreen ? 16 : 18} />
-                <Text style={styles.coinCount}>{profile?.coins?.toLocaleString() || '0'}</Text>
-              </Animated.View>
-            )}
-            
             <TouchableOpacity
               style={styles.menuButton}
               onPress={handleMenuPress}
               activeOpacity={0.7}
             >
-              <MoreVertical color="white" size={24} />
+              <View style={styles.hamburgerIcon}>
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+              </View>
             </TouchableOpacity>
+            
+            <Text style={styles.headerTitle}>{title}</Text>
           </View>
+          
+          {/* Right Section - Coin Display */}
+          {showCoinDisplay && (
+            <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
+              <Text style={styles.coinEmoji}>🪙</Text>
+              <Text style={styles.coinCount}>{profile?.coins?.toLocaleString() || '0'}</Text>
+            </Animated.View>
+          )}
         </View>
       </LinearGradient>
 
       <Modal
         visible={menuVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={handleCloseMenu}
         statusBarTranslucent
       >
         <Pressable style={styles.modalOverlay} onPress={handleCloseMenu}>
-          <Animated.View style={[styles.menuContainer, menuAnimatedStyle]}>
+          <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             <Pressable onPress={(e) => e.stopPropagation()}>
               {/* User Profile Section */}
-              <View style={styles.userSection}>
+              <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
                 <View style={styles.avatar}>
-                  <User color="#800080" size={isSmallScreen ? 24 : 28} />
+                  <User color="white" size={isSmallScreen ? 24 : 28} />
                 </View>
                 <View style={styles.userInfo}>
                   <Text style={styles.userName}>{profile?.username || 'User'}</Text>
                   <Text style={styles.userEmail}>{user?.email || ''}</Text>
                 </View>
-              </View>
-
-              <View style={styles.divider} />
+              </LinearGradient>
 
               {/* Menu Items */}
               <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
@@ -238,10 +239,8 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: '#800080',
-    height: 60,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     paddingTop: Platform.OS === 'ios' ? 50 : 40,
     minHeight: Platform.OS === 'ios' ? 100 : 90,
   },
@@ -252,106 +251,110 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   leftSection: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 16,
+  },
+  hamburgerIcon: {
+    width: 20,
+    height: 16,
+    justifyContent: 'space-between',
+  },
+  hamburgerLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: 'white',
+    borderRadius: 1,
+  },
+  headerTitle: {
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: 'bold',
+    color: 'white',
+    letterSpacing: 0.5,
   },
   coinDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: isSmallScreen ? 8 : 10,
-    paddingVertical: isSmallScreen ? 4 : 6,
-    borderRadius: 16,
+    paddingHorizontal: isSmallScreen ? 10 : 12,
+    paddingVertical: isSmallScreen ? 6 : 8,
+    borderRadius: 20,
+  },
+  coinEmoji: {
+    fontSize: isSmallScreen ? 16 : 18,
+    marginRight: 4,
   },
   coinCount: {
-    color: '#FFD700',
-    fontSize: isSmallScreen ? 12 : 14,
+    color: 'white',
+    fontSize: isSmallScreen ? 14 : 16,
     fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  menuButton: {
-    padding: 4,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: Platform.OS === 'ios' ? 100 : 90,
-    paddingRight: 10,
   },
-  menuContainer: {
+  slideMenu: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: isSmallScreen ? 280 : 320,
     backgroundColor: 'white',
-    borderRadius: 12,
-    minWidth: isSmallScreen ? 250 : 280,
-    maxWidth: screenWidth - 40,
-    maxHeight: '70%',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
+        shadowOffset: { width: 2, height: 0 },
         shadowOpacity: 0.25,
         shadowRadius: 16,
       },
       android: {
-        elevation: 8,
+        elevation: 16,
       },
       web: {
-        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.25)',
+        boxShadow: '2px 0 16px rgba(0, 0, 0, 0.25)',
       },
     }),
   },
   userSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8F9FA',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    padding: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
   },
   avatar: {
-    width: isSmallScreen ? 40 : 48,
-    height: isSmallScreen ? 40 : 48,
-    borderRadius: isSmallScreen ? 20 : 24,
-    backgroundColor: '#E8E5FF',
+    width: isSmallScreen ? 50 : 60,
+    height: isSmallScreen ? 50 : 60,
+    borderRadius: isSmallScreen ? 25 : 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
   },
   userEmail: {
-    fontSize: isSmallScreen ? 11 : 12,
-    color: '#666',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
+    fontSize: isSmallScreen ? 12 : 14,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   menuScrollView: {
-    maxHeight: 400,
+    flex: 1,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: isSmallScreen ? 12 : 14,
+    paddingHorizontal: 20,
+    paddingVertical: isSmallScreen ? 16 : 18,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
@@ -359,12 +362,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   menuItemIcon: {
-    marginRight: 12,
+    marginRight: 16,
     width: 24,
     alignItems: 'center',
   },
   menuItemText: {
-    fontSize: isSmallScreen ? 14 : 15,
+    fontSize: isSmallScreen ? 15 : 16,
     fontWeight: '500',
     color: '#333',
     flex: 1,
