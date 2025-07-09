@@ -1090,7 +1090,7 @@ export default function PromoteTab() {
                         <Text style={styles.controlButtonText}>Get Title</Text>
                       >
                         <Type color="#FF4757" size={16} />
-                        <Text style={styles.controlButtonText}>Get Title</Text>
+                        <Text style={styles.controlBuyttonText}>Get Title</Text>
                       </TouchableOpacity>
                     </View>
                     <View style={styles.webviewContainer}>
