@@ -12,6 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Play, Pause, SkipForward, Clock, Coins, ExternalLink, Menu } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
@@ -906,13 +907,7 @@ export default function ViewTab() {
   if (isLoading && videoQueue.length === 0) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
-          <Menu color="white" size={24} />
-          <Text style={styles.headerTitle}>VidGro</Text>
-          <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-            <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
-          </Animated.View>
-        </LinearGradient>
+        <GlobalHeader title="VidGro" showCoinDisplay={true} />
         
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF4757" />
@@ -925,13 +920,7 @@ export default function ViewTab() {
   if (!currentVideo) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['#FF4757', '#FF6B8A']} style={styles.header}>
-          <Menu color="white" size={24} />
-          <Text style={styles.headerTitle}>VidGro</Text>
-          <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-            <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
-          </Animated.View>
-        </LinearGradient>
+        <GlobalHeader title="VidGro" showCoinDisplay={true} />
         
         <View style={styles.noVideoContainer}>
           <Text style={styles.noVideoText}>Loading next video...</Text>

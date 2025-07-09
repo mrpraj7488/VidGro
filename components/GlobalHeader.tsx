@@ -10,6 +10,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { MoveVertical as MoreVertical, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User, Coins } from 'lucide-react-native';
@@ -155,7 +156,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
 
   return (
     <>
-      <View style={styles.header}>
+      <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.leftSection}>
             <Text style={styles.headerTitle}>{title}</Text>
@@ -178,7 +179,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       <Modal
         visible={menuVisible}
