@@ -1033,7 +1033,7 @@ export default function ViewTab() {
                 <Text style={styles.coinEmoji}>🪙</Text>
               </Animated.View>
               <Text style={styles.statValue}>{coinReward}</Text>
-              <Text style={styles.statLabel}>🪙Coins</Text>
+              <Text style={styles.statLabel}>Coins</Text>
             </View>
           </View>
         </View>
