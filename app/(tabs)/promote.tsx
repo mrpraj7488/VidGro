@@ -430,7 +430,6 @@ import {
   Constrained,
   Unconstrained,
   Fixed,
-  Variable,
   Static,
   Dynamic,
   Flexible,
