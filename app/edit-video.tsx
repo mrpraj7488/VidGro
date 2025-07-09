@@ -290,6 +290,24 @@ export default function EditVideoScreen() {
   const handleRepromoteVideo = async () => {
     if (!videoData || !user || repromoting) return;
 
+    // Check if video has completed its criteria before allowing repromote
+    if (videoData.status === 'active' && videoData.views_count < videoData.target_views) {
+      Alert.alert(
+        'Cannot Repromote',
+        'This video is still active and hasn\'t reached its target views yet. Please wait for it to complete or pause it first.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (videoData.status === 'on_hold') {
+      Alert.alert(
+        'Cannot Repromote',
+        'This video is currently on hold. Please wait for the hold period to complete.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     setRepromoting(true);
     
     try {
@@ -356,6 +374,14 @@ export default function EditVideoScreen() {
     } finally {
       setRepromoting(false);
     }
+  };
+
+  // Check if video can be repromoted
+  const canRepromote = () => {
+    if (!videoData) return false;
+    
+    // Allow repromote only for completed, paused, or repromoted videos
+    return ['completed', 'paused', 'repromoted'].includes(videoData.status);
   };
 
   const formatHoldTimer = (seconds: number) => {
@@ -869,14 +895,17 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   fullScreenModal: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: '50%',
+    borderRadius: 20,
+    maxHeight: '70%',
+    minHeight: '40%',
+    width: '100%',
+    maxWidth: 400,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -904,6 +933,8 @@ const styles = StyleSheet.create({
   modalList: {
     flex: 1,
     backgroundColor: 'white',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -924,5 +955,13 @@ const styles = StyleSheet.create({
   selectedDropdownItemText: {
     color: '#3498DB',
     fontWeight: '600',
+  },
+  disabledText: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  chevronDisabled: {
+    opacity: 0.5,
   },
 });
