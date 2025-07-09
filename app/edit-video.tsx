@@ -14,7 +14,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { ArrowLeft, Eye, Clock, TrendingUp, Activity, ChartBar as BarChart3, Trash2, RotateCcw, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Timer, Play, Pause } from 'lucide-react-native';
+import { 
+  ArrowLeft, 
+  Eye, 
+  Clock, 
+  Trash2, 
+  RotateCcw, 
+  Timer,
+  Play,
+  Pause,
+  CircleCheck as CheckCircle,
+  AlertTriangle
+} from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -25,29 +36,30 @@ import Animated, {
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
 
-interface VideoAnalytics {
-  totalViews: number;
-  completedViews: number;
-  totalWatchTime: number;
-  engagementRate: number;
-  completionRate: number;
-  averageWatchTime: number;
-  coinsEarned: number;
-  viewsRemaining: number;
-  estimatedCompletionDays: number;
-  minutesSinceCreation: number;
-  canDelete: boolean;
-  refundPercentage: number;
-  refundAmount: number;
+interface VideoData {
+  id: string;
+  youtube_url: string;
+  title: string;
+  views_count: number;
+  target_views: number;
+  coin_reward: number;
+  coin_cost: number;
+  status: 'active' | 'paused' | 'completed' | 'on_hold';
+  created_at: string;
+  updated_at: string;
+  hold_until?: string;
+  duration_seconds: number;
+  video_views?: any[];
 }
 
 export default function EditVideoScreen() {
   const { user, profile, refreshProfile } = useAuth();
   const { clearQueue } = useVideoStore();
   const params = useLocalSearchParams();
-  const [videoData, setVideoData] = useState<any>(null);
-  const [analytics, setAnalytics] = useState<VideoAnalytics | null>(null);
+  const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [holdTimer, setHoldTimer] = useState(0);
+  const [repromoteToggle, setRepromoteToggle] = useState(false);
 
   // Animation values
   const coinBounce = useSharedValue(1);
@@ -57,7 +69,16 @@ export default function EditVideoScreen() {
       try {
         const video = JSON.parse(params.videoData as string);
         setVideoData(video);
-        calculateAnalytics(video);
+        
+        // Calculate hold timer if video is on hold
+        if (video.status === 'on_hold') {
+          const holdUntil = new Date(video.hold_until || video.created_at);
+          holdUntil.setMinutes(holdUntil.getMinutes() + 10);
+          const remainingMs = holdUntil.getTime() - new Date().getTime();
+          setHoldTimer(Math.max(0, Math.floor(remainingMs / 1000)));
+        }
+        
+        setLoading(false);
       } catch (error) {
         console.error('Error parsing video data:', error);
         router.back();
@@ -65,83 +86,78 @@ export default function EditVideoScreen() {
     }
   }, [params.videoData]);
 
-  const calculateAnalytics = (video: any) => {
-    const views = video.video_views || [];
-    const totalViews = views.length;
-    const completedViews = views.filter((view: any) => view.completed).length;
-    const totalWatchTime = views.reduce((sum: number, view: any) => sum + view.watched_duration, 0);
-    const coinsEarned = views.reduce((sum: number, view: any) => sum + view.coins_earned, 0);
-    const engagementRate = totalViews > 0 ? (completedViews / totalViews) * 100 : 0;
-    const completionRate = video.target_views > 0 ? (video.views_count / video.target_views) * 100 : 0;
-    const averageWatchTime = totalViews > 0 ? totalWatchTime / totalViews : 0;
-    const viewsRemaining = Math.max(0, video.target_views - video.views_count);
-
-    // Calculate time since creation
-    const createdTime = new Date(video.created_at);
-    const now = new Date();
-    const minutesSinceCreation = Math.floor((now.getTime() - createdTime.getTime()) / (1000 * 60));
-
-    // Calculate refund information
-    const isWithin10Minutes = minutesSinceCreation <= 10;
-    const refundPercentage = isWithin10Minutes ? 100 : 80;
-    const refundAmount = Math.floor((video.coin_cost * refundPercentage) / 100);
-
-    // Estimate completion time
-    let estimatedCompletionDays = -1;
-    if (video.views_count > 0 && viewsRemaining > 0) {
-      const daysSinceCreated = (now.getTime() - createdTime.getTime()) / (1000 * 60 * 60 * 24);
-      const viewsPerDay = video.views_count / Math.max(daysSinceCreated, 1);
-      if (viewsPerDay > 0) {
-        estimatedCompletionDays = viewsRemaining / viewsPerDay;
-      }
+  // Update hold timer every second
+  useEffect(() => {
+    if (holdTimer > 0) {
+      const interval = setInterval(() => {
+        setHoldTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => clearInterval(interval);
     }
+  }, [holdTimer]);
 
-    setAnalytics({
-      totalViews,
-      completedViews,
-      totalWatchTime,
-      engagementRate,
-      completionRate,
-      averageWatchTime,
-      coinsEarned,
-      viewsRemaining,
-      estimatedCompletionDays,
-      minutesSinceCreation,
-      canDelete: true,
-      refundPercentage,
-      refundAmount,
-    });
-
-    setLoading(false);
+  const calculateTotalWatchTime = () => {
+    if (!videoData) return 0;
+    
+    // Calculate based on promotion criteria: views × duration
+    const totalSeconds = videoData.views_count * videoData.duration_seconds;
+    return totalSeconds;
   };
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+  const formatWatchTime = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
     if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
+      return `${hours} hour${hours > 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
     } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
+      return `${minutes} minute${minutes !== 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}`;
     } else {
-      return `${secs}s`;
+      return `${seconds} second${seconds !== 1 ? 's' : ''}`;
     }
   };
 
-  const formatEstimatedCompletion = (days: number) => {
-    if (days < 0) return 'Unknown';
-    if (days < 1) return `${Math.ceil(days * 24)} hours`;
-    if (days < 7) return `${Math.ceil(days)} days`;
-    return `${Math.ceil(days / 7)} weeks`;
+  const formatHoldTimer = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getMinutesSinceCreation = () => {
+    if (!videoData) return 0;
+    const createdTime = new Date(videoData.created_at);
+    const now = new Date();
+    return Math.floor((now.getTime() - createdTime.getTime()) / (1000 * 60));
+  };
+
+  const getRefundInfo = () => {
+    const minutesSinceCreation = getMinutesSinceCreation();
+    const isWithin10Minutes = minutesSinceCreation <= 10;
+    const refundPercentage = isWithin10Minutes ? 100 : 80;
+    const refundAmount = Math.floor((videoData?.coin_cost || 0) * refundPercentage / 100);
+    
+    return { refundPercentage, refundAmount, isWithin10Minutes };
   };
 
   const handleDeleteVideo = async () => {
-    if (!videoData || !analytics || !user) return;
+    if (!videoData || !user) return;
 
-    const message = analytics.minutesSinceCreation <= 10
-      ? `Delete video and restore 100% coins (🪙${analytics.refundAmount})?`
-      : `Deleting video after 10 minutes: ${analytics.refundPercentage}% coins (🪙${analytics.refundAmount}) will be restored. Confirm?`;
+    const { refundPercentage, refundAmount, isWithin10Minutes } = getRefundInfo();
+    
+    // Special message for videos that just finished hold period
+    const message = isWithin10Minutes
+      ? `Delete video and restore 100% coins (🪙${refundAmount})?`
+      : holdTimer === 0 && videoData.status === 'on_hold'
+      ? `10 minutes elapsed: Deleting now refunds 80% coins (🪙${refundAmount}). Confirm?`
+      : `Deleting video after 10 minutes: ${refundPercentage}% coins (🪙${refundAmount}) will be restored. Confirm?`;
 
     Alert.alert(
       'Delete Video',
@@ -164,7 +180,7 @@ export default function EditVideoScreen() {
 
               if (success) {
                 // Log the deletion
-                console.log(`Video ${videoData.youtube_url} deleted with ${analytics.refundPercentage}% refund`);
+                console.log(`Video ${videoData.youtube_url} deleted with ${refundPercentage}% refund`);
 
                 // Refresh profile and clear queue
                 await refreshProfile();
@@ -176,7 +192,7 @@ export default function EditVideoScreen() {
                   withSpring(1, { damping: 15, stiffness: 150 })
                 );
 
-                Alert.alert('Success', `Video deleted and 🪙${analytics.refundAmount} coins restored!`, [
+                Alert.alert('Success', `Video deleted and 🪙${refundAmount} coins restored!`, [
                   { text: 'OK', onPress: () => router.back() }
                 ]);
               } else {
@@ -275,13 +291,15 @@ export default function EditVideoScreen() {
     transform: [{ scale: coinBounce.value }],
   }));
 
-  if (loading || !videoData || !analytics) {
+  if (loading || !videoData) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading video analytics...</Text>
+        <Text>Loading video details...</Text>
       </View>
     );
   }
+
+  const totalWatchTime = calculateTotalWatchTime();
 
   return (
     <View style={styles.container}>
@@ -290,93 +308,69 @@ export default function EditVideoScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft color="white" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Video</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {videoData.title}
+        </Text>
         <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
           <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
         </Animated.View>
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Video Info */}
-        <View style={styles.videoInfoCard}>
-          <Text style={styles.videoTitle} numberOfLines={3}>
-            {videoData.title}
-          </Text>
-          <Text style={styles.videoUrl}>ID: {videoData.youtube_url}</Text>
-          <View style={styles.statusContainer}>
+        {/* Video Status */}
+        <View style={styles.statusCard}>
+          <View style={styles.statusHeader}>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(videoData.status) }]}>
               <Text style={styles.statusText}>{getStatusText(videoData.status)}</Text>
             </View>
-            <Text style={styles.videoDate}>
-              Created: {new Date(videoData.created_at).toLocaleDateString()}
-            </Text>
+            <Text style={styles.videoId}>ID: {videoData.youtube_url}</Text>
           </View>
         </View>
 
-        {/* Analytics Grid */}
-        <View style={styles.analyticsSection}>
-          <Text style={styles.sectionTitle}>Video Analytics</Text>
-          <View style={styles.analyticsGrid}>
-            <View style={styles.analyticsCard}>
-              <Eye color="#3498DB" size={24} />
-              <Text style={styles.analyticsValue}>{analytics.totalViews}</Text>
-              <Text style={styles.analyticsLabel}>Total Views</Text>
+        {/* Pending Status Timeline */}
+        {videoData.status === 'on_hold' && holdTimer > 0 && (
+          <View style={styles.pendingCard}>
+            <View style={styles.pendingHeader}>
+              <Timer color="#F39C12" size={24} />
+              <Text style={styles.pendingTitle}>Pending Status</Text>
             </View>
-
-            <View style={styles.analyticsCard}>
-              <Clock color="#F39C12" size={24} />
-              <Text style={styles.analyticsValue}>{formatDuration(analytics.totalWatchTime)}</Text>
-              <Text style={styles.analyticsLabel}>Watch Time</Text>
-            </View>
-
-            <View style={styles.analyticsCard}>
-              <TrendingUp color="#2ECC71" size={24} />
-              <Text style={styles.analyticsValue}>{analytics.engagementRate.toFixed(1)}%</Text>
-              <Text style={styles.analyticsLabel}>Engagement</Text>
-            </View>
-
-            <View style={styles.analyticsCard}>
-              <Activity color="#E74C3C" size={24} />
-              <Text style={styles.analyticsValue}>{formatDuration(analytics.averageWatchTime)}</Text>
-              <Text style={styles.analyticsLabel}>Avg. Watch</Text>
-            </View>
-
-            <View style={styles.analyticsCard}>
-              <BarChart3 color="#9B59B6" size={24} />
-              <Text style={styles.analyticsValue}>{analytics.completionRate.toFixed(1)}%</Text>
-              <Text style={styles.analyticsLabel}>Completion</Text>
-            </View>
-
-            <View style={styles.analyticsCard}>
-              <Text style={styles.coinIcon}>🪙</Text>
-              <Text style={styles.analyticsValue}>🪙{analytics.coinsEarned}</Text>
-              <Text style={styles.analyticsLabel}>Earned</Text>
+            <View style={styles.timerContainer}>
+              <Text style={styles.timerText}>{formatHoldTimer(holdTimer)} remaining</Text>
+              <Text style={styles.timerSubtext}>Video will enter queue after hold period</Text>
             </View>
           </View>
-        </View>
+        )}
 
-        {/* Progress Information */}
-        <View style={styles.progressSection}>
-          <Text style={styles.sectionTitle}>Progress Information</Text>
-          <View style={styles.progressCard}>
-            <View style={styles.progressItem}>
-              <Text style={styles.progressLabel}>Views Remaining:</Text>
-              <Text style={styles.progressValue}>{analytics.viewsRemaining}</Text>
-            </View>
-            <View style={styles.progressItem}>
-              <Text style={styles.progressLabel}>Estimated Completion:</Text>
-              <Text style={styles.progressValue}>
-                {formatEstimatedCompletion(analytics.estimatedCompletionDays)}
+        {/* Main Metrics - Only Total Views and Watch Time */}
+        <View style={styles.metricsSection}>
+          <Text style={styles.sectionTitle}>Video Metrics</Text>
+          
+          <View style={styles.metricsGrid}>
+            {/* Total Views */}
+            <View style={styles.metricCard}>
+              <View style={styles.metricHeader}>
+                <Eye color="#3498DB" size={24} />
+                <Text style={styles.metricLabel}>Total Views</Text>
+              </View>
+              <Text style={styles.metricValue}>
+                {videoData.views_count}/{videoData.target_views}
+              </Text>
+              <Text style={styles.metricSubtext}>
+                {videoData.views_count} of {videoData.target_views} completed
               </Text>
             </View>
-            <View style={styles.progressItem}>
-              <Text style={styles.progressLabel}>Time Since Creation:</Text>
-              <Text style={styles.progressValue}>{analytics.minutesSinceCreation} minutes</Text>
-            </View>
-            <View style={styles.progressItem}>
-              <Text style={styles.progressLabel}>Deletion Refund:</Text>
-              <Text style={styles.progressValue}>
-                🪙{analytics.refundAmount} ({analytics.refundPercentage}%)
+
+            {/* Watch Time */}
+            <View style={styles.metricCard}>
+              <View style={styles.metricHeader}>
+                <Clock color="#F39C12" size={24} />
+                <Text style={styles.metricLabel}>Watch Time</Text>
+              </View>
+              <Text style={styles.metricValue}>
+                {formatWatchTime(totalWatchTime)}
+              </Text>
+              <Text style={styles.metricSubtext}>
+                Based on {videoData.duration_seconds}s per view
               </Text>
             </View>
           </View>
@@ -386,28 +380,56 @@ export default function EditVideoScreen() {
         <View style={styles.actionSection}>
           <Text style={styles.sectionTitle}>Actions</Text>
 
-          {videoData.status === 'completed' && (
-            <TouchableOpacity style={[styles.actionButton, styles.repromoteButton]} onPress={handleRepromoteVideo}>
-              <RotateCcw color="white" size={20} />
-              <Text style={styles.actionButtonText}>Repromote Video</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={handleDeleteVideo}>
+          {/* Delete Button */}
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.deleteButton]} 
+            onPress={handleDeleteVideo}
+          >
             <Trash2 color="white" size={20} />
-            <Text style={styles.actionButtonText}>Delete Video</Text>
+            <View style={styles.actionContent}>
+              <Text style={styles.actionButtonText}>Delete Video</Text>
+              <Text style={styles.actionSubtext}>
+                Refund: 🪙{getRefundInfo().refundAmount} ({getRefundInfo().refundPercentage}%)
+              </Text>
+            </View>
           </TouchableOpacity>
+
+          {/* Repromote Toggle */}
+          <View style={styles.repromoteSection}>
+            <View style={styles.repromoteHeader}>
+              <Text style={styles.repromoteLabel}>Repromote</Text>
+              <TouchableOpacity
+                style={[styles.toggle, repromoteToggle && styles.toggleActive]}
+                onPress={() => setRepromoteToggle(!repromoteToggle)}
+              >
+                <View style={[
+                  styles.toggleThumb,
+                  repromoteToggle && styles.toggleThumbActive
+                ]} />
+              </TouchableOpacity>
+            </View>
+            
+            {repromoteToggle && (
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.repromoteButton]} 
+                onPress={handleRepromoteVideo}
+              >
+                <RotateCcw color="white" size={20} />
+                <View style={styles.actionContent}>
+                  <Text style={styles.actionButtonText}>Reset & Repromote</Text>
+                  <Text style={styles.actionSubtext}>
+                    Reset views and start new 10-minute hold
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Status Information */}
         <View style={styles.statusInfoSection}>
           <Text style={styles.sectionTitle}>Status Information</Text>
           <View style={styles.statusInfoCard}>
-            <View style={styles.statusInfoHeader}>
-              <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(videoData.status) }]} />
-              <Text style={styles.statusInfoTitle}>Current Status: {getStatusText(videoData.status)}</Text>
-            </View>
-
             {videoData.status === 'on_hold' && (
               <View style={styles.statusMessage}>
                 <Timer color="#F39C12" size={20} />
@@ -473,9 +495,12 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
+    flex: 1,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
     color: 'white',
+    textAlign: 'center',
+    marginHorizontal: 16,
   },
   coinDisplay: {
     flexDirection: 'row',
@@ -493,7 +518,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  videoInfoCard: {
+  statusCard: {
     backgroundColor: 'white',
     margin: 16,
     borderRadius: 16,
@@ -501,32 +526,19 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 4,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
-  videoTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    lineHeight: 24,
-  },
-  videoUrl: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 12,
-    fontFamily: 'monospace',
-  },
-  statusContainer: {
+  statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -541,11 +553,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
-  videoDate: {
+  videoId: {
     fontSize: 12,
     color: '#666',
+    fontFamily: 'monospace',
   },
-  analyticsSection: {
+  pendingCard: {
+    backgroundColor: '#FFF8E1',
+    margin: 16,
+    marginTop: 0,
+    borderRadius: 16,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F39C12',
+  },
+  pendingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pendingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F57C00',
+    marginLeft: 8,
+  },
+  timerContainer: {
+    alignItems: 'center',
+  },
+  timerText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#F39C12',
+    fontFamily: 'monospace',
+  },
+  timerSubtext: {
+    fontSize: 12,
+    color: '#F57C00',
+    marginTop: 4,
+  },
+  metricsSection: {
     margin: 16,
   },
   sectionTitle: {
@@ -554,52 +601,12 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 12,
   },
-  analyticsGrid: {
+  metricsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
   },
-  analyticsCard: {
-    width: (screenWidth - 48) / 2,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  coinIcon: {
-    fontSize: 24,
-  },
-  analyticsValue: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  analyticsLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  progressSection: {
-    margin: 16,
-  },
-  progressCard: {
+  metricCard: {
+    flex: 1,
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
@@ -618,20 +625,27 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  progressItem: {
+  metricHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  progressLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  progressValue: {
+  metricLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+    marginLeft: 8,
+  },
+  metricValue: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  metricSubtext: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
   },
   actionSection: {
     margin: 16,
@@ -639,22 +653,93 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    gap: 8,
-  },
-  repromoteButton: {
-    backgroundColor: '#3498DB',
   },
   deleteButton: {
     backgroundColor: '#E74C3C',
+  },
+  repromoteButton: {
+    backgroundColor: '#3498DB',
+    marginTop: 8,
+  },
+  actionContent: {
+    marginLeft: 12,
+    flex: 1,
   },
   actionButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 2,
+  },
+  actionSubtext: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+  },
+  repromoteSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  repromoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  repromoteLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  toggle: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleActive: {
+    backgroundColor: '#3498DB',
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'white',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
+      },
+    }),
+  },
+  toggleThumbActive: {
+    transform: [{ translateX: 20 }],
   },
   statusInfoSection: {
     margin: 16,
@@ -679,29 +764,10 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  statusInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  statusInfoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
   statusMessage: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: '#F8F9FA',
-    padding: 12,
-    borderRadius: 8,
   },
   statusMessageText: {
     flex: 1,
