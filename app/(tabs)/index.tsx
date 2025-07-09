@@ -1036,7 +1036,7 @@ export default function ViewTab() {
                 <Coins color="#FFA726" size={18} />
               </Animated.View>
               <Text style={styles.statValue}>{coinReward}</Text>
-              <Text style={styles.statLabel}>Coins</Text>
+              <Text style={styles.statLabel}>🪙Coins</Text>
             </View>
           </View>
         </View>
@@ -1047,7 +1047,7 @@ export default function ViewTab() {
           <View style={styles.topControls}>
             <TouchableOpacity style={styles.autoPlayContainer} onPress={openYouTubeVideo}>
               <ExternalLink color="#FF4757" size={16} />
-              <Text style={styles.youtubeLabel}>YouTube</Text>
+              <Text style={styles.youtubeLabel}>Watch On YouTube</Text>
             </TouchableOpacity>
             <View style={styles.autoPlayContainer}>
               <Text style={styles.autoPlayLabel}>Auto Play</Text>
