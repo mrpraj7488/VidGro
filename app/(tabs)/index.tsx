@@ -950,7 +950,7 @@ export default function ViewTab() {
         <Menu color="white" size={24} />
         <Text style={styles.headerTitle}>VidGro</Text>
         <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
-          <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+          <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
           <Coins color="#FFD700" size={isSmallScreen ? 18 : 20} />
         </Animated.View>
       </LinearGradient>
