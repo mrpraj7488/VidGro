@@ -18,7 +18,7 @@ import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign, Timer, ArrowRight } from 'lucide-react-native';
+import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -887,7 +887,7 @@ export default function PromoteTab() {
 
       console.log('Coins deducted successfully');
 
-      // Use the enhanced create_video_with_hold function
+      // Create video promotion with 10-minute hold using the enhanced function
       const { data: videoResult, error: insertError } = await supabase
         .rpc('create_video_with_hold', {
           user_uuid: user.id,
@@ -905,17 +905,23 @@ export default function PromoteTab() {
         throw new Error(`Failed to create video promotion: ${insertError.message}`);
       }
 
-      console.log('Video promotion created with hold period:', videoResult);
+      console.log('Video promotion created successfully with hold period:', videoResult);
       console.log(`Video ${videoData.id} status changed to Pending`);
 
       // Refresh profile to get updated coin balance
       await refreshProfile();
 
-      // Show enhanced success message with hold period information
+      // Show enhanced success alert with hold period information
       Alert.alert(
         'Video Promoted Successfully!',
-        `Your video "${title}" has been promoted and is now in a 10-minute hold period. After this period, it will automatically enter the view queue.\n\n🪙${totalCost} coins deducted.\n\nStatus: PENDING → ACTIVE → COMPLETED`,
-        [{ text: 'OK' }]
+        `Your video has been promoted and is now on hold for 10 minutes.\n\n` +
+        `Status Flow:\n` +
+        `• PENDING (0-10 minutes): Video is on hold\n` +
+        `• ACTIVE (After 10 minutes): Video enters view queue\n` +
+        `• COMPLETED (Target reached): Video promotion finished\n\n` +
+        `Cost: 🪙${totalCost} coins deducted\n` +
+        `Reward: 🪙${rewardPerView} per view`,
+        [{ text: 'OK', onPress: () => {} }]
       );
       
       // Reset form
@@ -1011,33 +1017,6 @@ export default function PromoteTab() {
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Hold Period Information Card */}
-          <View style={styles.holdInfoCard}>
-            <View style={styles.holdInfoHeader}>
-              <Timer color="#F39C12" size={20} />
-              <Text style={styles.holdInfoTitle}>10-Minute Hold Period</Text>
-            </View>
-            <Text style={styles.holdInfoText}>
-              After promotion, your video will be held for 10 minutes before entering the view queue.
-            </Text>
-            <View style={styles.statusFlow}>
-              <View style={styles.statusStep}>
-                <View style={[styles.statusDot, { backgroundColor: '#F39C12' }]} />
-                <Text style={styles.statusStepText}>PENDING</Text>
-              </View>
-              <ArrowRight color="#666" size={16} />
-              <View style={styles.statusStep}>
-                <View style={[styles.statusDot, { backgroundColor: '#2ECC71' }]} />
-                <Text style={styles.statusStepText}>ACTIVE</Text>
-              </View>
-              <ArrowRight color="#666" size={16} />
-              <View style={styles.statusStep}>
-                <View style={[styles.statusDot, { backgroundColor: '#3498DB' }]} />
-                <Text style={styles.statusStepText}>COMPLETED</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Error Display */}
           {error && (
             <View style={styles.errorContainer}>
@@ -1343,56 +1322,74 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
   holdInfoCard: {
-    backgroundColor: '#FFF8E1',
+    backgroundColor: 'white',
     margin: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
     borderLeftColor: '#F39C12',
-  },
-  holdInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
   holdInfoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#F57C00',
-    marginLeft: 8,
+    color: '#333',
+    marginBottom: 8,
   },
   holdInfoText: {
     fontSize: 14,
-    color: '#F57C00',
+    color: '#666',
     marginBottom: 12,
     lineHeight: 20,
   },
   statusFlow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
   statusStep: {
     alignItems: 'center',
-    gap: 4,
+    flex: 1,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginBottom: 4,
   },
   statusStepText: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#F57C00',
+    color: '#666',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  statusArrow: {
+    paddingHorizontal: 8,
+  },
+  statusArrowText: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: 'bold',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
   },
   errorContainer: {
     flexDirection: 'row',
