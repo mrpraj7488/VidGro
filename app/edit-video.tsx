@@ -14,21 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import {
-  ArrowLeft,
-  Eye,
-  Clock,
-  TrendingUp,
-  Activity,
-  BarChart3,
-  Trash2,
-  RotateCcw,
-  AlertTriangle,
-  CheckCircle,
-  Timer,
-  Play,
-  Pause,
-} from 'lucide-react-native';
+import { ArrowLeft, Eye, Clock, TrendingUp, Activity, ChartBar as BarChart3, Trash2, RotateCcw, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Timer, Play, Pause } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
