@@ -18,7 +18,7 @@ import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Coins, Crown, DollarSign, Menu } from 'lucide-react-native';
+import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -833,7 +833,7 @@ export default function PromoteTab() {
     }
 
     if (!profile || profile.coins < totalCost) {
-      setError(`You need ₡${totalCost} coins to promote this video. You have ₡${profile?.coins || 0} coins.`);
+      setError(`You need 🪙${totalCost} coins to promote this video. You have 🪙${profile?.coins || 0} coins.`);
       return;
     }
 
@@ -867,26 +867,6 @@ export default function PromoteTab() {
         embeddable: videoData.embeddable
       });
 
-      // Use the enhanced database function to create video with 10-minute hold
-      const { data: videoId, error: videoError } = await supabase
-        .rpc('create_video_with_hold', {
-          user_uuid: user.id,
-          youtube_url_param: videoData.id, // Store only the video ID
-          title_param: title,
-          description_param: `Embed URL: ${videoData.embedUrl} | Original URL: ${videoData.originalUrl} | Auto-detected title: ${videoData.autoDetectedTitle || 'N/A'} | User-set duration: ${userSetDuration}s | Video ID: ${videoData.id}`,
-          duration_seconds_param: userSetDuration,
-          coin_cost_param: totalCost,
-          coin_reward_param: rewardPerView,
-          target_views_param: views
-        });
-
-      if (videoError) {
-        console.error('Error creating video with hold:', videoError);
-        throw new Error(`Failed to create video promotion: ${videoError.message}`);
-      }
-
-      console.log('Video created with 10-minute hold, ID:', videoId);
-
       // Use the database function to deduct coins safely
       const { data: coinUpdateResult, error: coinError } = await supabase
         .rpc('update_user_coins', {
@@ -894,7 +874,6 @@ export default function PromoteTab() {
           coin_amount: -totalCost,
           transaction_type_param: 'video_promotion',
           description_param: `Promoted: ${title}`,
-          reference_uuid: videoId
         });
 
       if (coinError) {
@@ -908,17 +887,41 @@ export default function PromoteTab() {
 
       console.log('Coins deducted successfully');
 
+      // Create video promotion with 10-minute hold using the enhanced function
+      const { data: videoResult, error: insertError } = await supabase
+        .rpc('create_video_with_hold', {
+          user_uuid: user.id,
+          youtube_url_param: videoData.id, // Store only the video ID
+          title_param: title,
+          description_param: `Embed URL: ${videoData.embedUrl} | Original URL: ${videoData.originalUrl} | Auto-detected title: ${videoData.autoDetectedTitle || 'N/A'} | User-set duration: ${userSetDuration}s | Video ID: ${videoData.id}`,
+          duration_seconds_param: userSetDuration,
+          coin_cost_param: totalCost,
+          coin_reward_param: rewardPerView,
+          target_views_param: views
+        });
+
+      if (insertError) {
+        console.error('Error creating video promotion:', insertError);
+        throw new Error(`Failed to create video promotion: ${insertError.message}`);
+      }
+
+      console.log('Video promotion created successfully with hold period:', videoResult);
+      console.log(`Video ${videoData.id} status changed to Pending`);
+
       // Refresh profile to get updated coin balance
       await refreshProfile();
 
-      // Show success toast with hold period information
-      showToast(`Video promoted successfully! ₡${totalCost} coins deducted. Video is on hold for 10 minutes.`);
-      
-      // Show detailed alert about the 10-minute hold period
+      // Show enhanced success alert with hold period information
       Alert.alert(
         'Video Promoted Successfully!',
-        `Your video "${title}" has been promoted and is now on hold for 10 minutes before entering the view queue.\n\n• Status: PENDING (for 10 minutes)\n• Then: ACTIVE (in view queue)\n• Finally: COMPLETED (when target reached)\n\n₡${totalCost} coins have been deducted from your balance.`,
-        [{ text: 'OK' }]
+        `Your video has been promoted and is now on hold for 10 minutes.\n\n` +
+        `Status Flow:\n` +
+        `• PENDING (0-10 minutes): Video is on hold\n` +
+        `• ACTIVE (After 10 minutes): Video enters view queue\n` +
+        `• COMPLETED (Target reached): Video promotion finished\n\n` +
+        `Cost: 🪙${totalCost} coins deducted\n` +
+        `Reward: 🪙${rewardPerView} per view`,
+        [{ text: 'OK', onPress: () => {} }]
       );
       
       // Reset form
@@ -1003,20 +1006,45 @@ export default function PromoteTab() {
         colors={['#FF4757', '#FF6B8A']}
         style={styles.header}
       >
-        <Menu color="white" size={24} />
         <Text style={styles.headerTitle}>Promote Your Video</Text>
         <View style={styles.coinDisplay}>
-          <Coins color="#FFD700" size={20} />
-          <Text style={styles.coinCount}>₡{profile?.coins || 0}</Text>
+          <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
         </View>
       </LinearGradient>
+
+      {/* Hold Period Information Card */}
+      <View style={styles.holdInfoCard}>
+        <Text style={styles.holdInfoTitle}>📋 Promotion Process</Text>
+        <Text style={styles.holdInfoText}>
+          After promotion, your video will be held for 10 minutes before entering the view queue.
+        </Text>
+        <View style={styles.statusFlow}>
+          <View style={styles.statusStep}>
+            <View style={[styles.statusDot, { backgroundColor: '#F39C12' }]} />
+            <Text style={styles.statusStepText}>PENDING (0-10 min)</Text>
+          </View>
+          <View style={styles.statusArrow}>
+            <Text style={styles.statusArrowText}>→</Text>
+          </View>
+          <View style={styles.statusStep}>
+            <View style={[styles.statusDot, { backgroundColor: '#2ECC71' }]} />
+            <Text style={styles.statusStepText}>ACTIVE (In Queue)</Text>
+          </View>
+          <View style={styles.statusArrow}>
+            <Text style={styles.statusArrowText}>→</Text>
+          </View>
+          <View style={styles.statusStep}>
+            <View style={[styles.statusDot, { backgroundColor: '#3498DB' }]} />
+            <Text style={styles.statusStepText}>COMPLETED</Text>
+          </View>
+        </View>
+      </View>
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-
           {/* Error Display */}
           {error && (
             <View style={styles.errorContainer}>
@@ -1204,24 +1232,24 @@ export default function PromoteTab() {
                 
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Base Cost:</Text>
-                  <Text style={styles.costValue}>₡{baseCost}</Text>
+                  <Text style={styles.costValue}>🪙{baseCost}</Text>
                 </View>
                 
                 {profile?.is_vip && (
                   <View style={styles.costRow}>
                     <Text style={styles.costLabel}>VIP Discount (10%):</Text>
-                    <Text style={styles.discountValue}>-₡{vipDiscount}</Text>
+                    <Text style={styles.discountValue}>-🪙{vipDiscount}</Text>
                   </View>
                 )}
                 
                 <View style={styles.finalCostRow}>
                   <Text style={styles.finalCostLabel}>Final Cost:</Text>
-                  <Text style={styles.finalCostValue}>₡{totalCost}</Text>
+                  <Text style={styles.finalCostValue}>🪙{totalCost}</Text>
                 </View>
                 
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Reward per view:</Text>
-                  <Text style={styles.costValue}>₡{rewardPerView}</Text>
+                  <Text style={styles.costValue}>🪙{rewardPerView}</Text>
                 </View>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Your balance:</Text>
@@ -1229,7 +1257,7 @@ export default function PromoteTab() {
                     styles.costValue, 
                     (profile?.coins || 0) < totalCost && styles.insufficientBalance
                   ]}>
-                    ₡{profile?.coins || 0}
+                    🪙{profile?.coins || 0}
                   </Text>
                 </View>
                 {videoData && videoData.embeddable && (
@@ -1246,7 +1274,7 @@ export default function PromoteTab() {
               <TouchableOpacity style={styles.vipPrompt} onPress={handleUpgradeToVip}>
                 <Crown color="#FFA726" size={20} />
                 <Text style={styles.vipPromptText}>
-                  VIP members save ₡{vipDiscount || Math.ceil(baseCost * 0.1)} on this promotion - Become VIP?
+                  VIP members save 🪙{vipDiscount || Math.ceil(baseCost * 0.1)} on this promotion - Become VIP?
                 </Text>
               </TouchableOpacity>
             )}
@@ -1321,76 +1349,75 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 4,
+  },
+  holdInfoCard: {
+    backgroundColor: 'white',
+    margin: 16,
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F39C12',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  holdInfoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  holdInfoText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  statusFlow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusStep: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  statusStepText: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  statusArrow: {
+    paddingHorizontal: 8,
+  },
+  statusArrowText: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: 'bold',
   },
   keyboardView: {
     flex: 1,
   },
   scrollView: {
     flex: 1,
-  },
-  holdInfoCard: {
-    backgroundColor: 'white',
-    margin: 16,
-    borderRadius: 16,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF4757',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  holdInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  holdInfoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF4757',
-    marginLeft: 8,
-  },
-  holdInfoText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  holdStatusFlow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  holdStatusItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  holdStatusLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FF4757',
-    marginBottom: 2,
-  },
-  holdStatusTime: {
-    fontSize: 10,
-    color: '#999',
-  },
-  holdStatusArrow: {
-    fontSize: 16,
-    color: '#FF4757',
-    marginHorizontal: 8,
   },
   errorContainer: {
     flexDirection: 'row',
