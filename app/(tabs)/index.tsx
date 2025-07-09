@@ -75,7 +75,7 @@ export default function ViewTab() {
   const [watchStartTime, setWatchStartTime] = useState<number | null>(null);
   const [hasCompletedVideo, setHasCompletedVideo] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [isSecurityPaused, setIsSecurityPaused] = useState(false);
+  const [isBackgroundPaused, setIsBackgroundPaused] = useState(false);
 
   // Refs
   const webViewRef = useRef<WebView>(null);
@@ -83,7 +83,7 @@ export default function ViewTab() {
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const appStateRef = useRef(AppState.currentState);
-  const isBackgroundPausedRef = useRef(false);
+  const backgroundPauseRef = useRef(false);
 
   // Animation values
   const coinBounce = useSharedValue(1);
@@ -92,27 +92,24 @@ export default function ViewTab() {
 
   const currentVideo = getCurrentVideo();
 
-  // App state change handler with improved logic
+  // Fixed app state change handler to prevent continuous play/pause
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
       console.log(`🔒 App state change: ${appStateRef.current} -> ${nextAppState}`);
       
       if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
         console.log('🔒 App going to background, forcing pause');
-        if (playerState.isPlaying && !isSecurityPaused) {
-          setIsSecurityPaused(true);
-          isBackgroundPausedRef.current = true;
+        if (playerState.isPlaying) {
+          backgroundPauseRef.current = true;
+          setIsBackgroundPaused(true);
           pauseVideo();
         }
       } else if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
         console.log('🔒 App returning to foreground');
-        // Only resume if we paused due to background
-        if (isBackgroundPausedRef.current && isSecurityPaused) {
-          setTimeout(() => {
-            setIsSecurityPaused(false);
-            isBackgroundPausedRef.current = false;
-            // Don't auto-resume, let user manually play
-          }, 100);
+        // Don't auto-resume, let user manually play
+        if (backgroundPauseRef.current) {
+          setIsBackgroundPaused(false);
+          backgroundPauseRef.current = false;
         }
       }
       
@@ -121,7 +118,7 @@ export default function ViewTab() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [playerState.isPlaying, isSecurityPaused]);
+  }, [playerState.isPlaying]);
 
   // Fetch videos on component mount
   useEffect(() => {
@@ -143,8 +140,8 @@ export default function ViewTab() {
       });
       setHasCompletedVideo(false);
       setRetryCount(0);
-      setIsSecurityPaused(false);
-      isBackgroundPausedRef.current = false;
+      setIsBackgroundPaused(false);
+      backgroundPauseRef.current = false;
       watchTimeRef.current = 0;
       setWatchStartTime(null);
       
@@ -178,7 +175,7 @@ export default function ViewTab() {
 
   // Progress tracking
   useEffect(() => {
-    if (playerState.isPlaying && !isSecurityPaused) {
+    if (playerState.isPlaying && !isBackgroundPaused) {
       progressIntervalRef.current = setInterval(() => {
         webViewRef.current?.postMessage(JSON.stringify({ action: 'getCurrentTime' }));
       }, 1000);
@@ -195,7 +192,7 @@ export default function ViewTab() {
         progressIntervalRef.current = null;
       }
     };
-  }, [playerState.isPlaying, isSecurityPaused]);
+  }, [playerState.isPlaying, isBackgroundPaused]);
 
   const showControlsTemporarily = useCallback(() => {
     setShowControls(true);
@@ -203,8 +200,8 @@ export default function ViewTab() {
   }, []);
 
   const playVideo = useCallback(() => {
-    if (isSecurityPaused) {
-      console.log('🔒 Security pause active, cannot play');
+    if (isBackgroundPaused) {
+      console.log('🔒 Background pause active, cannot play');
       return;
     }
     
@@ -213,18 +210,17 @@ export default function ViewTab() {
       withSpring(0.8, { damping: 15, stiffness: 150 }),
       withSpring(1, { damping: 15, stiffness: 150 })
     );
-  }, [isSecurityPaused]);
+  }, [isBackgroundPaused]);
 
   const pauseVideo = useCallback(() => {
-    console.log('🔒 Security pause:', isSecurityPaused ? 'active' : 'inactive');
     webViewRef.current?.postMessage(JSON.stringify({ action: 'pause' }));
-  }, [isSecurityPaused]);
+  }, []);
 
   const togglePlayPause = useCallback(() => {
-    if (isSecurityPaused) {
+    if (isBackgroundPaused) {
       Alert.alert(
         'Video Paused',
-        'Video playback is paused for security. Please stay in the app to continue watching.',
+        'Video was paused when you left the app. Tap play to continue.',
         [{ text: 'OK' }]
       );
       return;
@@ -236,7 +232,7 @@ export default function ViewTab() {
       playVideo();
     }
     showControlsTemporarily();
-  }, [playerState.isPlaying, playVideo, pauseVideo, showControlsTemporarily, isSecurityPaused]);
+  }, [playerState.isPlaying, playVideo, pauseVideo, showControlsTemporarily, isBackgroundPaused]);
 
   const toggleMute = useCallback(() => {
     const newMutedState = !isMuted;
@@ -334,11 +330,11 @@ export default function ViewTab() {
           
           setPlayerState(prev => ({ 
             ...prev, 
-            isPlaying: isPlaying && !isSecurityPaused,
+            isPlaying: isPlaying && !isBackgroundPaused,
             isBuffering 
           }));
           
-          if (isPlaying && !watchStartTime && !isSecurityPaused) {
+          if (isPlaying && !watchStartTime && !isBackgroundPaused) {
             setWatchStartTime(Date.now());
           }
           break;
@@ -349,7 +345,7 @@ export default function ViewTab() {
           
           setPlayerState(prev => ({ ...prev, currentTime, duration }));
           
-          if (watchStartTime && !isSecurityPaused) {
+          if (watchStartTime && !isBackgroundPaused) {
             watchTimeRef.current = currentTime;
             
             // Check for completion
@@ -376,8 +372,9 @@ export default function ViewTab() {
     } catch (error) {
       console.error('❌ Error parsing WebView message:', error);
     }
-  }, [watchStartTime, hasCompletedVideo, completeVideoView, retryCount, retryVideo, handleVideoError, currentVideo, isSecurityPaused]);
+  }, [watchStartTime, hasCompletedVideo, completeVideoView, retryCount, retryVideo, handleVideoError, currentVideo, isBackgroundPaused]);
 
+  // New function to open video in YouTube
   const openVideoInYouTube = useCallback(() => {
     if (!currentVideo) return;
     
@@ -408,7 +405,6 @@ export default function ViewTab() {
             firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
             var player;
-            var isSecurityPaused = false;
             
             function onYouTubeIframeAPIReady() {
               player = new YT.Player('player', {
@@ -482,7 +478,7 @@ export default function ViewTab() {
                 
                 switch(data.action) {
                   case 'play':
-                    if (!isSecurityPaused && player && player.playVideo) {
+                    if (player && player.playVideo) {
                       player.playVideo();
                     }
                     break;
@@ -511,12 +507,6 @@ export default function ViewTab() {
                       }));
                     }
                     break;
-                  case 'securityPause':
-                    isSecurityPaused = data.paused;
-                    if (isSecurityPaused && player && player.pauseVideo) {
-                      player.pauseVideo();
-                    }
-                    break;
                 }
               } catch (e) {
                 console.error('Error handling message:', e);
@@ -527,16 +517,6 @@ export default function ViewTab() {
       </html>
     `;
   }, []);
-
-  // Send security pause message to WebView
-  useEffect(() => {
-    if (webViewRef.current) {
-      webViewRef.current.postMessage(JSON.stringify({ 
-        action: 'securityPause', 
-        paused: isSecurityPaused 
-      }));
-    }
-  }, [isSecurityPaused]);
 
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinBounce.value }],
@@ -646,14 +626,11 @@ export default function ViewTab() {
 
           {/* Video Controls Overlay */}
           <Animated.View style={[styles.controlsOverlay, controlsAnimatedStyle]}>
-            {/* Security Pause Indicator */}
-            {isSecurityPaused && (
-              <View style={styles.securityPauseIndicator}>
-                <Text style={styles.securityPauseText}>
-                  🔒 Video paused for security
-                </Text>
-                <Text style={styles.securityPauseSubtext}>
-                  Stay in the app to continue watching
+            {/* Background pause indicator */}
+            {isBackgroundPaused && (
+              <View style={styles.backgroundPauseIndicator}>
+                <Text style={styles.backgroundPauseText}>
+                  Video was paused when you left the app
                 </Text>
               </View>
             )}
@@ -662,16 +639,13 @@ export default function ViewTab() {
             <View style={styles.mainControls}>
               <Animated.View style={playButtonAnimatedStyle}>
                 <TouchableOpacity
-                  style={[
-                    styles.playButton,
-                    isSecurityPaused && styles.playButtonDisabled
-                  ]}
+                  style={styles.playButton}
                   onPress={togglePlayPause}
                   disabled={!playerState.isReady}
                 >
                   {playerState.isBuffering ? (
                     <Text style={styles.bufferingText}>⏳</Text>
-                  ) : playerState.isPlaying && !isSecurityPaused ? (
+                  ) : playerState.isPlaying && !isBackgroundPaused ? (
                     <Pause color="white" size={isSmallScreen ? 32 : 40} />
                   ) : (
                     <Play color="white" size={isSmallScreen ? 32 : 40} />
@@ -704,6 +678,7 @@ export default function ViewTab() {
           {currentVideo.title}
         </Text>
         
+        {/* Clickable YouTube Link */}
         <TouchableOpacity 
           style={styles.youtubeLink}
           onPress={openVideoInYouTube}
@@ -827,23 +802,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  securityPauseIndicator: {
-    backgroundColor: 'rgba(255, 71, 87, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+  backgroundPauseIndicator: {
+    backgroundColor: 'rgba(255, 193, 7, 0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
+    marginTop: 16,
   },
-  securityPauseText: {
+  backgroundPauseText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
-  },
-  securityPauseSubtext: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 12,
+    textAlign: 'center',
   },
   mainControls: {
     flex: 1,
@@ -859,9 +829,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  playButtonDisabled: {
-    opacity: 0.5,
   },
   bufferingText: {
     fontSize: isSmallScreen ? 24 : 32,
