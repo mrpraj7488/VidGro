@@ -69,6 +69,7 @@ export default function ViewTab() {
   const [isBackgroundPaused, setIsBackgroundPaused] = useState(false);
   const [securityViolations, setSecurityViolations] = useState(0);
   const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
+  const [securityPauseProcessing, setSecurityPauseProcessing] = useState(false);
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -864,6 +865,7 @@ export default function ViewTab() {
       setIsBackgroundPaused(false);
       setSecurityViolations(0);
       setLastInteractionTime(Date.now());
+      setSecurityPauseProcessing(false);
       progressValue.value = 0;
       
       // Clear all timeouts
@@ -918,6 +920,7 @@ export default function ViewTab() {
     setHasStarted(false);
     setIsBackgroundPaused(false);
     setSecurityViolations(0);
+    setSecurityPauseProcessing(false);
     progressValue.value = 0;
     isSecurityPausedRef.current = false;
     
@@ -1175,7 +1178,12 @@ export default function ViewTab() {
     trackInteraction();
   }, [isTabFocused, appState, isBackgroundPaused]);
 
-  const handlePlayPause = () => {
+  const handlePlayPause = useCallback(() => {
+    if (securityPauseProcessing) {
+      console.log('⚠️ Play/pause blocked due to security pause');
+      return;
+    }
+    
     if (!isTabFocused || appState !== 'active' || isBackgroundPaused || isSecurityPausedRef.current) {
       return;
     }
@@ -1187,7 +1195,14 @@ export default function ViewTab() {
     } else {
       playVideo();
     }
-  };
+    
+    setIsPlaying(!isPlaying);
+    
+    // Reset watch time when manually pausing
+    if (isPlaying) {
+      setWatchTime(0);
+    }
+  }, [isPlaying, securityPauseProcessing]);
 
   const handleSkipVideo = () => {
     trackInteraction();
