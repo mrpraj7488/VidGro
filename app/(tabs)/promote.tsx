@@ -1087,12 +1087,12 @@ export default function PromoteTab() {
                         style={styles.controlButton}
                         onPress={detectTitleManually}
                         disabled={!iframeLoaded}<Type color="#FF4757" size={16} />
-                        <Text style={styles.controlButtonText}>Get Title</Text>
                       >
                         <Type color="#FF4757" size={16} />
-                        <Text style={styles.controlBuyttonText}>Get Title</Text>
+                        <Text style={styles.controlButtonText}>Get Title</Text>
                       </TouchableOpacity>
                     </View>
+                  
                     <View style={styles.webviewContainer}>
                       <WebView
                         ref={webviewRef}
