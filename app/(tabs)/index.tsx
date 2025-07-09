@@ -53,6 +53,11 @@ export default function ViewTab() {
 
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
+  const [watchTime, setWatchTime] = useState(0);
+  const [securityPauseActive, setSecurityPauseActive] = useState(false);
+  const [lastSecurityPause, setLastSecurityPause] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
@@ -62,14 +67,12 @@ export default function ViewTab() {
   const [coinsEarned, setCoinsEarned] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [isTabFocused, setIsTabFocused] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
   const [isSkipping, setIsSkipping] = useState(false);
   const [coinUpdateInProgress, setCoinUpdateInProgress] = useState(false);
   const [coinsAwarded, setCoinsAwarded] = useState(false);
   const [isBackgroundPaused, setIsBackgroundPaused] = useState(false);
   const [securityViolations, setSecurityViolations] = useState(0);
   const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
-  const [securityPauseProcessing, setSecurityPauseProcessing] = useState(false);
 
   // Refs
   const webviewRef = useRef<WebView>(null);
@@ -189,6 +192,98 @@ export default function ViewTab() {
 
     return () => backHandler.remove();
   }, [isPlaying]);
+
+  const triggerSecurityPause = useCallback(() => {
+    const now = Date.now();
+    
+    // Prevent multiple simultaneous security pauses and add cooldown
+    if (securityPauseActive || (now - lastSecurityPause < 5000)) {
+      console.log('🔒 Security pause already active or in cooldown, skipping');
+      return;
+    }
+
+    setLastSecurityPause(now);
+    setSecurityPauseActive(true);
+    setIsPlaying(false);
+    
+    console.log('🔒 Security pause triggered at', new Date().toLocaleTimeString());
+    
+    // Auto-resume after 3 seconds
+    setTimeout(() => {
+      setSecurityPauseActive(false);
+      setIsPlaying(true);
+      console.log('▶️ Security pause ended, resuming playback at', new Date().toLocaleTimeString());
+    }, 3000);
+  }, [securityPauseActive, lastSecurityPause]);
+
+  const handlePlayPause = useCallback(() => {
+    // Prevent play/pause during security pause
+    if (securityPauseActive) {
+      return;
+    }
+    
+    setIsPlaying(!isPlaying);
+  }, [isPlaying, securityPauseActive]);
+
+  const handleVideoEnd = useCallback(async () => {
+    if (!currentVideo || !user) return;
+
+    // Only award coins if video was watched for sufficient time
+    if (watchTime >= 30) {
+      try {
+        const success = await supabase.rpc('complete_video_view', {
+          user_uuid: user.id,
+          video_uuid: currentVideo.id,
+          watch_duration: Math.floor(watchTime)
+        });
+
+        if (success) {
+          await refreshProfile();
+        }
+      } catch (error) {
+        console.error('Error completing video view:', error);
+      }
+    }
+
+    // Move to next video
+    moveToNextVideo();
+  }, [currentVideo, user, watchTime, refreshProfile, moveToNextVideo]);
+
+  // Watch time tracking
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isPlaying && !securityPauseActive && currentVideo) {
+      interval = setInterval(() => {
+        setWatchTime(prevTime => prevTime + 1);
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isPlaying, securityPauseActive]);
+
+  // Security pause trigger (every 30-45 seconds)
+  useEffect(() => {
+    if (!isPlaying || securityPauseActive) return;
+
+    const randomDelay = Math.random() * 15000 + 30000; // 30-45 seconds
+    const timeout = setTimeout(() => {
+      triggerSecurityPause();
+    }, randomDelay);
+
+    return () => clearTimeout(timeout);
+  }, [isPlaying, securityPauseActive, triggerSecurityPause]);
+
+  // Auto-fetch videos when queue is empty
+  useEffect(() => {
+    if (user && videoQueue.length === 0) {
+      fetchVideos(user.id);
+    }
+  }, [user, videoQueue.length, fetchVideos]);
 
   // Create HTML content for YouTube iframe with enhanced popup suppression
   const createHtmlContent = (videoId: string) => `
@@ -865,7 +960,6 @@ export default function ViewTab() {
       setIsBackgroundPaused(false);
       setSecurityViolations(0);
       setLastInteractionTime(Date.now());
-      setSecurityPauseProcessing(false);
       progressValue.value = 0;
       
       // Clear all timeouts
@@ -887,13 +981,6 @@ export default function ViewTab() {
       }, loadingTimeoutDuration);
     }
   }, [currentVideo]);
-
-  // Fetch videos on component mount
-  useEffect(() => {
-    if (user && videoQueue.length === 0) {
-      fetchVideos(user.id);
-    }
-  }, [user, videoQueue.length, fetchVideos]);
 
   // Instant skip function for seamless experience
   const handleInstantSkip = useCallback((reason: string = 'Video unavailable') => {
@@ -920,7 +1007,6 @@ export default function ViewTab() {
     setHasStarted(false);
     setIsBackgroundPaused(false);
     setSecurityViolations(0);
-    setSecurityPauseProcessing(false);
     progressValue.value = 0;
     isSecurityPausedRef.current = false;
     
@@ -1177,32 +1263,6 @@ export default function ViewTab() {
     }
     trackInteraction();
   }, [isTabFocused, appState, isBackgroundPaused]);
-
-  const handlePlayPause = useCallback(() => {
-    if (securityPauseProcessing) {
-      console.log('⚠️ Play/pause blocked due to security pause');
-      return;
-    }
-    
-    if (!isTabFocused || appState !== 'active' || isBackgroundPaused || isSecurityPausedRef.current) {
-      return;
-    }
-    
-    trackInteraction();
-    
-    if (isPlaying) {
-      pauseVideo();
-    } else {
-      playVideo();
-    }
-    
-    setIsPlaying(!isPlaying);
-    
-    // Reset watch time when manually pausing
-    if (isPlaying) {
-      setWatchTime(0);
-    }
-  }, [isPlaying, securityPauseProcessing]);
 
   const handleSkipVideo = () => {
     trackInteraction();
