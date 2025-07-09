@@ -40,9 +40,14 @@ export default function VideoHoldTimer({
 
   useEffect(() => {
     const calculateTimeRemaining = () => {
-      const holdUntilTime = new Date(holdUntil || createdAt);
-      if (!holdUntil) {
-        // If no holdUntil, calculate 10 minutes from creation
+      let holdUntilTime: Date;
+      
+      if (holdUntil) {
+        // Use the exact hold_until timestamp from database
+        holdUntilTime = new Date(holdUntil);
+      } else {
+        // Fallback: calculate 10 minutes from creation (not 20)
+        holdUntilTime = new Date(createdAt);
         holdUntilTime.setMinutes(holdUntilTime.getMinutes() + 10);
       }
       
@@ -54,7 +59,10 @@ export default function VideoHoldTimer({
       
       if (remainingSeconds <= 0 && isActive) {
         setIsActive(false);
-        onComplete?.();
+        // Add small delay before calling onComplete to prevent errors
+        setTimeout(() => {
+          onComplete?.();
+        }, 100);
         
         // Fade out animation
         opacity.value = withTiming(0, { duration: 500 });
