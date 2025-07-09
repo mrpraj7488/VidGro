@@ -10,6 +10,8 @@ import {
   Dimensions,
   Modal,
   FlatList,
+  StatusBar,
+  Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -26,6 +28,7 @@ import Animated, {
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
+const isVerySmallScreen = screenWidth < 360;
 
 interface VideoData {
   id: string;
@@ -71,13 +74,18 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
     onClose();
   };
 
+  const handleBackdropPress = () => {
+    onClose();
+  };
+
   const renderItem = ({ item }: { item: number }) => (
-    <TouchableOpacity
+    <Pressable
       style={[
         styles.dropdownItem,
         item === selectedValue && styles.selectedDropdownItem
       ]}
       onPress={() => handleSelect(item)}
+      android_ripple={{ color: '#E3F2FD' }}
     >
       <Text style={[
         styles.dropdownItemText,
@@ -88,7 +96,7 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
       {item === selectedValue && (
         <Check color="#3498DB" size={16} />
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 
   return (
@@ -97,18 +105,25 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <TouchableOpacity
+      <Pressable
         style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
+        onPress={handleBackdropPress}
       >
-        <View style={styles.fullScreenModal}>
+        <Pressable 
+          style={styles.fullScreenModal}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{label}</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Pressable 
+              onPress={onClose} 
+              style={styles.closeButton}
+              android_ripple={{ color: 'rgba(255,255,255,0.3)', borderless: true }}
+            >
               <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
           <FlatList
             data={options}
@@ -117,9 +132,10 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
             style={styles.modalList}
             showsVerticalScrollIndicator={false}
             bounces={true}
+            contentContainerStyle={styles.modalListContent}
           />
-        </View>
-      </TouchableOpacity>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 };
@@ -513,9 +529,10 @@ export default function EditVideoScreen() {
 
           {/* Repromote Section */}
           <View style={styles.repromoteSection}>
-            <TouchableOpacity 
+            <Pressable 
               style={styles.repromoteToggle}
               onPress={() => setShowRepromoteOptions(!showRepromoteOptions)}
+              android_ripple={{ color: '#F5F5F5' }}
             >
               <Text style={styles.repromoteLabel}>Repromote Video</Text>
               <ChevronDown 
@@ -526,32 +543,66 @@ export default function EditVideoScreen() {
                   showRepromoteOptions && styles.chevronRotated
                 ]}
               />
-            </TouchableOpacity>
+            </Pressable>
             
             {showRepromoteOptions && (
               <View style={styles.repromoteOptions}>
+                {!canRepromote() && (
+                  <View style={styles.repromoteDisabledNotice}>
+                    <Text style={styles.disabledNoticeText}>
+                      Repromote is only available for completed, paused, or previously repromoted videos.
+                    </Text>
+                  </View>
+                )}
+                
                 {/* Views Selection */}
                 <View style={styles.optionGroup}>
                   <Text style={styles.optionLabel}>Target Views</Text>
-                  <TouchableOpacity 
-                    style={styles.dropdown}
+                  <Pressable 
+                    style={[
+                      styles.dropdown,
+                      !canRepromote() && styles.dropdownDisabled
+                    ]}
                     onPress={() => setShowViewsDropdown(true)}
+                    disabled={!canRepromote()}
+                    android_ripple={{ color: '#F0F0F0' }}
                   >
-                    <Text style={styles.dropdownText}>{selectedViews} views</Text>
-                    <ChevronDown color="#666" size={16} />
-                  </TouchableOpacity>
+                    <Text style={[
+                      styles.dropdownText,
+                      !canRepromote() && styles.dropdownTextDisabled
+                    ]}>
+                      {selectedViews} views
+                    </Text>
+                    <ChevronDown 
+                      color={canRepromote() ? "#666" : "#CCC"} 
+                      size={16} 
+                    />
+                  </Pressable>
                 </View>
 
                 {/* Duration Selection */}
                 <View style={styles.optionGroup}>
                   <Text style={styles.optionLabel}>Watch Duration</Text>
-                  <TouchableOpacity 
-                    style={styles.dropdown}
+                  <Pressable 
+                    style={[
+                      styles.dropdown,
+                      !canRepromote() && styles.dropdownDisabled
+                    ]}
                     onPress={() => setShowDurationDropdown(true)}
+                    disabled={!canRepromote()}
+                    android_ripple={{ color: '#F0F0F0' }}
                   >
-                    <Text style={styles.dropdownText}>{selectedDuration} seconds</Text>
-                    <ChevronDown color="#666" size={16} />
-                  </TouchableOpacity>
+                    <Text style={[
+                      styles.dropdownText,
+                      !canRepromote() && styles.dropdownTextDisabled
+                    ]}>
+                      {selectedDuration} seconds
+                    </Text>
+                    <ChevronDown 
+                      color={canRepromote() ? "#666" : "#CCC"} 
+                      size={16} 
+                    />
+                  </Pressable>
                 </View>
 
                 {/* Cost Display */}
@@ -562,14 +613,15 @@ export default function EditVideoScreen() {
                 </View>
 
                 {/* Repromote Button */}
-                <TouchableOpacity 
+                <Pressable 
                   style={[
                     styles.actionButton, 
                     styles.repromoteButton,
-                    repromoting && styles.buttonDisabled
+                    (repromoting || !canRepromote()) && styles.buttonDisabled
                   ]} 
                   onPress={handleRepromoteVideo}
-                  disabled={repromoting}
+                  disabled={repromoting || !canRepromote()}
+                  android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
                 >
                   <Play color="white" size={20} />
                   <View style={styles.actionContent}>
@@ -577,10 +629,10 @@ export default function EditVideoScreen() {
                       {repromoting ? 'Repromoting...' : 'Repromote Now'}
                     </Text>
                     <Text style={styles.actionSubtext}>
-                      Instantly active in queue
+                      {canRepromote() ? 'Instantly active in queue' : 'Not available for this video'}
                     </Text>
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             )}
           </View>
@@ -897,36 +949,58 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: isVerySmallScreen ? 10 : 20,
   },
   fullScreenModal: {
     backgroundColor: 'white',
     borderRadius: 20,
-    maxHeight: '70%',
-    minHeight: '40%',
+    maxHeight: isSmallScreen ? '80%' : '70%',
+    minHeight: isSmallScreen ? '50%' : '40%',
     width: '100%',
-    maxWidth: 400,
+    maxWidth: isVerySmallScreen ? screenWidth - 20 : 400,
+    ...Platform.select({
+      android: {
+        elevation: 10,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+      },
+      web: {
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+      },
+    }),
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FF4757',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: isVerySmallScreen ? 15 : 20,
+    paddingVertical: isVerySmallScreen ? 12 : 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 16,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: isVerySmallScreen ? 16 : 18,
     fontWeight: '600',
     color: 'white',
+    flex: 1,
+    marginRight: 10,
   },
   closeButton: {
-    padding: 4,
+    padding: isVerySmallScreen ? 6 : 8,
+    borderRadius: 20,
+    minWidth: 32,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   closeButtonText: {
-    fontSize: 20,
+    fontSize: isVerySmallScreen ? 18 : 20,
     color: 'white',
     fontWeight: 'bold',
   },
@@ -936,25 +1010,50 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
+  modalListContent: {
+    paddingBottom: 20,
+  },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: isVerySmallScreen ? 15 : 20,
+    paddingVertical: isVerySmallScreen ? 12 : 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    minHeight: isVerySmallScreen ? 48 : 56,
   },
   selectedDropdownItem: {
     backgroundColor: '#F0F8FF',
   },
   dropdownItemText: {
-    fontSize: 16,
+    fontSize: isVerySmallScreen ? 14 : 16,
     color: '#333',
+    flex: 1,
   },
   selectedDropdownItemText: {
     color: '#3498DB',
     fontWeight: '600',
+  },
+  repromoteDisabledNotice: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFC107',
+  },
+  disabledNoticeText: {
+    fontSize: isVerySmallScreen ? 12 : 13,
+    color: '#856404',
+    lineHeight: 18,
+  },
+  dropdownDisabled: {
+    backgroundColor: '#F8F9FA',
+    opacity: 0.6,
+  },
+  dropdownTextDisabled: {
+    color: '#999',
   },
   disabledText: {
     fontSize: 12,
