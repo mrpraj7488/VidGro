@@ -103,15 +103,18 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={styles.dropdownModal}>
-          <View style={styles.dropdownHeader}>
-            <Text style={styles.dropdownTitle}>{label}</Text>
+        <View style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{label}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
           </View>
           <FlatList
             data={options}
             renderItem={renderItem}
             keyExtractor={(item) => item.toString()}
-            style={styles.dropdownList}
+            style={styles.modalList}
             showsVerticalScrollIndicator={false}
             bounces={true}
           />
@@ -853,49 +856,52 @@ const styles = StyleSheet.create({
   // Modal Dropdown Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  fullScreenModal: {
+    flex: 1,
+    backgroundColor: '#FF4757',
+    marginTop: Platform.OS === 'ios' ? 50 : 40,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: 'white',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dropdownModal: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    width: screenWidth * 0.8,
-    maxHeight: screenWidth * 0.8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.25)',
-      },
-    }),
-  },
-  dropdownHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  dropdownTitle: {
+  closeButtonText: {
+    color: 'white',
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
+    fontWeight: 'bold',
   },
-  dropdownList: {
-    maxHeight: screenWidth * 0.6,
+  modalList: {
+    flex: 1,
+    backgroundColor: 'white',
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F8F9FA',
   },
@@ -903,11 +909,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F8FF',
   },
   dropdownItemText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#333',
   },
   selectedDropdownItemText: {
     color: '#3498DB',
     fontWeight: '600',
+  },
   },
 });
