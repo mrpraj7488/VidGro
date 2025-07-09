@@ -324,7 +324,6 @@ import {
   Latest,
   Recent,
   Old,
-  New,
   Fresh,
   Updated,
   Modified,
