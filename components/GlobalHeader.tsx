@@ -28,6 +28,8 @@ const isSmallScreen = screenWidth < 480;
 interface GlobalHeaderProps {
   title: string;
   showCoinDisplay?: boolean;
+  menuVisible: boolean;
+  setMenuVisible: (visible: boolean) => void;
 }
 
 interface MenuItem {
@@ -38,9 +40,8 @@ interface MenuItem {
   destructive?: boolean;
 }
 
-export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHeaderProps) {
+export default function GlobalHeader({ title, showCoinDisplay = true, menuVisible, setMenuVisible }: GlobalHeaderProps) {
   const { user, profile, signOut } = useAuth();
-  const [menuVisible, setMenuVisible] = useState(false);
   
   // Animation values
   const coinBounce = useSharedValue(1);
@@ -204,18 +205,16 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
         transparent
         animationType="none"
         onRequestClose={handleCloseMenu}
-        // SOLUTION: Lower z-index for GlobalHeader Modal to ensure dropdowns render above
         statusBarTranslucent={Platform.OS === 'android'}
         presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       >
-        {/* SOLUTION: Lower z-index (100) to allow dropdown Modal (1000) to render above */}
         <Animated.View style={[
-          styles.modalOverlay, 
-          overlayAnimatedStyle, 
-          { 
+          styles.modalOverlay,
+          overlayAnimatedStyle,
+          {
             zIndex: 100, // Lower z-index than dropdown's 1000
-            elevation: 100 // Lower elevation than dropdown's 1000
-          }
+            elevation: 100, // Lower elevation than dropdown's 1000
+          },
         ]}>
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
@@ -247,7 +246,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
                   </View>
                   <Text style={[
                     styles.menuItemText,
-                    item.destructive && styles.destructiveText
+                    item.destructive && styles.destructiveText,
                   ]}>
                     {item.title}
                   </Text>
@@ -315,13 +314,10 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: 'bold',
   },
-  // SOLUTION: Lower z-index for GlobalHeader Modal overlay to prevent conflicts
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flexDirection: 'row',
-    // SOLUTION: Lower z-index to ensure dropdowns can render above
-    // This allows the dropdown's z-index: 1000 to be clearly above this component
   },
   overlayPressable: {
     flex: 1,
@@ -330,19 +326,18 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 280 : 320,
     height: '100%',
     backgroundColor: 'white',
-    // SOLUTION: Moderate shadow/elevation to prevent interference with dropdowns
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 2, height: 0 },
-        shadowOpacity: 0.15, // Moderate opacity
-        shadowRadius: 12, // Moderate radius
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
       },
       android: {
-        elevation: 100, // Lower elevation than dropdowns
+        elevation: 100,
       },
       web: {
-        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)', // Moderate web shadow
+        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)',
       },
     }),
   },
