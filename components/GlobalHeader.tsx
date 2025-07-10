@@ -204,17 +204,17 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
         transparent
         animationType="none"
         onRequestClose={handleCloseMenu}
-        // SOLUTION: Reduced z-index for GlobalHeader Modal to ensure dropdowns render above
+        // SOLUTION: Lower z-index for GlobalHeader Modal to ensure dropdowns render above
         statusBarTranslucent={Platform.OS === 'android'}
         presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       >
-        {/* SOLUTION: Significantly reduced z-index to allow dropdown Modal to render above */}
+        {/* SOLUTION: Lower z-index (100) to allow dropdown Modal (1000) to render above */}
         <Animated.View style={[
           styles.modalOverlay, 
           overlayAnimatedStyle, 
           { 
-            zIndex: 100, // Much lower z-index than dropdown's 999999
-            elevation: 100 // Much lower elevation than dropdown's 999999
+            zIndex: 100, // Lower z-index than dropdown's 1000
+            elevation: 100 // Lower elevation than dropdown's 1000
           }
         ]}>
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
@@ -315,13 +315,13 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: 'bold',
   },
-  // SOLUTION: Significantly reduced z-index for GlobalHeader Modal overlay
+  // SOLUTION: Lower z-index for GlobalHeader Modal overlay to prevent conflicts
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flexDirection: 'row',
-    // SOLUTION: Much lower z-index to ensure dropdowns can render above
-    // This allows the dropdown's z-index: 999999 to be clearly above this component
+    // SOLUTION: Lower z-index to ensure dropdowns can render above
+    // This allows the dropdown's z-index: 1000 to be clearly above this component
   },
   overlayPressable: {
     flex: 1,
@@ -330,19 +330,19 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 280 : 320,
     height: '100%',
     backgroundColor: 'white',
-    // SOLUTION: Reduced shadow/elevation to prevent interference with dropdowns
+    // SOLUTION: Moderate shadow/elevation to prevent interference with dropdowns
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 2, height: 0 },
-        shadowOpacity: 0.15, // Reduced opacity
-        shadowRadius: 12, // Reduced radius
+        shadowOpacity: 0.15, // Moderate opacity
+        shadowRadius: 12, // Moderate radius
       },
       android: {
-        elevation: 8, // Reduced elevation
+        elevation: 100, // Lower elevation than dropdowns
       },
       web: {
-        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)', // Reduced web shadow
+        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)', // Moderate web shadow
       },
     }),
   },
