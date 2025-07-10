@@ -12,7 +12,7 @@ import {
   Linking,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, MessageCircle, Mail, Phone, Clock, Send, CircleHelp as HelpCircle } from 'lucide-react-native';
+import { ArrowLeft, MessageCircle, Mail, Clock, Send, CircleHelp as HelpCircle } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,

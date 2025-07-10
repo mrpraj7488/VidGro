@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   Alert,
   Platform,
-  Dimensions,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
@@ -15,21 +13,9 @@ import {
   DollarSign, 
   Crown, 
   Gift, 
-  CircleStop as StopCircle, 
   Star, 
   User, 
-  Share2, 
-  FileText, 
-  Shield, 
-  Globe, 
-  Settings, 
-  MessageCircle, 
-  LogOut, 
-  Trash2, 
-  RefreshCw,
-  ChevronRight,
   Coins,
-  Menu
 } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 
@@ -46,23 +32,9 @@ interface QuickAction {
   featured?: boolean;
 }
 
-interface MenuSection {
-  title: string;
-  items: MenuItem[];
-}
-
-interface MenuItem {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon: React.ReactNode;
-  onPress: () => void;
-  destructive?: boolean;
-}
 
 export default function OthersTab() {
   const { user, profile, signOut } = useAuth();
-  const [refreshing, setRefreshing] = useState(false);
 
   const handleBuyCoins = () => {
     router.push('/buy-coins');
@@ -76,25 +48,6 @@ export default function OthersTab() {
     Alert.alert('Free Coins', 'Watch a 30-45 second ad to earn 150-400 coins');
   };
 
-  const handleStopAds = () => {
-    Alert.alert('Stop Ads', 'Spend coins to stop ads for 6 hours');
-  };
-
-  const handleRateUs = () => {
-    Alert.alert('Rate Us', 'Thank you for using VidGro!');
-  };
-
-  const handleCleanup = () => {
-    Alert.alert('App Cleanup', 'App cleanup feature coming soon!');
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  };
 
   const quickActions: QuickAction[] = [
     {
@@ -123,14 +76,6 @@ export default function OthersTab() {
       color: '#4ECDC4',
       onPress: handleFreeCoins,
     },
-    {
-      id: 'stop-ads',
-      title: 'Stop Ads',
-      subtitle: 'Ad-free for 6 hours',
-      icon: <StopCircle color="white" size={24} />,
-      color: '#9B59B6',
-      onPress: handleStopAds,
-    },
   ];
 
   return (
@@ -140,8 +85,6 @@ export default function OthersTab() {
       <ScrollView 
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
       >
         {/* User Profile Card */}
         <View style={styles.profileCard}>

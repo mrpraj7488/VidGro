@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, Share2, Copy, Gift, Users, Coins } from 'lucide-react-native';
+import { ArrowLeft, Share2, Copy, Gift, Users } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -124,7 +124,7 @@ export default function ReferFriendScreen() {
           
           <View style={styles.benefitCard}>
             <View style={styles.benefitIcon}>
-              <Coins color="#FFD700" size={24} />
+              <Text style={styles.coinEmoji}>🪙</Text>
             </View>
             <View style={styles.benefitContent}>
               <Text style={styles.benefitTitle}>You Get 50 Coins</Text>
@@ -296,6 +296,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  coinEmoji: {
+    fontSize: 24,
   },
   benefitContent: {
     flex: 1,

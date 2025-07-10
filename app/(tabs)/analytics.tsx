@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Video, ChevronDown, ChevronUp, CreditCard as Edit3, RotateCcw, Eye, Clock, TrendingUp, Activity, Menu, Timer, Play, Pause, ChartBar as BarChart3, DollarSign } from 'lucide-react-native';
+import { Video, ChevronDown, ChevronUp, CreditCard as Edit3, RotateCcw, Eye, Clock, Timer, Activity, DollarSign } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 import Animated, { 
   useSharedValue, 
@@ -312,7 +312,7 @@ export default function AnalyticsTab() {
       case 'video_watch': return <Eye color="#4ECDC4" size={16} />;
       case 'video_promotion': return <Video color="#FF4757" size={16} />;
       case 'purchase': return <DollarSign color="#FFA726" size={16} />;
-      case 'admin_adjustment': return <BarChart3 color="#9B59B6" size={16} />;
+      case 'admin_adjustment': return <Activity color="#9B59B6" size={16} />;
       default: return <Activity color="#666" size={16} />;
     }
   };
