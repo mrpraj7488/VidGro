@@ -18,7 +18,6 @@ import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import GlobalHeader from '@/components/GlobalHeader';
 import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -122,47 +121,19 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
     onClose();
   };
 
-  const handleBackdropPress = () => {
-    onClose();
-  };
-
   return (
     <Modal
       visible={visible}
-      transparent={false} // SOLUTION: Use non-transparent Modal for better isolation on Android
+      transparent
       animationType="none"
       onRequestClose={onClose}
-      // SOLUTION: Moderate z-index with proper Modal isolation instead of extreme values
-      statusBarTranslucent={Platform.OS === 'android'}
-      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : 'fullScreen'} // SOLUTION: Use fullScreen on Android for better rendering
-      // SOLUTION: Enhanced Android-specific props for better performance
-      hardwareAccelerated={Platform.OS === 'android'}
-      supportedOrientations={['portrait']}
     >
-      {/* SOLUTION: Moderate z-index hierarchy (1000) instead of extreme values (999999) */}
-      <Animated.View style={[
-        styles.dropdownOverlay, 
-        { 
-          opacity: opacityAnim,
-          // SOLUTION: Moderate z-index that's higher than GlobalHeader (100) but not extreme
-          zIndex: 1000,
-          elevation: 1000, // Android moderate elevation
-        }
-      ]}>
-        <TouchableOpacity 
-          style={styles.dropdownBackdrop} 
-          onPress={handleBackdropPress}
-          activeOpacity={1}
-        />
+      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
+        <TouchableOpacity style={styles.dropdownBackdrop} onPress={onClose} />
         <Animated.View 
           style={[
             styles.dropdownContainer,
-            { 
-              transform: [{ translateY: slideAnim }],
-              // SOLUTION: Consistent moderate z-index
-              zIndex: 1000,
-              elevation: 1000,
-            }
+            { transform: [{ translateY: slideAnim }] }
           ]}
         >
           <LinearGradient
@@ -170,11 +141,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
             style={styles.dropdownHeader}
           >
             <Text style={styles.dropdownTitle}>{placeholder}</Text>
-            <TouchableOpacity 
-              onPress={onClose} 
-              style={styles.closeButton}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </LinearGradient>
@@ -183,7 +150,6 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
             style={styles.dropdownScrollView}
             showsVerticalScrollIndicator={false}
             bounces={true}
-            nestedScrollEnabled={true}
           >
             {options.map((option, index) => (
               <TouchableOpacity
@@ -194,8 +160,6 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
                   index === options.length - 1 && styles.dropdownOptionLast
                 ]}
                 onPress={() => handleSelect(option.value)}
-                activeOpacity={0.7}
-                delayPressIn={0}
               >
                 <Text style={[
                   styles.dropdownOptionText,
@@ -217,6 +181,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
 
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
+  const [menuVisible, setMenuVisible] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [title, setTitle] = useState('');
   const [userSetDuration, setUserSetDuration] = useState<number | null>(null);
@@ -365,16 +330,12 @@ export default function PromoteTab() {
     }
   };
 
-  // SOLUTION: Enhanced createIframeHTML with Android-specific optimizations
   const createIframeHTML = (embedUrl: string) => {
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <!-- SOLUTION: Enhanced meta tags for Android WebView compatibility -->
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:;">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <style>
           body {
             margin: 0;
@@ -430,10 +391,6 @@ export default function PromoteTab() {
           var hasError = false;
           var initializationInProgress = false;
           
-          // SOLUTION: Enhanced error handling for Android WebView
-          var isAndroid = /Android/i.test(navigator.userAgent);
-          var androidVersion = isAndroid ? parseFloat(navigator.userAgent.slice(navigator.userAgent.indexOf("Android")+8)) : 0;
-          
           // Set loading timeout
           loadingTimeoutId = setTimeout(function() {
             if (!isPlayerReady && !hasTimedOut) {
@@ -450,35 +407,25 @@ export default function PromoteTab() {
             }
           }, ${loadingTimeoutDuration});
 
-          // SOLUTION: Enhanced YouTube IFrame API loading with fallback for Android
-          function loadYouTubeAPI() {
-            var tag = document.createElement('script');
-            tag.src = "https://www.youtube.com/iframe_api";
-            tag.onerror = function() {
-              console.error('Failed to load YouTube IFrame API');
-              clearTimeout(loadingTimeoutId);
-              hasError = true;
-              document.getElementById('loading').style.display = 'none';
-              document.getElementById('error').style.display = 'block';
-              document.getElementById('error').textContent = 'Failed to load YouTube API';
-              
-              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'API_LOAD_ERROR',
-                message: 'Failed to load YouTube IFrame API'
-              }));
-            };
+          // Load YouTube IFrame API
+          var tag = document.createElement('script');
+          tag.src = "https://www.youtube.com/iframe_api";
+          tag.onerror = function() {
+            console.error('Failed to load YouTube IFrame API');
+            clearTimeout(loadingTimeoutId);
+            hasError = true;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = 'Failed to load YouTube API';
             
-            var firstScriptTag = document.getElementsByTagName('script')[0];
-            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-          }
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'API_LOAD_ERROR',
+              message: 'Failed to load YouTube IFrame API'
+            }));
+          };
           
-          // SOLUTION: Delayed API loading for better Android compatibility
-          if (isAndroid && androidVersion < 7.0) {
-            // Older Android versions need more time
-            setTimeout(loadYouTubeAPI, 1000);
-          } else {
-            loadYouTubeAPI();
-          }
+          var firstScriptTag = document.getElementsByTagName('script')[0];
+          firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
           function onYouTubeIframeAPIReady() {
             if (initializationInProgress || hasError || hasTimedOut) {
@@ -503,10 +450,7 @@ export default function PromoteTab() {
                   'disablekb': 1,
                   'iv_load_policy': 3,
                   'enablejsapi': 1,
-                  'origin': window.location.origin,
-                  // SOLUTION: Enhanced player vars for Android compatibility
-                  'playsinline': 1,
-                  'widget_referrer': window.location.origin
+                  'origin': window.location.origin
                 },
                 events: {
                   'onReady': onPlayerReady,
@@ -544,8 +488,7 @@ export default function PromoteTab() {
               videoId: '${videoData?.id}'
             }));
             
-            // SOLUTION: Enhanced auto-playback test with Android-specific delay
-            var playbackDelay = isAndroid ? 2000 : 1500;
+            // Auto-start playback test with delay to prevent stack overflow
             setTimeout(function() {
               if (player && player.playVideo && isPlayerReady && !hasError) {
                 try {
@@ -555,7 +498,7 @@ export default function PromoteTab() {
                   console.error('Error starting playback:', error);
                 }
               }
-            }, playbackDelay);
+            }, 1500);
           }
 
           function onPlayerStateChange(event) {
@@ -708,7 +651,7 @@ export default function PromoteTab() {
             }
           }
           
-          // SOLUTION: Enhanced error handling for Android WebView
+          // Handle page errors
           window.onerror = function(msg, url, lineNo, columnNo, error) {
             console.error('Page error:', msg);
             hasError = true;
@@ -1022,7 +965,36 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader title="Promote" showCoinDisplay={true} />
+      {/* Header with Menu Icon and Purple Theme */}
+      <LinearGradient
+        colors={['#800080', '#9B59B6']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          {/* Left Section - Menu + Title */}
+          <View style={styles.leftSection}>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setMenuVisible(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.hamburgerIcon}>
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+              </View>
+            </TouchableOpacity>
+            
+            <Text style={styles.headerTitle}>Promote</Text>
+          </View>
+          
+          {/* Right Section - Coin Display */}
+          <View style={styles.coinDisplay}>
+            <Text style={styles.coinEmoji}>🪙</Text>
+            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1085,7 +1057,6 @@ export default function PromoteTab() {
                 {showIframe && (
                   <View style={styles.iframeContainer}>
                     <View style={styles.webviewContainer}>
-                      {/* SOLUTION: Enhanced WebView with Android-specific props */}
                       <WebView
                         ref={webviewRef}
                         source={{ html: createIframeHTML(videoData.embedUrl) }}
@@ -1098,25 +1069,6 @@ export default function PromoteTab() {
                         mixedContentMode="compatibility"
                         originWhitelist={['*']}
                         allowsFullscreenVideo={false}
-                        // SOLUTION: Enhanced Android-specific WebView props for better compatibility
-                        {...Platform.select({
-                          android: {
-                            androidHardwareAcceleration: true,
-                            androidLayerType: 'hardware',
-                            allowFileAccess: true,
-                            allowUniversalAccessFromFileURLs: true,
-                            allowFileAccessFromFileURLs: true,
-                            cacheEnabled: true,
-                            thirdPartyCookiesEnabled: true,
-                          },
-                          ios: {
-                            allowsLinkPreview: false,
-                            dataDetectorTypes: 'none',
-                          },
-                          web: {
-                            allowsProtectedMedia: false,
-                          }
-                        })}
                       />
                     </View>
                     
@@ -1178,8 +1130,6 @@ export default function PromoteTab() {
               <TouchableOpacity
                 style={styles.dropdownTrigger}
                 onPress={() => openDropdown('views')}
-                activeOpacity={0.7}
-                delayPressIn={0}
               >
                 <Eye color="#666" size={20} style={styles.inputIcon} />
                 <Text style={[
@@ -1198,8 +1148,6 @@ export default function PromoteTab() {
               <TouchableOpacity
                 style={styles.dropdownTrigger}
                 onPress={() => openDropdown('duration')}
-                activeOpacity={0.7}
-                delayPressIn={0}
               >
                 <Clock color="#666" size={20} style={styles.inputIcon} />
                 <Text style={[
@@ -1280,7 +1228,7 @@ export default function PromoteTab() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* SOLUTION: Enhanced Futuristic Dropdowns with moderate z-index and better isolation */}
+      {/* Futuristic Dropdowns */}
       <FuturisticDropdown
         options={VIEW_OPTIONS}
         selectedValue={targetViews}
@@ -1306,6 +1254,61 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    minHeight: Platform.OS === 'ios' ? 100 : 90,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 16,
+  },
+  hamburgerIcon: {
+    width: 20,
+    height: 16,
+    justifyContent: 'space-between',
+  },
+  hamburgerLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: 'white',
+    borderRadius: 1,
+  },
+  headerTitle: {
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: 'bold',
+    color: 'white',
+    letterSpacing: 0.5,
+  },
+  coinDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: isSmallScreen ? 10 : 12,
+    paddingVertical: isSmallScreen ? 6 : 8,
+    borderRadius: 20,
+  },
+  coinEmoji: {
+    fontSize: isSmallScreen ? 16 : 18,
+    marginRight: 4,
+  },
+  coinCount: {
+    color: 'white',
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: 'bold',
   },
   keyboardView: {
     flex: 1,
@@ -1392,7 +1395,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 52,
-    minHeight: 52,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1412,28 +1414,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: '#999',
-    textAlign: 'left',
   },
   dropdownTriggerTextSelected: {
     color: '#333',
     fontWeight: '500',
   },
-  // SOLUTION: Moderate z-index dropdown styles with enhanced platform-specific optimizations
   dropdownOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)', // Stronger overlay for better visibility
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
-    // SOLUTION: Moderate z-index values for stable cross-platform rendering
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
   dropdownBackdrop: {
     flex: 1,
-    width: '100%',
-    height: '100%',
   },
   dropdownContainer: {
     backgroundColor: 'white',
@@ -1441,21 +1433,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: screenHeight * 0.7,
     overflow: 'hidden',
-    // SOLUTION: Enhanced platform-specific shadows with moderate values
-    ...Platform.select({
-      android: {
-        elevation: 1000, // Moderate Android elevation
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -8 }, // Moderate shadow
-        shadowOpacity: 0.3, // Moderate opacity
-        shadowRadius: 16, // Moderate shadow radius
-      },
-      web: {
-        boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.3)', // Moderate web shadow
-      },
-    }),
   },
   dropdownHeader: {
     flexDirection: 'row',
@@ -1463,13 +1440,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    // SOLUTION: Enhanced Android-specific styling
-    ...Platform.select({
-      android: {
-        paddingTop: 20,
-        elevation: 5, // Additional elevation for header
-      },
-    }),
   },
   dropdownTitle: {
     fontSize: 18,
@@ -1483,12 +1453,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    // SOLUTION: Enhanced Android button styling
-    ...Platform.select({
-      android: {
-        elevation: 3,
-      },
-    }),
   },
   closeButtonText: {
     color: 'white',
@@ -1497,14 +1461,6 @@ const styles = StyleSheet.create({
   },
   dropdownScrollView: {
     maxHeight: screenHeight * 0.5,
-    backgroundColor: 'white', // Ensure solid background
-    // SOLUTION: Enhanced Android ScrollView styling
-    ...Platform.select({
-      android: {
-        paddingBottom: 20,
-        elevation: 3,
-      },
-    }),
   },
   dropdownOption: {
     flexDirection: 'row',
@@ -1514,23 +1470,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
-    minHeight: 56,
-    backgroundColor: 'white', // Ensure solid background for each option
-    // SOLUTION: Enhanced Android option styling
-    ...Platform.select({
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   dropdownOptionSelected: {
     backgroundColor: '#F8F0FF',
-    // SOLUTION: Enhanced selected state for Android
-    ...Platform.select({
-      android: {
-        elevation: 2,
-      },
-    }),
   },
   dropdownOptionLast: {
     borderBottomWidth: 0,
@@ -1539,7 +1481,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
-    flex: 1,
   },
   dropdownOptionTextSelected: {
     color: '#800080',
