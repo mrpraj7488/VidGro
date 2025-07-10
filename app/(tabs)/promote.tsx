@@ -129,66 +129,75 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
     onClose();
   };
 
+  if (!visible) {
+    return null;
+  }
+
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
+      presentationStyle="overFullScreen"
     >
       {/* FIXED: Solid overlay background for Android */}
-      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
-        <Pressable
-          style={styles.dropdownBackdrop}
-          onPress={handleBackdropPress}
-        />
+      <View style={styles.modalContainer}>
         <Animated.View
-          style={[
-            styles.dropdownContainer,
-            { transform: [{ translateY: slideAnim }] }
-          ]}
+          style={[styles.dropdownOverlay, { opacity: opacityAnim }]}
         >
-          <LinearGradient
-            colors={['#800080', '#9B59B6', '#A569BD']}
-            style={styles.dropdownHeader}
+          <Pressable
+            style={styles.dropdownBackdrop}
+            onPress={handleBackdropPress}
+          />
+          <Animated.View
+            style={[
+              styles.dropdownContainer,
+              { transform: [{ translateY: slideAnim }] }
+            ]}
           >
-            <Text style={styles.dropdownTitle}>{placeholder}</Text>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </Pressable>
-          </LinearGradient>
-
-          <ScrollView 
-            style={styles.dropdownScrollView}
-            showsVerticalScrollIndicator={false}
-            bounces={true}
-          >
-            {options.map((option, index) => (
-              <Pressable
-                key={option.value}
-                style={[
-                  styles.dropdownOption,
-                  selectedValue === option.value && styles.dropdownOptionSelected,
-                  index === options.length - 1 && styles.dropdownOptionLast
-                ]}
-                onPress={() => handleSelect(option.value)}
-                android_ripple={{ color: '#F3E8FF' }}
-              >
-                <Text style={[
-                  styles.dropdownOptionText,
-                  selectedValue === option.value && styles.dropdownOptionTextSelected
-                ]}>
-                  {option.label}
-                </Text>
-                {selectedValue === option.value && (
-                  <CheckCircle color="#800080" size={20} />
-                )}
+            <LinearGradient
+              colors={['#800080', '#9B59B6', '#A569BD']}
+              style={styles.dropdownHeader}
+            >
+              <Text style={styles.dropdownTitle}>{placeholder}</Text>
+              <Pressable onPress={onClose} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
               </Pressable>
-            ))}
-          </ScrollView>
+            </LinearGradient>
+
+            <ScrollView 
+              style={styles.dropdownScrollView}
+              showsVerticalScrollIndicator={false}
+              bounces={true}
+            >
+              {options.map((option, index) => (
+                <Pressable
+                  key={option.value}
+                  style={[
+                    styles.dropdownOption,
+                    selectedValue === option.value && styles.dropdownOptionSelected,
+                    index === options.length - 1 && styles.dropdownOptionLast
+                  ]}
+                  onPress={() => handleSelect(option.value)}
+                  android_ripple={{ color: '#F3E8FF' }}
+                >
+                  <Text style={[
+                    styles.dropdownOptionText,
+                    selectedValue === option.value && styles.dropdownOptionTextSelected
+                  ]}>
+                    {option.label}
+                  </Text>
+                  {selectedValue === option.value && (
+                    <CheckCircle color="#800080" size={20} />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </View>
     </Modal>
   );
 };
@@ -1350,34 +1359,32 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  // FIXED: Enhanced Modal Styles for Android Transparency Issue
+  // Enhanced Modal Styles for Android Compatibility
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   dropdownOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)', // Solid semi-transparent overlay
     justifyContent: 'flex-end',
   },
   dropdownBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
+    backgroundColor: 'transparent',
     backgroundColor: 'rgba(0, 0, 0, 0.5)', // Explicit background for Android
   },
   dropdownContainer: {
-    backgroundColor: '#FFFFFF', // Explicit white background
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: screenHeight * 0.7,
     overflow: 'hidden',
     ...Platform.select({
       android: {
-        elevation: 16,
-        backgroundColor: '#FFFFFF', // Double ensure white background on Android
+        elevation: 20,
+        backgroundColor: '#FFFFFF',
+        shadowColor: 'transparent',
       },
       ios: {
         shadowColor: '#000',
@@ -1398,7 +1405,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
+    ...Platform.select({
+      android: {
+        paddingTop: (StatusBar.currentHeight || 0) + 16,
+        backgroundColor: '#FFFFFF', // Double ensure white background on Android
+      },
+      ios: {
+        paddingTop: 16,
+        backgroundColor: '#FFFFFF',
+      },
+      web: {
+        paddingTop: 16,
+        backgroundColor: '#FFFFFF',
+      },
+    }),
   },
   dropdownTitle: {
     fontSize: 18,
@@ -1420,6 +1440,12 @@ const styles = StyleSheet.create({
   },
   dropdownScrollView: {
     maxHeight: screenHeight * 0.5,
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      android: {
+        backgroundColor: '#FFFFFF',
+      },
+    }),
     backgroundColor: '#FFFFFF', // Explicit white background for scroll view
   },
   dropdownOption: {
@@ -1431,10 +1457,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     minHeight: 56,
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      android: {
+        backgroundColor: '#FFFFFF',
+      },
+    }),
     backgroundColor: '#FFFFFF', // Explicit white background for each option
   },
   dropdownOptionSelected: {
-    backgroundColor: '#FFF8F8',
+    backgroundColor: '#F3E8FF',
+    ...Platform.select({
+      android: {
+        backgroundColor: '#F3E8FF',
+      },
+    }),
   },
   dropdownOptionLast: {
     borderBottomWidth: 0,
