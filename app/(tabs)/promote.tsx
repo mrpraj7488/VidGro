@@ -138,18 +138,18 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
       statusBarTranslucent
     >
       <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
-        <Pressable 
-          style={styles.dropdownBackdrop} 
+        <Pressable
+          style={styles.dropdownBackdrop}
           onPress={handleBackdropPress}
         />
-        <Animated.View 
+        <Animated.View
           style={[
             styles.dropdownContainer,
             { transform: [{ translateY: slideAnim }] }
           ]}
         >
           <LinearGradient
-            colors={['#FF4757', '#FF6B8A', '#FFA726']}
+            colors={['#800080', '#9B59B6', '#A569BD']}
             style={styles.dropdownHeader}
           >
             <Text style={styles.dropdownTitle}>{placeholder}</Text>
@@ -157,7 +157,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
               <Text style={styles.closeButtonText}>✕</Text>
             </Pressable>
           </LinearGradient>
-          
+
           <ScrollView 
             style={styles.dropdownScrollView}
             showsVerticalScrollIndicator={false}
@@ -181,7 +181,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
                   {option.label}
                 </Text>
                 {selectedValue === option.value && (
-                  <CheckCircle color="#FF4757" size={20} />
+                  <CheckCircle color="#800080" size={20} />
                 )}
               </Pressable>
             ))}
@@ -210,11 +210,11 @@ export default function PromoteTab() {
   const [testingPlayback, setTestingPlayback] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
-  
+
   // Dropdown states
   const [showViewsDropdown, setShowViewsDropdown] = useState(false);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
-  
+
   const webviewRef = useRef<WebView>(null);
   const maxRetries = 2;
   const loadingTimeoutDuration = 5000; // 5 seconds
@@ -246,14 +246,14 @@ export default function PromoteTab() {
   const calculateCosts = () => {
     const durationSeconds = userSetDuration || 0;
     const views = targetViews || 0;
-    
+
     // Dynamic cost calculation: (views × duration) / 100 × 2.5
     const baseCost = Math.ceil((views * durationSeconds) / 100 * 2.5);
-    
+
     // VIP discount: 10% off for VIP members
     const vipDiscount = profile?.is_vip ? Math.ceil(baseCost * 0.1) : 0;
     const totalCost = baseCost - vipDiscount;
-    
+
     return { 
       baseCost, 
       totalCost, 
@@ -390,7 +390,7 @@ export default function PromoteTab() {
         <div id="loading" class="loading">Testing video compatibility...</div>
         <div id="error" class="error" style="display: none;"></div>
         <div id="player"></div>
-        
+
         <script>
           console.log('Initializing YouTube iframe validation for video ID: ${videoData?.id}');
           
@@ -684,7 +684,7 @@ export default function PromoteTab() {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('WebView message:', data);
-      
+
       switch (data.type) {
         case 'PLAYER_READY':
           setIframeLoaded(true);
@@ -784,11 +784,11 @@ export default function PromoteTab() {
     if (!userSetDuration || userSetDuration < 10) {
       return 'Duration must be at least 10 seconds';
     }
-    
+
     if (userSetDuration > 600) {
       return 'Duration must be less than 600 seconds (10 minutes)';
     }
-    
+
     return null;
   };
 
@@ -1014,7 +1014,7 @@ export default function PromoteTab() {
                   onPress={fetchVideoData}
                   disabled={fetchingVideo || !youtubeUrl.trim()}
                 >
-                  <Search color={fetchingVideo ? "#999" : "#FF4757"} size={20} />
+                  <Search color={fetchingVideo ? "#999" : "#800080"} size={20} />
                 </TouchableOpacity>
               </View>
               {fetchingVideo && (
@@ -1213,7 +1213,7 @@ export default function PromoteTab() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Fixed Futuristic Dropdowns with your original branding colors */}
+      {/* Fixed Futuristic Dropdowns */}
       <FuturisticDropdown
         options={VIEW_OPTIONS}
         selectedValue={targetViews}
@@ -1254,7 +1254,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF4757',
+    borderLeftColor: '#800080',
   },
   errorIcon: {
     marginRight: 8,
@@ -1349,7 +1349,7 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  // Fixed dropdown styles with your original branding colors
+  // Fixed Modal Styles for Android
   dropdownOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1368,6 +1368,20 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: screenHeight * 0.7,
     overflow: 'hidden',
+    ...Platform.select({
+      android: {
+        elevation: 16,
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+      },
+      web: {
+        boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.25)',
+      },
+    }),
   },
   dropdownHeader: {
     flexDirection: 'row',
@@ -1375,6 +1389,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
   },
   dropdownTitle: {
     fontSize: 18,
@@ -1405,9 +1420,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    minHeight: 56,
   },
   dropdownOptionSelected: {
-    backgroundColor: '#FFF8F8',
+    backgroundColor: '#F0F8FF',
   },
   dropdownOptionLast: {
     borderBottomWidth: 0,
@@ -1418,7 +1434,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   dropdownOptionTextSelected: {
-    color: '#FF4757',
+    color: '#800080',
     fontWeight: '600',
   },
   iframeSection: {
@@ -1564,11 +1580,11 @@ const styles = StyleSheet.create({
   },
   finalCostValue: {
     fontSize: 18,
-    fontWeight: 'bol',
-    color: '#FF4757',
+    fontWeight: 'bold',
+    color: '#800080',
   },
   insufficientBalance: {
-    color: '#FF4757',
+    color: '#800080',
   },
   vipPrompt: {
     flexDirection: 'row',
@@ -1591,23 +1607,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF4757',
+    backgroundColor: '#800080',
     borderRadius: 12,
     height: 52,
     marginBottom: 24,
     ...Platform.select({
       ios: {
-        shadowColor: '#FF4757',
+        shadowColor: '#800080',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
       },
       android: {
-        
         elevation: 4,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
+        boxShadow: '0 4px 8px rgba(128, 0, 128, 0.3)',
       },
     }),
   },
@@ -1618,7 +1633,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   promoteButtonText: {
-    
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
