@@ -187,14 +187,13 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
       <Modal
         visible={menuVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={handleCloseMenu}
-        statusBarTranslucent={Platform.OS === 'android'}
+        statusBarTranslucent
       >
-        <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={handleCloseMenu} />
+        <Pressable style={styles.modalOverlay} onPress={handleCloseMenu}>
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
-            <View>
+            <Pressable onPress={(e) => e.stopPropagation()}>
               {/* User Profile Section */}
               <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
                 <View style={styles.avatar}>
@@ -230,9 +229,9 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
+            </Pressable>
           </Animated.View>
-        </View>
+        </Pressable>
       </Modal>
     </>
   );
@@ -296,15 +295,14 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    flexDirection: 'row',
-  },
-  modalBackdrop: {
-    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   slideMenu: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
     width: isSmallScreen ? 280 : 320,
-    height: '100%',
     backgroundColor: 'white',
     ...Platform.select({
       ios: {
