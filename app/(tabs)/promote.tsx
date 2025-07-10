@@ -1590,7 +1590,7 @@ const styles = StyleSheet.create({
   promoteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: '
+    justifyContent: 'center',
     backgroundColor: '#FF4757',
     borderRadius: 12,
     height: 52,
