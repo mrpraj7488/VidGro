@@ -19,17 +19,7 @@ import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { 
-  Link, 
-  Eye, 
-  Clock, 
-  TrendingUp, 
-  ChevronDown, 
-  Check,
-  AlertCircle,
-  Play,
-  DollarSign
-} from 'lucide-react-native';
+import { Link, Eye, Clock, TrendingUp, ChevronDown, Check, CircleAlert as AlertCircle, Play, DollarSign } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 import Animated, {
   useSharedValue,
