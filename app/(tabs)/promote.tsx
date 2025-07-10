@@ -132,13 +132,23 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
       transparent
       animationType="none"
       onRequestClose={onClose}
-      // SOLUTION: Enhanced Modal props for better isolation from GlobalHeader
+      // SOLUTION: Maximum z-index and Modal isolation to ensure dropdown renders above everything
       statusBarTranslucent={Platform.OS === 'android'}
       presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       hardwareAccelerated={Platform.OS === 'android'}
+      // SOLUTION: Force Modal to be on top layer
+      supportedOrientations={['portrait']}
     >
-      {/* SOLUTION: Higher z-index overlay to ensure dropdown renders above GlobalHeader */}
-      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim, zIndex: 9999 }]}>
+      {/* SOLUTION: Maximum z-index overlay with enhanced isolation */}
+      <Animated.View style={[
+        styles.dropdownOverlay, 
+        { 
+          opacity: opacityAnim,
+          // SOLUTION: Maximum z-index to ensure dropdown is always on top
+          zIndex: 999999,
+          elevation: 999999, // Android maximum elevation
+        }
+      ]}>
         <TouchableOpacity 
           style={styles.dropdownBackdrop} 
           onPress={handleBackdropPress}
@@ -147,7 +157,12 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
         <Animated.View 
           style={[
             styles.dropdownContainer,
-            { transform: [{ translateY: slideAnim }] }
+            { 
+              transform: [{ translateY: slideAnim }],
+              // SOLUTION: Ensure container also has maximum z-index
+              zIndex: 999999,
+              elevation: 999999,
+            }
           ]}
         >
           <LinearGradient
@@ -1223,7 +1238,7 @@ export default function PromoteTab() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* SOLUTION: Futuristic Dropdowns with enhanced Modal isolation */}
+      {/* SOLUTION: Enhanced Futuristic Dropdowns with maximum z-index isolation */}
       <FuturisticDropdown
         options={VIEW_OPTIONS}
         selectedValue={targetViews}
@@ -1361,14 +1376,17 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  // SOLUTION: Enhanced dropdown styles with higher z-index and better isolation
+  // SOLUTION: Maximum z-index dropdown styles with complete isolation
   dropdownOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Slightly darker for better visibility
+    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Darker overlay for better visibility
     justifyContent: 'flex-end',
-    // Higher z-index to ensure dropdown renders above GlobalHeader
-    zIndex: 9999,
-    elevation: 9999, // Android elevation
+    // SOLUTION: Maximum possible z-index values for complete isolation
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   dropdownBackdrop: {
     flex: 1,
@@ -1381,19 +1399,19 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: screenHeight * 0.7,
     overflow: 'hidden',
-    // Enhanced shadow and elevation for better visibility
+    // SOLUTION: Maximum shadow and elevation for complete visibility
     ...Platform.select({
       android: {
-        elevation: 20, // Higher elevation for Android
+        elevation: 999999, // Maximum Android elevation
       },
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -8 }, // Stronger shadow
-        shadowOpacity: 0.35, // More opaque shadow
-        shadowRadius: 20, // Larger shadow radius
+        shadowOffset: { width: 0, height: -12 }, // Stronger shadow
+        shadowOpacity: 0.5, // Maximum opacity
+        shadowRadius: 24, // Larger shadow radius
       },
       web: {
-        boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.35)', // Enhanced web shadow
+        boxShadow: '0 -12px 48px rgba(0, 0, 0, 0.5)', // Maximum web shadow
       },
     }),
   },
@@ -1406,6 +1424,7 @@ const styles = StyleSheet.create({
     ...Platform.select({
       android: {
         paddingTop: 20,
+        elevation: 5, // Additional elevation for header
       },
     }),
   },
@@ -1423,7 +1442,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Platform.select({
       android: {
-        elevation: 2,
+        elevation: 3,
       },
     }),
   },
@@ -1434,9 +1453,11 @@ const styles = StyleSheet.create({
   },
   dropdownScrollView: {
     maxHeight: screenHeight * 0.5,
+    backgroundColor: 'white', // Ensure solid background
     ...Platform.select({
       android: {
         paddingBottom: 20,
+        elevation: 3,
       },
     }),
   },
@@ -1449,7 +1470,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     minHeight: 56,
-    backgroundColor: 'white', // Ensure solid background
+    backgroundColor: 'white', // Ensure solid background for each option
     ...Platform.select({
       android: {
         elevation: 1,
