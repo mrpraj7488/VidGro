@@ -909,7 +909,7 @@ export default function PromoteTab() {
     return option ? option.label : 'Select views';
   };
 
-  const getSelected 𝐃urationLabel = () => {
+  const getSelectedDurationLabel = () => {
     const option = DURATION_OPTIONS.find(opt => opt.value === userSetDuration);
     return option ? option.label : 'Select duration';
   };
