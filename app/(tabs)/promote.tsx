@@ -129,24 +129,24 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={false} // SOLUTION: Use non-transparent Modal for better isolation on Android
       animationType="none"
       onRequestClose={onClose}
-      // SOLUTION: Maximum z-index and Modal isolation to ensure dropdown renders above everything
+      // SOLUTION: Moderate z-index with proper Modal isolation instead of extreme values
       statusBarTranslucent={Platform.OS === 'android'}
-      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : 'fullScreen'} // SOLUTION: Use fullScreen on Android for better rendering
+      // SOLUTION: Enhanced Android-specific props for better performance
       hardwareAccelerated={Platform.OS === 'android'}
-      // SOLUTION: Force Modal to be on top layer
       supportedOrientations={['portrait']}
     >
-      {/* SOLUTION: Maximum z-index overlay with enhanced isolation */}
+      {/* SOLUTION: Moderate z-index hierarchy (1000) instead of extreme values (999999) */}
       <Animated.View style={[
         styles.dropdownOverlay, 
         { 
           opacity: opacityAnim,
-          // SOLUTION: Maximum z-index to ensure dropdown is always on top
-          zIndex: 999999,
-          elevation: 999999, // Android maximum elevation
+          // SOLUTION: Moderate z-index that's higher than GlobalHeader (100) but not extreme
+          zIndex: 1000,
+          elevation: 1000, // Android moderate elevation
         }
       ]}>
         <TouchableOpacity 
@@ -159,9 +159,9 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
             styles.dropdownContainer,
             { 
               transform: [{ translateY: slideAnim }],
-              // SOLUTION: Ensure container also has maximum z-index
-              zIndex: 999999,
-              elevation: 999999,
+              // SOLUTION: Consistent moderate z-index
+              zIndex: 1000,
+              elevation: 1000,
             }
           ]}
         >
@@ -365,12 +365,16 @@ export default function PromoteTab() {
     }
   };
 
+  // SOLUTION: Enhanced createIframeHTML with Android-specific optimizations
   const createIframeHTML = (embedUrl: string) => {
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- SOLUTION: Enhanced meta tags for Android WebView compatibility -->
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:;">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <style>
           body {
             margin: 0;
@@ -426,6 +430,10 @@ export default function PromoteTab() {
           var hasError = false;
           var initializationInProgress = false;
           
+          // SOLUTION: Enhanced error handling for Android WebView
+          var isAndroid = /Android/i.test(navigator.userAgent);
+          var androidVersion = isAndroid ? parseFloat(navigator.userAgent.slice(navigator.userAgent.indexOf("Android")+8)) : 0;
+          
           // Set loading timeout
           loadingTimeoutId = setTimeout(function() {
             if (!isPlayerReady && !hasTimedOut) {
@@ -442,25 +450,35 @@ export default function PromoteTab() {
             }
           }, ${loadingTimeoutDuration});
 
-          // Load YouTube IFrame API
-          var tag = document.createElement('script');
-          tag.src = "https://www.youtube.com/iframe_api";
-          tag.onerror = function() {
-            console.error('Failed to load YouTube IFrame API');
-            clearTimeout(loadingTimeoutId);
-            hasError = true;
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'block';
-            document.getElementById('error').textContent = 'Failed to load YouTube API';
+          // SOLUTION: Enhanced YouTube IFrame API loading with fallback for Android
+          function loadYouTubeAPI() {
+            var tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            tag.onerror = function() {
+              console.error('Failed to load YouTube IFrame API');
+              clearTimeout(loadingTimeoutId);
+              hasError = true;
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('error').style.display = 'block';
+              document.getElementById('error').textContent = 'Failed to load YouTube API';
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'API_LOAD_ERROR',
+                message: 'Failed to load YouTube IFrame API'
+              }));
+            };
             
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'API_LOAD_ERROR',
-              message: 'Failed to load YouTube IFrame API'
-            }));
-          };
+            var firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+          }
           
-          var firstScriptTag = document.getElementsByTagName('script')[0];
-          firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+          // SOLUTION: Delayed API loading for better Android compatibility
+          if (isAndroid && androidVersion < 7.0) {
+            // Older Android versions need more time
+            setTimeout(loadYouTubeAPI, 1000);
+          } else {
+            loadYouTubeAPI();
+          }
 
           function onYouTubeIframeAPIReady() {
             if (initializationInProgress || hasError || hasTimedOut) {
@@ -485,7 +503,10 @@ export default function PromoteTab() {
                   'disablekb': 1,
                   'iv_load_policy': 3,
                   'enablejsapi': 1,
-                  'origin': window.location.origin
+                  'origin': window.location.origin,
+                  // SOLUTION: Enhanced player vars for Android compatibility
+                  'playsinline': 1,
+                  'widget_referrer': window.location.origin
                 },
                 events: {
                   'onReady': onPlayerReady,
@@ -523,7 +544,8 @@ export default function PromoteTab() {
               videoId: '${videoData?.id}'
             }));
             
-            // Auto-start playback test with delay to prevent stack overflow
+            // SOLUTION: Enhanced auto-playback test with Android-specific delay
+            var playbackDelay = isAndroid ? 2000 : 1500;
             setTimeout(function() {
               if (player && player.playVideo && isPlayerReady && !hasError) {
                 try {
@@ -533,7 +555,7 @@ export default function PromoteTab() {
                   console.error('Error starting playback:', error);
                 }
               }
-            }, 1500);
+            }, playbackDelay);
           }
 
           function onPlayerStateChange(event) {
@@ -686,7 +708,7 @@ export default function PromoteTab() {
             }
           }
           
-          // Handle page errors
+          // SOLUTION: Enhanced error handling for Android WebView
           window.onerror = function(msg, url, lineNo, columnNo, error) {
             console.error('Page error:', msg);
             hasError = true;
@@ -1063,6 +1085,7 @@ export default function PromoteTab() {
                 {showIframe && (
                   <View style={styles.iframeContainer}>
                     <View style={styles.webviewContainer}>
+                      {/* SOLUTION: Enhanced WebView with Android-specific props */}
                       <WebView
                         ref={webviewRef}
                         source={{ html: createIframeHTML(videoData.embedUrl) }}
@@ -1075,6 +1098,25 @@ export default function PromoteTab() {
                         mixedContentMode="compatibility"
                         originWhitelist={['*']}
                         allowsFullscreenVideo={false}
+                        // SOLUTION: Enhanced Android-specific WebView props for better compatibility
+                        {...Platform.select({
+                          android: {
+                            androidHardwareAcceleration: true,
+                            androidLayerType: 'hardware',
+                            allowFileAccess: true,
+                            allowUniversalAccessFromFileURLs: true,
+                            allowFileAccessFromFileURLs: true,
+                            cacheEnabled: true,
+                            thirdPartyCookiesEnabled: true,
+                          },
+                          ios: {
+                            allowsLinkPreview: false,
+                            dataDetectorTypes: 'none',
+                          },
+                          web: {
+                            allowsProtectedMedia: false,
+                          }
+                        })}
                       />
                     </View>
                     
@@ -1238,7 +1280,7 @@ export default function PromoteTab() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* SOLUTION: Enhanced Futuristic Dropdowns with maximum z-index isolation */}
+      {/* SOLUTION: Enhanced Futuristic Dropdowns with moderate z-index and better isolation */}
       <FuturisticDropdown
         options={VIEW_OPTIONS}
         selectedValue={targetViews}
@@ -1376,12 +1418,12 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  // SOLUTION: Maximum z-index dropdown styles with complete isolation
+  // SOLUTION: Moderate z-index dropdown styles with enhanced platform-specific optimizations
   dropdownOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Darker overlay for better visibility
+    backgroundColor: 'rgba(0, 0, 0, 0.8)', // Stronger overlay for better visibility
     justifyContent: 'flex-end',
-    // SOLUTION: Maximum possible z-index values for complete isolation
+    // SOLUTION: Moderate z-index values for stable cross-platform rendering
     position: 'absolute',
     top: 0,
     left: 0,
@@ -1399,19 +1441,19 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: screenHeight * 0.7,
     overflow: 'hidden',
-    // SOLUTION: Maximum shadow and elevation for complete visibility
+    // SOLUTION: Enhanced platform-specific shadows with moderate values
     ...Platform.select({
       android: {
-        elevation: 999999, // Maximum Android elevation
+        elevation: 1000, // Moderate Android elevation
       },
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -12 }, // Stronger shadow
-        shadowOpacity: 0.5, // Maximum opacity
-        shadowRadius: 24, // Larger shadow radius
+        shadowOffset: { width: 0, height: -8 }, // Moderate shadow
+        shadowOpacity: 0.3, // Moderate opacity
+        shadowRadius: 16, // Moderate shadow radius
       },
       web: {
-        boxShadow: '0 -12px 48px rgba(0, 0, 0, 0.5)', // Maximum web shadow
+        boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.3)', // Moderate web shadow
       },
     }),
   },
@@ -1421,6 +1463,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    // SOLUTION: Enhanced Android-specific styling
     ...Platform.select({
       android: {
         paddingTop: 20,
@@ -1440,6 +1483,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    // SOLUTION: Enhanced Android button styling
     ...Platform.select({
       android: {
         elevation: 3,
@@ -1454,6 +1498,7 @@ const styles = StyleSheet.create({
   dropdownScrollView: {
     maxHeight: screenHeight * 0.5,
     backgroundColor: 'white', // Ensure solid background
+    // SOLUTION: Enhanced Android ScrollView styling
     ...Platform.select({
       android: {
         paddingBottom: 20,
@@ -1471,6 +1516,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
     minHeight: 56,
     backgroundColor: 'white', // Ensure solid background for each option
+    // SOLUTION: Enhanced Android option styling
     ...Platform.select({
       android: {
         elevation: 1,
@@ -1479,6 +1525,7 @@ const styles = StyleSheet.create({
   },
   dropdownOptionSelected: {
     backgroundColor: '#F8F0FF',
+    // SOLUTION: Enhanced selected state for Android
     ...Platform.select({
       android: {
         elevation: 2,
