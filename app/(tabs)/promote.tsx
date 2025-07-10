@@ -181,6 +181,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
 
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
+  const [menuVisible, setMenuVisible] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [title, setTitle] = useState('');
   const [userSetDuration, setUserSetDuration] = useState<number | null>(null);
@@ -964,15 +965,34 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      {/* Updated Header with Purple Theme */}
+      {/* Header with Menu Icon and Purple Theme */}
       <LinearGradient
         colors={['#800080', '#9B59B6']}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>Promote</Text>
-        <View style={styles.coinDisplay}>
-          <Text style={styles.coinEmoji}>🪙</Text>
-          <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+        <View style={styles.headerContent}>
+          {/* Left Section - Menu + Title */}
+          <View style={styles.leftSection}>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setMenuVisible(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.hamburgerIcon}>
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+              </View>
+            </TouchableOpacity>
+            
+            <Text style={styles.headerTitle}>Promote</Text>
+          </View>
+          
+          {/* Right Section - Coin Display */}
+          <View style={styles.coinDisplay}>
+            <Text style={styles.coinEmoji}>🪙</Text>
+            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+          </View>
         </View>
       </LinearGradient>
 
@@ -1236,34 +1256,59 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    minHeight: Platform.OS === 'ios' ? 100 : 90,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
+    flex: 1,
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 16,
+  },
+  hamburgerIcon: {
+    width: 20,
+    height: 16,
+    justifyContent: 'space-between',
+  },
+  hamburgerLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: 'white',
+    borderRadius: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: isSmallScreen ? 20 : 24,
     fontWeight: 'bold',
     color: 'white',
+    letterSpacing: 0.5,
   },
   coinDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: isSmallScreen ? 10 : 12,
+    paddingVertical: isSmallScreen ? 6 : 8,
     borderRadius: 20,
   },
   coinEmoji: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 16 : 18,
     marginRight: 4,
   },
   coinCount: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: 'bold',
   },
   keyboardView: {
     flex: 1,
