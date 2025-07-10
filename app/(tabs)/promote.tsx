@@ -649,7 +649,7 @@ export default function PromoteTab() {
               <Text style={styles.label}>Set Duration (seconds) *</Text>
               <TouchableOpacity style={styles.dropdownTrigger} onPress={() => openDropdown('duration')}>
                 <Clock color="#666" size={20} style={styles.inputIcon} />
-                <Text style={[styles.dropdownTriggerText, userSetDuration && styles.dropdownTriggerTextSelected]>
+                <Text style={[styles.dropdownTriggerText, userSetDuration && styles.dropdownTriggerTextSelected]}>
                   {getSelectedDurationLabel()}
                 </Text>
                 <ChevronDown color="#666" size={20} />
