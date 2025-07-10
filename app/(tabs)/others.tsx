@@ -7,6 +7,7 @@ import {
   Alert,
   Platform,
   Dimensions,
+  StyleSheet,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
