@@ -18,7 +18,6 @@ import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import GlobalHeader from '@/components/GlobalHeader';
 import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -182,6 +181,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
 
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
+  const [menuVisible, setMenuVisible] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [title, setTitle] = useState('');
   const [userSetDuration, setUserSetDuration] = useState<number | null>(null);
@@ -965,7 +965,36 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader title="Promote" showCoinDisplay={true} />
+      {/* Header with Menu Icon and Purple Theme */}
+      <LinearGradient
+        colors={['#800080', '#9B59B6']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          {/* Left Section - Menu + Title */}
+          <View style={styles.leftSection}>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setMenuVisible(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.hamburgerIcon}>
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+                <View style={styles.hamburgerLine} />
+              </View>
+            </TouchableOpacity>
+            
+            <Text style={styles.headerTitle}>Promote</Text>
+          </View>
+          
+          {/* Right Section - Coin Display */}
+          <View style={styles.coinDisplay}>
+            <Text style={styles.coinEmoji}>🪙</Text>
+            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1101,8 +1130,6 @@ export default function PromoteTab() {
               <TouchableOpacity
                 style={styles.dropdownTrigger}
                 onPress={() => openDropdown('views')}
-                activeOpacity={0.7}
-                delayPressIn={0}
               >
                 <Eye color="#666" size={20} style={styles.inputIcon} />
                 <Text style={[
@@ -1121,8 +1148,6 @@ export default function PromoteTab() {
               <TouchableOpacity
                 style={styles.dropdownTrigger}
                 onPress={() => openDropdown('duration')}
-                activeOpacity={0.7}
-                delayPressIn={0}
               >
                 <Clock color="#666" size={20} style={styles.inputIcon} />
                 <Text style={[
@@ -1230,6 +1255,61 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    minHeight: Platform.OS === 'ios' ? 100 : 90,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 16,
+  },
+  hamburgerIcon: {
+    width: 20,
+    height: 16,
+    justifyContent: 'space-between',
+  },
+  hamburgerLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: 'white',
+    borderRadius: 1,
+  },
+  headerTitle: {
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: 'bold',
+    color: 'white',
+    letterSpacing: 0.5,
+  },
+  coinDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: isSmallScreen ? 10 : 12,
+    paddingVertical: isSmallScreen ? 6 : 8,
+    borderRadius: 20,
+  },
+  coinEmoji: {
+    fontSize: isSmallScreen ? 16 : 18,
+    marginRight: 4,
+  },
+  coinCount: {
+    color: 'white',
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: 'bold',
+  },
   keyboardView: {
     flex: 1,
   },
@@ -1315,7 +1395,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 52,
-    minHeight: 52,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1335,7 +1414,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: '#999',
-    textAlign: 'left',
   },
   dropdownTriggerTextSelected: {
     color: '#333',
@@ -1348,8 +1426,6 @@ const styles = StyleSheet.create({
   },
   dropdownBackdrop: {
     flex: 1,
-    width: '100%',
-    height: '100%',
   },
   dropdownContainer: {
     backgroundColor: 'white',
@@ -1405,7 +1481,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
-    flex: 1,
   },
   dropdownOptionTextSelected: {
     color: '#800080',
