@@ -113,10 +113,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
     },
     {
       id: 'configure-ads',
-      title: 'Configure Ads
-    }
-  ]
-}',
+      title: 'Configure Ads',
       icon: <Settings color="#800080" size={20} />,
       onPress: () => {
         handleCloseMenu();
@@ -206,38 +203,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
                 <Text style={styles.userEmail}>{user?.email || ''}</Text>
               </View>
             </LinearGradient>
-              {/* Menu Items */}
-              <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
-                {menuItems.map((item, index) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.menuItem,
-                      index === menuItems.length - 1 && styles.lastMenuItem,
-                    ]}
-                    onPress={item.onPress}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.menuItemIcon}>
-                      {item.icon}
-                    </View>
-                    <Text style={[
-                      styles.menuItemText,
-                      item.destructive && styles.destructiveText
-                    ]}>
-                      {item.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
-    </>
-  );
-}
-
+            
             {/* Menu Items */}
             <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
               {menuItems.map((item, index) => (
@@ -264,6 +230,37 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
             </ScrollView>
           </Animated.View>
         </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    width: '100%',
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingBottom: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 12,
+  },
+  hamburgerIcon: {
+    width: 24,
+    height: 18,
+    justifyContent: 'space-between',
+  },
+  hamburgerLine: {
     width: 20,
     height: 2,
     backgroundColor: 'white',
@@ -297,11 +294,8 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   slideMenu: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
     width: isSmallScreen ? 280 : 320,
+    height: '100%',
     backgroundColor: 'white',
     ...Platform.select({
       ios: {
