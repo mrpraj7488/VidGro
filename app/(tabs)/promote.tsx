@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Crown, DollarSign } from 'lucide-react-native';
+import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -1351,7 +1351,11 @@ const styles = StyleSheet.create({
   },
   // Fixed Modal Styles for Android
   dropdownOverlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
@@ -1423,7 +1427,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   dropdownOptionSelected: {
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#FFF8F8',
   },
   dropdownOptionLast: {
     borderBottomWidth: 0,
