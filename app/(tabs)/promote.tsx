@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import GlobalHeader from '@/components/GlobalHeader';
 import {
   View,
   Text,
@@ -966,7 +965,6 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader title="Promote" showCoinDisplay={true} />
       {/* Header with Menu Icon and Purple Theme */}
       <LinearGradient
         colors={['#800080', '#9B59B6']}
@@ -1279,36 +1277,38 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   hamburgerIcon: {
-    flexDirection: 'column',
-    gap: 2,
+    width: 20,
+    height: 16,
+    justifyContent: 'space-between',
   },
   hamburgerLine: {
-    width: 18,
+    width: 20,
     height: 2,
     backgroundColor: 'white',
     borderRadius: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: isSmallScreen ? 20 : 24,
     fontWeight: 'bold',
     color: 'white',
+    letterSpacing: 0.5,
   },
   coinDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: isSmallScreen ? 10 : 12,
+    paddingVertical: isSmallScreen ? 6 : 8,
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
   },
   coinEmoji: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 16 : 18,
     marginRight: 4,
   },
   coinCount: {
-    fontSize: 16,
-    fontWeight: '600',
     color: 'white',
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: 'bold',
   },
   keyboardView: {
     flex: 1,
