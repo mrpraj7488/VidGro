@@ -19,6 +19,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  Easing,
 } from 'react-native-reanimated';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -44,18 +45,28 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
   // Animation values
   const coinBounce = useSharedValue(1);
   const slideX = useSharedValue(-screenWidth);
+  const overlayOpacity = useSharedValue(0);
 
   const handleMenuPress = () => {
     setMenuVisible(true);
-    slideX.value = withSpring(0, {
-      damping: 20,
-      stiffness: 150,
+    slideX.value = withTiming(0, {
+      duration: 300,
+      easing: Easing.out(Easing.quad),
+    });
+    overlayOpacity.value = withTiming(0.5, {
+      duration: 300,
+      easing: Easing.out(Easing.quad),
     });
   };
 
   const handleCloseMenu = () => {
     slideX.value = withTiming(-screenWidth, {
       duration: 300,
+      easing: Easing.in(Easing.quad),
+    });
+    overlayOpacity.value = withTiming(0, {
+      duration: 300,
+      easing: Easing.in(Easing.quad),
     });
     setTimeout(() => setMenuVisible(false), 300);
   };
@@ -153,6 +164,10 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
     transform: [{ translateX: slideX.value }],
   }));
 
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
   return (
     <>
       <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
@@ -187,11 +202,12 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
       <Modal
         visible={menuVisible}
         transparent
-        animationType="slide"
+        animationType="none"
         onRequestClose={handleCloseMenu}
         statusBarTranslucent={Platform.OS === 'android'}
       >
-        <Pressable style={styles.modalOverlay} onPress={handleCloseMenu}>
+        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle]}>
+          <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             {/* User Profile Section */}
             <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
@@ -229,7 +245,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
               ))}
             </ScrollView>
           </Animated.View>
-        </Pressable>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -292,6 +308,10 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flexDirection: 'row',
+  },
+  overlayPressable: {
+    flex: 1,
   },
   slideMenu: {
     width: isSmallScreen ? 280 : 320,
