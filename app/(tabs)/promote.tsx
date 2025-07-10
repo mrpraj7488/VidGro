@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
+import GlobalHeader from './GlobalHeader'; // Import GlobalHeader
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -527,31 +528,7 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      {/* Uncomment the line below to use GlobalHeader instead of the custom header */}
-      {/* <GlobalHeader title="Promote" showCoinDisplay={true} /> */}
-      <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.leftSection}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => setMenuVisible(true)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.hamburgerIcon}>
-                <View style={styles.hamburgerLine} />
-                <View style={styles.hamburgerLine} />
-                <View style={styles.hamburgerLine} />
-              </View>
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Promote</Text>
-          </View>
-          <View style={styles.coinDisplay}>
-            <Text style={styles.coinEmoji}>🪙</Text>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-          </View>
-        </View>
-      </LinearGradient>
-
+      <GlobalHeader title="Promote" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {error && (
@@ -672,7 +649,7 @@ export default function PromoteTab() {
               <Text style={styles.label}>Set Duration (seconds) *</Text>
               <TouchableOpacity style={styles.dropdownTrigger} onPress={() => openDropdown('duration')}>
                 <Clock color="#666" size={20} style={styles.inputIcon} />
-                <Text style={[styles.dropdownTriggerText, userSetDuration && styles.dropdownTriggerTextSelected]}>
+                <Text style={[styles.dropdownTriggerText, userSetDuration && styles.dropdownTriggerTextSelected]>
                   {getSelectedDurationLabel()}
                 </Text>
                 <ChevronDown color="#666" size={20} />
