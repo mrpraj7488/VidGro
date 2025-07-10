@@ -18,6 +18,7 @@ import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import GlobalHeader from '@/components/GlobalHeader';
 import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -181,7 +182,6 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
 
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
-  const [menuVisible, setMenuVisible] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [title, setTitle] = useState('');
   const [userSetDuration, setUserSetDuration] = useState<number | null>(null);
@@ -477,17 +477,12 @@ export default function PromoteTab() {
             if (hasError || hasTimedOut) {
               return;
             }
-            
             console.log('Player ready');
-            clearTimeout(loadingTimeoutId);
             isPlayerReady = true;
-            document.getElementById('loading').style.display = 'none';
-            
             window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'PLAYER_READY',
               videoId: '${videoData?.id}'
             }));
-            
             // Auto-start playback test with delay to prevent stack overflow
             setTimeout(function() {
               if (player && player.playVideo && isPlayerReady && !hasError) {
@@ -505,19 +500,13 @@ export default function PromoteTab() {
             if (hasError || hasTimedOut) {
               return;
             }
-            
             var state = event.data;
             var stateNames = {
               '-1': 'UNSTARTED',
               '0': 'ENDED',
               '1': 'PLAYING',
-              '2': 'PAUSED',
-              '3': 'BUFFERING',
-              '5': 'CUED'
-            };
-            
+            }
             console.log('Player state changed to:', stateNames[state] || state);
-            
             // Check for live video (buffering state that doesn't progress)
             if (state === 3) { // BUFFERING
               setTimeout(function() {
@@ -540,15 +529,12 @@ export default function PromoteTab() {
                 }
               }, 3000);
             }
-            
             if (state === 1) { // PLAYING
-              console.log('Video is playing - embedable confirmed');
-              
+              console.log('Video is playing - embeddable confirmed');
               // Extract title
               setTimeout(function() {
                 detectTitle();
               }, 2000);
-              
               window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'PLAYBACK_SUCCESS',
                 embeddable: true,
@@ -570,7 +556,6 @@ export default function PromoteTab() {
             hasError = true;
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'block';
-            
             var errorMessages = {
               2: 'Invalid video ID',
               5: 'HTML5 player error',
@@ -578,10 +563,8 @@ export default function PromoteTab() {
               101: 'Video not allowed to be played in embedded players',
               150: 'Video not allowed to be played in embedded players'
             };
-            
             var errorMessage = errorMessages[event.data] || 'Video playback error';
             document.getElementById('error').textContent = errorMessage;
-            
             // Check if we should retry
             if ((event.data === 5 || !event.data) && retryAttempt < maxRetries) {
               console.log('Retrying due to error:', errorMessage);
@@ -603,16 +586,14 @@ export default function PromoteTab() {
               }));
             }
           }
-          
+
           function detectTitle() {
             try {
               var detectedTitle = '';
-              
               // Method 1: Check document title
               if (document.title && document.title !== 'YouTube') {
                 detectedTitle = document.title.replace(' - YouTube', '');
               }
-              
               // Method 2: Try to get video data from player
               if (player && player.getVideoData) {
                 try {
@@ -624,24 +605,19 @@ export default function PromoteTab() {
                   console.log('Could not get video data:', e);
                 }
               }
-              
               // Method 3: Fallback title
               if (!detectedTitle) {
                 detectedTitle = 'Video ${videoData?.id || 'Unknown'}';
               }
-              
               console.log('Title detected:', detectedTitle);
-              
               window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'TITLE_DETECTED',
                 title: detectedTitle,
                 success: true
               }));
-              
             } catch (error) {
               console.error('Title detection failed:', error);
               var fallbackTitle = 'Video ${videoData?.id || 'Unknown'}';
-              
               window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'TITLE_DETECTED',
                 title: fallbackTitle,
@@ -650,7 +626,7 @@ export default function PromoteTab() {
               }));
             }
           }
-          
+
           // Handle page errors
           window.onerror = function(msg, url, lineNo, columnNo, error) {
             console.error('Page error:', msg);
@@ -671,30 +647,25 @@ export default function PromoteTab() {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('WebView message:', data);
-      
       switch (data.type) {
         case 'PLAYER_READY':
           setIframeLoaded(true);
           setLoadingTimeout(false);
           showToast('Video player loaded successfully');
           break;
-          
         case 'LOADING_TIMEOUT':
           setLoadingTimeout(true);
           setIframeLoaded(false);
           setError('Video loading timeout. It may not be embeddable.');
           break;
-          
         case 'API_LOAD_ERROR':
         case 'PLAYER_INIT_ERROR':
           setError('Failed to load YouTube API. Please check your internet connection.');
           break;
-          
         case 'LIVE_VIDEO_DETECTED':
           setError('Live videos cannot be promoted. Please choose a regular video.');
           setVideoData(prev => prev ? { ...prev, embeddable: false, isLive: true } : null);
           break;
-          
         case 'PLAYBACK_SUCCESS':
           setTestingPlayback(false);
           setEmbedabilityTested(true);
@@ -702,25 +673,21 @@ export default function PromoteTab() {
           setError(null);
           showToast('✅ Video is embeddable and ready for promotion!');
           break;
-          
         case 'PLAYBACK_FAILED':
           setTestingPlayback(false);
           setEmbedabilityTested(true);
           setVideoData(prev => prev ? { ...prev, embeddable: false } : null);
-          
           if (data.isEmbeddingError) {
             setError('This video cannot be embedded. Please make it embeddable first or choose a different video.');
           } else {
             setError(data.message || 'Video playback failed. Please try a different video.');
           }
           break;
-          
         case 'RETRY_NEEDED':
           if (retryCount < maxRetries) {
             console.log(`Retrying video load (attempt ${data.retryAttempt})`);
             showToast(`Retrying... (${data.retryAttempt}/${maxRetries})`);
             setRetryCount(data.retryAttempt);
-            
             // Retry after 2 seconds
             setTimeout(() => {
               setShowIframe(false);
@@ -733,7 +700,6 @@ export default function PromoteTab() {
             setError('Video failed to load after multiple attempts.');
           }
           break;
-          
         case 'TITLE_DETECTED':
           if (data.title) {
             setVideoData(prev => prev ? { ...prev, autoDetectedTitle: data.title } : null);
@@ -743,7 +709,6 @@ export default function PromoteTab() {
             showToast(`Title detected: ${data.title}`);
           }
           break;
-          
         case 'STATE_CHANGE':
           if (data.state === 1) { // PLAYING
             setIsPlaying(true);
@@ -751,7 +716,6 @@ export default function PromoteTab() {
             setIsPlaying(false);
           }
           break;
-          
         case 'PAGE_ERROR':
           console.log('Page error in iframe:', data.message);
           setError('Page error occurred in video player.');
@@ -771,11 +735,9 @@ export default function PromoteTab() {
     if (!userSetDuration || userSetDuration < 10) {
       return 'Duration must be at least 10 seconds';
     }
-    
     if (userSetDuration > 600) {
       return 'Duration must be less than 600 seconds (10 minutes)';
     }
-    
     return null;
   };
 
@@ -947,7 +909,7 @@ export default function PromoteTab() {
     return option ? option.label : 'Select views';
   };
 
-  const getSelectedDurationLabel = () => {
+  const getSelected 𝐃urationLabel = () => {
     const option = DURATION_OPTIONS.find(opt => opt.value === userSetDuration);
     return option ? option.label : 'Select duration';
   };
@@ -965,36 +927,7 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header with Menu Icon and Purple Theme */}
-      <LinearGradient
-        colors={['#800080', '#9B59B6']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          {/* Left Section - Menu + Title */}
-          <View style={styles.leftSection}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => setMenuVisible(true)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.hamburgerIcon}>
-                <View style={styles.hamburgerLine} />
-                <View style={styles.hamburgerLine} />
-                <View style={styles.hamburgerLine} />
-              </View>
-            </TouchableOpacity>
-            
-            <Text style={styles.headerTitle}>Promote</Text>
-          </View>
-          
-          {/* Right Section - Coin Display */}
-          <View style={styles.coinDisplay}>
-            <Text style={styles.coinEmoji}>🪙</Text>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-          </View>
-        </View>
-      </LinearGradient>
+      <GlobalHeader title="Promote" showCoinDisplay={true} />
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1184,19 +1117,10 @@ export default function PromoteTab() {
                 
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Your balance:</Text>
-                  <Text style={[
-                    styles.costValue, 
-                    (profile?.coins || 0) < totalCost && styles.insufficientBalance
-                  ]}>
+                  <Text style={styles.costValue}>
                     🪙{profile?.coins || 0}
                   </Text>
                 </View>
-                {videoData && videoData.embeddable && (
-                  <View style={styles.costRow}>
-                    <Text style={styles.costLabel}>Compatibility:</Text>
-                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Verified</Text>
-                  </View>
-                )}
               </View>
             )}
 
@@ -1254,61 +1178,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    minHeight: Platform.OS === 'ios' ? 100 : 90,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flex: 1,
-  },
-  leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuButton: {
-    padding: 8,
-    marginRight: 16,
-  },
-  hamburgerIcon: {
-    width: 20,
-    height: 16,
-    justifyContent: 'space-between',
-  },
-  hamburgerLine: {
-    width: 20,
-    height: 2,
-    backgroundColor: 'white',
-    borderRadius: 1,
-  },
-  headerTitle: {
-    fontSize: isSmallScreen ? 20 : 24,
-    fontWeight: 'bold',
-    color: 'white',
-    letterSpacing: 0.5,
-  },
-  coinDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: isSmallScreen ? 10 : 12,
-    paddingVertical: isSmallScreen ? 6 : 8,
-    borderRadius: 20,
-  },
-  coinEmoji: {
-    fontSize: isSmallScreen ? 16 : 18,
-    marginRight: 4,
-  },
-  coinCount: {
-    color: 'white',
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: 'bold',
   },
   keyboardView: {
     flex: 1,
@@ -1460,6 +1329,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   dropdownScrollView: {
+    maxHeight: screenHeight * 0 off-screen {
     maxHeight: screenHeight * 0.5,
   },
   dropdownOption: {
