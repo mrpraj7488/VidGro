@@ -1,55 +1,125 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
+  StyleSheet,
   TextInput,
   TouchableOpacity,
   ScrollView,
   Alert,
-  StyleSheet,
+  KeyboardAvoidingView,
   Platform,
+  ToastAndroid,
   Dimensions,
   Modal,
+  Animated,
   Pressable,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Link, Eye, Clock, TrendingUp, ChevronDown, Check, CircleAlert as AlertCircle, Play, DollarSign } from 'lucide-react-native';
+import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  Easing,
-} from 'react-native-reanimated';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 480;
-const isVerySmallScreen = screenWidth < 360;
+const isSmallScreen = screenWidth < 375;
 
-interface DropdownProps {
-  visible: boolean;
-  onClose: () => void;
-  options: { value: number; label: string }[];
-  selectedValue: number;
-  onSelect: (value: number) => void;
-  title: string;
+interface VideoData {
+  id: string;
+  embedUrl: string;
+  thumbnail: string;
+  title?: string;
+  embeddable: boolean;
+  originalUrl: string;
+  autoDetectedTitle?: string;
+  isLive?: boolean;
 }
 
-const EnhancedDropdown: React.FC<DropdownProps> = ({
-  visible,
-  onClose,
+interface DropdownOption {
+  label: string;
+  value: number;
+}
+
+const VIEW_OPTIONS: DropdownOption[] = [
+  { label: '35 views', value: 35 },
+  { label: '50 views', value: 50 },
+  { label: '100 views', value: 100 },
+  { label: '200 views', value: 200 },
+  { label: '300 views', value: 300 },
+  { label: '400 views', value: 400 },
+  { label: '500 views', value: 500 },
+  { label: '750 views', value: 750 },
+  { label: '1000 views', value: 1000 },
+];
+
+const DURATION_OPTIONS: DropdownOption[] = [
+  { label: '45 seconds', value: 45 },
+  { label: '60 seconds', value: 60 },
+  { label: '90 seconds', value: 90 },
+  { label: '120 seconds', value: 120 },
+  { label: '150 seconds', value: 150 },
+  { label: '180 seconds', value: 180 },
+  { label: '240 seconds', value: 240 },
+  { label: '300 seconds', value: 300 },
+  { label: '360 seconds', value: 360 },
+  { label: '420 seconds', value: 420 },
+  { label: '480 seconds', value: 480 },
+  { label: '540 seconds', value: 540 },
+];
+
+interface FuturisticDropdownProps {
+  options: DropdownOption[];
+  selectedValue: number | null;
+  onSelect: (value: number) => void;
+  placeholder: string;
+  visible: boolean;
+  onClose: () => void;
+}
+
+const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
   options,
   selectedValue,
   onSelect,
-  title,
+  placeholder,
+  visible,
+  onClose,
 }) => {
+  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: screenHeight,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
   const handleSelect = (value: number) => {
     onSelect(value);
     onClose();
@@ -59,69 +129,66 @@ const EnhancedDropdown: React.FC<DropdownProps> = ({
     onClose();
   };
 
-  const renderItem = ({ item }: { item: { value: number; label: string } }) => (
-    <Pressable
-      key={item.value}
-      style={[
-        styles.dropdownItem,
-        item.value === selectedValue && styles.selectedDropdownItem
-      ]}
-      onPress={() => handleSelect(item.value)}
-      android_ripple={{ color: '#E3F2FD' }}
-    >
-      <Text style={[
-        styles.dropdownItemText,
-        item.value === selectedValue && styles.selectedDropdownItemText
-      ]}>
-        {item.label}
-      </Text>
-      {item.value === selectedValue && (
-        <Check color="#800080" size={16} />
-      )}
-    </Pressable>
-  );
-
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={styles.modalOverlay}>
+      {/* FIXED: Solid overlay background for Android */}
+      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
         <Pressable
-          style={styles.modalBackdrop}
+          style={styles.dropdownBackdrop}
           onPress={handleBackdropPress}
+        />
+        <Animated.View
+          style={[
+            styles.dropdownContainer,
+            { transform: [{ translateY: slideAnim }] }
+          ]}
         >
-          <View style={styles.modalContainer}>
-            <Pressable 
-              style={styles.modalContent}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{title}</Text>
-                <Pressable 
-                  onPress={onClose} 
-                  style={styles.closeButton}
-                  android_ripple={{ color: 'rgba(255,255,255,0.3)', borderless: true }}
-                >
-                  <Text style={styles.closeButtonText}>✕</Text>
-                </Pressable>
-              </View>
-              
-              <ScrollView
-                style={styles.modalList}
-                showsVerticalScrollIndicator={false}
-                bounces={true}
-                contentContainerStyle={styles.modalListContent}
-              >
-                {options.map((item) => renderItem({ item }))}
-              </ScrollView>
+          <LinearGradient
+            colors={['#800080', '#9B59B6', '#A569BD']}
+            style={styles.dropdownHeader}
+          >
+            <Text style={styles.dropdownTitle}>{placeholder}</Text>
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <Text style={styles.closeButtonText}>✕</Text>
             </Pressable>
-          </View>
-        </Pressable>
-      </View>
+          </LinearGradient>
+
+          <ScrollView 
+            style={styles.dropdownScrollView}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+          >
+            {options.map((option, index) => (
+              <Pressable
+                key={option.value}
+                style={[
+                  styles.dropdownOption,
+                  selectedValue === option.value && styles.dropdownOptionSelected,
+                  index === options.length - 1 && styles.dropdownOptionLast
+                ]}
+                onPress={() => handleSelect(option.value)}
+                android_ripple={{ color: '#F3E8FF' }}
+              >
+                <Text style={[
+                  styles.dropdownOptionText,
+                  selectedValue === option.value && styles.dropdownOptionTextSelected
+                ]}>
+                  {option.label}
+                </Text>
+                {selectedValue === option.value && (
+                  <CheckCircle color="#800080" size={20} />
+                )}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -129,55 +196,42 @@ const EnhancedDropdown: React.FC<DropdownProps> = ({
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
   const { clearQueue } = useVideoStore();
-  
-  // Form state
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [videoTitle, setVideoTitle] = useState('');
-  const [selectedViews, setSelectedViews] = useState(50);
-  const [selectedDuration, setSelectedDuration] = useState(30);
-  const [isPromoting, setIsPromoting] = useState(false);
-  const [videoInfo, setVideoInfo] = useState<any>(null);
-  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
-  
+  const [title, setTitle] = useState('');
+  const [userSetDuration, setUserSetDuration] = useState<number | null>(null);
+  const [targetViews, setTargetViews] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetchingVideo, setFetchingVideo] = useState(false);
+  const [videoData, setVideoData] = useState<VideoData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showIframe, setShowIframe] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [embedabilityTested, setEmbedabilityTested] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [testingPlayback, setTestingPlayback] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
   // Dropdown states
   const [showViewsDropdown, setShowViewsDropdown] = useState(false);
   const [showDurationDropdown, setShowDurationDropdown] = useState(false);
-  
-  // Animation values
-  const coinBounce = useSharedValue(1);
-  const promoteButtonScale = useSharedValue(1);
 
-  // Options for dropdowns
-  const viewsOptions = [
-    { value: 10, label: '10 views' },
-    { value: 25, label: '25 views' },
-    { value: 50, label: '50 views' },
-    { value: 100, label: '100 views' },
-    { value: 200, label: '200 views' },
-    { value: 500, label: '500 views' },
-  ];
+  const webviewRef = useRef<WebView>(null);
+  const maxRetries = 2;
+  const loadingTimeoutDuration = 5000; // 5 seconds
 
-  const durationOptions = [
-    { value: 30, label: '30 seconds' },
-    { value: 45, label: '45 seconds' },
-    { value: 60, label: '60 seconds' },
-    { value: 90, label: '90 seconds' },
-    { value: 120, label: '120 seconds' },
-  ];
-
-  // Extract YouTube video ID from URL
-  const extractVideoId = (url: string): string | null => {
-    if (!url) return null;
-    
-    // If it's already just an ID
-    if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
-      return url;
+  const showToast = (message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      console.log('Toast:', message);
     }
-    
+  };
+
+  const extractVideoId = (url: string): string | null => {
     const patterns = [
-      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=))([^"&?\/\s]{11})/,
-      /(?:youtu\.be\/)([^"&?\/\s]{11})/,
-      /(?:youtube\.com\/shorts\/)([^"&?\/\s]{11})/,
+      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/,
+      /^([a-zA-Z0-9_-]{11})$/
     ];
 
     for (const pattern of patterns) {
@@ -189,321 +243,994 @@ export default function PromoteTab() {
     return null;
   };
 
-  // Fetch video information from YouTube
-  const fetchVideoInfo = async (videoId: string) => {
-    setIsLoadingVideo(true);
+  // Enhanced cost calculation: Dynamic formula (views × duration) / 100 × 2.5
+  const calculateCosts = () => {
+    const durationSeconds = userSetDuration || 0;
+    const views = targetViews || 0;
+
+    // Dynamic cost calculation: (views × duration) / 100 × 2.5
+    const baseCost = Math.ceil((views * durationSeconds) / 100 * 2.5);
+
+    // VIP discount: 10% off for VIP members
+    const vipDiscount = profile?.is_vip ? Math.ceil(baseCost * 0.1) : 0;
+    const totalCost = baseCost - vipDiscount;
+
+    return { 
+      baseCost, 
+      totalCost, 
+      vipDiscount,
+      costPerView: Math.ceil(baseCost / views) || 0
+    };
+  };
+
+  const { baseCost, totalCost, vipDiscount, costPerView } = calculateCosts();
+
+  // Auto-fetch video data when URL changes (with debounce)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (youtubeUrl.trim() && extractVideoId(youtubeUrl)) {
+        fetchVideoData();
+      } else {
+        setVideoData(null);
+        setEmbedabilityTested(false);
+        setError(null);
+        setTitle(''); // Clear auto-filled title when URL is cleared
+      }
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [youtubeUrl]);
+
+  const fetchVideoData = async () => {
+    if (!youtubeUrl.trim()) {
+      setError('Please enter a YouTube URL');
+      return;
+    }
+
+    setFetchingVideo(true);
+    setError(null);
+    setVideoData(null);
+    setShowIframe(false);
+    setEmbedabilityTested(false);
+    setRetryCount(0);
+    setLoadingTimeout(false);
+
     try {
-      // Simulate API call - replace with actual YouTube API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Extracting video ID from URL:', youtubeUrl);
+      const videoId = extractVideoId(youtubeUrl);
       
-      // Mock video data - replace with actual API response
-      const mockVideoInfo = {
-        title: 'Sample Video Title',
-        duration: 180, // seconds
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL format');
+      }
+
+      console.log('Video ID extracted:', videoId);
+
+      // Auto-fetch title using YouTube oEmbed API (no API key required)
+      try {
+        const oEmbedResponse = await fetch(
+          `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+        );
+        
+        if (oEmbedResponse.ok) {
+          const oEmbedData = await oEmbedResponse.json();
+          if (oEmbedData.title && !title) {
+            setTitle(oEmbedData.title);
+            showToast(`Title auto-filled: ${oEmbedData.title}`);
+          }
+        }
+      } catch (oEmbedError) {
+        console.log('Could not fetch title via oEmbed, user can enter manually');
+      }
+
+      const processedVideoData: VideoData = {
+        id: videoId,
+        embedUrl: `https://www.youtube.com/embed/${videoId}`,
         thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-        channelTitle: 'Sample Channel',
+        embeddable: false, // Will be tested
+        originalUrl: youtubeUrl,
       };
+
+      setVideoData(processedVideoData);
+      setError(null);
+      setShowIframe(true); // Auto-show iframe for testing
       
-      setVideoInfo(mockVideoInfo);
-      setVideoTitle(mockVideoInfo.title);
-    } catch (error) {
-      console.error('Error fetching video info:', error);
-      Alert.alert('Error', 'Could not fetch video information. Please check the URL.');
+      showToast('Video processing... Testing compatibility...');
+    } catch (error: any) {
+      console.error('Error extracting video data:', error);
+      setError(error.message || 'Failed to extract video ID. Please check the URL format.');
+      setVideoData(null);
     } finally {
-      setIsLoadingVideo(false);
+      setFetchingVideo(false);
     }
   };
 
-  // Handle URL input change
-  const handleUrlChange = (url: string) => {
-    setYoutubeUrl(url);
-    const videoId = extractVideoId(url);
-    
-    if (videoId) {
-      fetchVideoInfo(videoId);
-    } else {
-      setVideoInfo(null);
-      setVideoTitle('');
+  const createIframeHTML = (embedUrl: string) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+          }
+          #player {
+            width: 100%;
+            height: 100%;
+            border: none;
+          }
+          .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+          }
+          .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff4757;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            z-index: 1000;
+          }
+        </style>
+      </head>
+      <body>
+        <div id="loading" class="loading">Testing video compatibility...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="player"></div>
+
+        <script>
+          console.log('Initializing YouTube iframe validation for video ID: ${videoData?.id}');
+          
+          var player;
+          var isPlayerReady = false;
+          var loadingTimeoutId;
+          var retryAttempt = ${retryCount};
+          var maxRetries = ${maxRetries};
+          var hasTimedOut = false;
+          var isLiveVideo = false;
+          var hasError = false;
+          var initializationInProgress = false;
+          
+          // Set loading timeout
+          loadingTimeoutId = setTimeout(function() {
+            if (!isPlayerReady && !hasTimedOut) {
+              hasTimedOut = true;
+              console.log('Loading timeout reached');
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('error').style.display = 'block';
+              document.getElementById('error').textContent = 'Video loading timeout. May not be embeddable.';
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'LOADING_TIMEOUT',
+                message: 'Loading timeout after ${loadingTimeoutDuration}ms'
+              }));
+            }
+          }, ${loadingTimeoutDuration});
+
+          // Load YouTube IFrame API
+          var tag = document.createElement('script');
+          tag.src = "https://www.youtube.com/iframe_api";
+          tag.onerror = function() {
+            console.error('Failed to load YouTube IFrame API');
+            clearTimeout(loadingTimeoutId);
+            hasError = true;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = 'Failed to load YouTube API';
+            
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'API_LOAD_ERROR',
+              message: 'Failed to load YouTube IFrame API'
+            }));
+          };
+          
+          var firstScriptTag = document.getElementsByTagName('script')[0];
+          firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+          function onYouTubeIframeAPIReady() {
+            if (initializationInProgress || hasError || hasTimedOut) {
+              return;
+            }
+            
+            initializationInProgress = true;
+            console.log('YouTube IFrame API ready');
+            
+            try {
+              player = new YT.Player('player', {
+                height: '100%',
+                width: '100%',
+                videoId: '${videoData?.id}',
+                playerVars: {
+                  'autoplay': 0,
+                  'controls': 0,
+                  'modestbranding': 1,
+                  'showinfo': 0,
+                  'rel': 0,
+                  'fs': 0,
+                  'disablekb': 1,
+                  'iv_load_policy': 3,
+                  'enablejsapi': 1,
+                  'origin': window.location.origin
+                },
+                events: {
+                  'onReady': onPlayerReady,
+                  'onStateChange': onPlayerStateChange,
+                  'onError': onPlayerError
+                }
+              });
+            } catch (error) {
+              console.error('Error creating YouTube player:', error);
+              hasError = true;
+              clearTimeout(loadingTimeoutId);
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('error').style.display = 'block';
+              document.getElementById('error').textContent = 'Failed to initialize player';
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAYER_INIT_ERROR',
+                message: 'Failed to initialize YouTube player'
+              }));
+            }
+          }
+
+          function onPlayerReady(event) {
+            if (hasError || hasTimedOut) {
+              return;
+            }
+            
+            console.log('Player ready');
+            clearTimeout(loadingTimeoutId);
+            isPlayerReady = true;
+            document.getElementById('loading').style.display = 'none';
+            
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'PLAYER_READY',
+              videoId: '${videoData?.id}'
+            }));
+            
+            // Auto-start playback test with delay to prevent stack overflow
+            setTimeout(function() {
+              if (player && player.playVideo && isPlayerReady && !hasError) {
+                try {
+                  console.log('Starting auto-playback test');
+                  player.playVideo();
+                } catch (error) {
+                  console.error('Error starting playback:', error);
+                }
+              }
+            }, 1500);
+          }
+
+          function onPlayerStateChange(event) {
+            if (hasError || hasTimedOut) {
+              return;
+            }
+            
+            var state = event.data;
+            var stateNames = {
+              '-1': 'UNSTARTED',
+              '0': 'ENDED',
+              '1': 'PLAYING',
+              '2': 'PAUSED',
+              '3': 'BUFFERING',
+              '5': 'CUED'
+            };
+            
+            console.log('Player state changed to:', stateNames[state] || state);
+            
+            // Check for live video (buffering state that doesn't progress)
+            if (state === 3) { // BUFFERING
+              setTimeout(function() {
+                if (player && player.getPlayerState && player.getPlayerState() === 3) {
+                  // Still buffering after 3 seconds, might be live
+                  try {
+                    var videoData = player.getVideoData();
+                    if (videoData && videoData.isLive) {
+                      isLiveVideo = true;
+                      console.log('Live video detected');
+                      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'LIVE_VIDEO_DETECTED',
+                        message: 'Live videos are not supported'
+                      }));
+                      return;
+                    }
+                  } catch (error) {
+                    console.log('Could not check live status:', error);
+                  }
+                }
+              }, 3000);
+            }
+            
+            if (state === 1) { // PLAYING
+              console.log('Video is playing - embedable confirmed');
+              
+              // Extract title
+              setTimeout(function() {
+                detectTitle();
+              }, 2000);
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAYBACK_SUCCESS',
+                embeddable: true,
+                state: state,
+                stateName: stateNames[state]
+              }));
+            } else if (state === 2) { // PAUSED
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'STATE_CHANGE',
+                state: state,
+                stateName: stateNames[state]
+              }));
+            }
+          }
+
+          function onPlayerError(event) {
+            console.error('Player error:', event.data);
+            clearTimeout(loadingTimeoutId);
+            hasError = true;
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            
+            var errorMessages = {
+              2: 'Invalid video ID',
+              5: 'HTML5 player error',
+              100: 'Video not found or private',
+              101: 'Video not allowed to be played in embedded players',
+              150: 'Video not allowed to be played in embedded players'
+            };
+            
+            var errorMessage = errorMessages[event.data] || 'Video playback error';
+            document.getElementById('error').textContent = errorMessage;
+            
+            // Check if we should retry
+            if ((event.data === 5 || !event.data) && retryAttempt < maxRetries) {
+              console.log('Retrying due to error:', errorMessage);
+              setTimeout(function() {
+                window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'RETRY_NEEDED',
+                  error: event.data,
+                  message: errorMessage,
+                  retryAttempt: retryAttempt + 1
+                }));
+              }, 2000);
+            } else {
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAYBACK_FAILED',
+                embeddable: false,
+                error: event.data,
+                message: errorMessage,
+                isEmbeddingError: event.data === 101 || event.data === 150
+              }));
+            }
+          }
+          
+          function detectTitle() {
+            try {
+              var detectedTitle = '';
+              
+              // Method 1: Check document title
+              if (document.title && document.title !== 'YouTube') {
+                detectedTitle = document.title.replace(' - YouTube', '');
+              }
+              
+              // Method 2: Try to get video data from player
+              if (player && player.getVideoData) {
+                try {
+                  var videoData = player.getVideoData();
+                  if (videoData && videoData.title) {
+                    detectedTitle = videoData.title;
+                  }
+                } catch (e) {
+                  console.log('Could not get video data:', e);
+                }
+              }
+              
+              // Method 3: Fallback title
+              if (!detectedTitle) {
+                detectedTitle = 'Video ${videoData?.id || 'Unknown'}';
+              }
+              
+              console.log('Title detected:', detectedTitle);
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'TITLE_DETECTED',
+                title: detectedTitle,
+                success: true
+              }));
+              
+            } catch (error) {
+              console.error('Title detection failed:', error);
+              var fallbackTitle = 'Video ${videoData?.id || 'Unknown'}';
+              
+              window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'TITLE_DETECTED',
+                title: fallbackTitle,
+                success: false,
+                message: 'Used fallback title'
+              }));
+            }
+          }
+          
+          // Handle page errors
+          window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('Page error:', msg);
+            hasError = true;
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'PAGE_ERROR',
+              message: 'Page error: ' + msg
+            }));
+            return true; // Prevent default error handling
+          };
+        </script>
+      </body>
+      </html>
+    `;
+  };
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('WebView message:', data);
+
+      switch (data.type) {
+        case 'PLAYER_READY':
+          setIframeLoaded(true);
+          setLoadingTimeout(false);
+          showToast('Video player loaded successfully');
+          break;
+          
+        case 'LOADING_TIMEOUT':
+          setLoadingTimeout(true);
+          setIframeLoaded(false);
+          setError('Video loading timeout. It may not be embeddable.');
+          break;
+          
+        case 'API_LOAD_ERROR':
+        case 'PLAYER_INIT_ERROR':
+          setError('Failed to load YouTube API. Please check your internet connection.');
+          break;
+          
+        case 'LIVE_VIDEO_DETECTED':
+          setError('Live videos cannot be promoted. Please choose a regular video.');
+          setVideoData(prev => prev ? { ...prev, embeddable: false, isLive: true } : null);
+          break;
+          
+        case 'PLAYBACK_SUCCESS':
+          setTestingPlayback(false);
+          setEmbedabilityTested(true);
+          setVideoData(prev => prev ? { ...prev, embeddable: true } : null);
+          setError(null);
+          showToast('✅ Video is embeddable and ready for promotion!');
+          break;
+          
+        case 'PLAYBACK_FAILED':
+          setTestingPlayback(false);
+          setEmbedabilityTested(true);
+          setVideoData(prev => prev ? { ...prev, embeddable: false } : null);
+          
+          if (data.isEmbeddingError) {
+            setError('This video cannot be embedded. Please make it embeddable first or choose a different video.');
+          } else {
+            setError(data.message || 'Video playback failed. Please try a different video.');
+          }
+          break;
+          
+        case 'RETRY_NEEDED':
+          if (retryCount < maxRetries) {
+            console.log(`Retrying video load (attempt ${data.retryAttempt})`);
+            showToast(`Retrying... (${data.retryAttempt}/${maxRetries})`);
+            setRetryCount(data.retryAttempt);
+            
+            // Retry after 2 seconds
+            setTimeout(() => {
+              setShowIframe(false);
+              setTimeout(() => {
+                setShowIframe(true);
+              }, 100);
+            }, 2000);
+          } else {
+            showToast('Video unavailable after retries');
+            setError('Video failed to load after multiple attempts.');
+          }
+          break;
+          
+        case 'TITLE_DETECTED':
+          if (data.title) {
+            setVideoData(prev => prev ? { ...prev, autoDetectedTitle: data.title } : null);
+            if (!title) {
+              setTitle(data.title);
+            }
+            showToast(`Title detected: ${data.title}`);
+          }
+          break;
+          
+        case 'STATE_CHANGE':
+          if (data.state === 1) { // PLAYING
+            setIsPlaying(true);
+          } else if (data.state === 2) { // PAUSED
+            setIsPlaying(false);
+          }
+          break;
+          
+        case 'PAGE_ERROR':
+          console.log('Page error in iframe:', data.message);
+          setError('Page error occurred in video player.');
+          break;
+      }
+    } catch (error) {
+      console.error('Error parsing WebView message:', error);
     }
   };
 
-  // Calculate coin cost
-  const calculateCoinCost = () => {
-    const baseCost = selectedViews * 2; // 2 coins per view
-    const durationMultiplier = selectedDuration / 30; // 30 seconds as base
-    return Math.ceil(baseCost * durationMultiplier);
+  const validateYouTubeUrl = (url: string) => {
+    const youtubeRegex = /^(https?\:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+    return youtubeRegex.test(url);
   };
 
-  // Handle video promotion
+  const validateDuration = () => {
+    if (!userSetDuration || userSetDuration < 10) {
+      return 'Duration must be at least 10 seconds';
+    }
+
+    if (userSetDuration > 600) {
+      return 'Duration must be less than 600 seconds (10 minutes)';
+    }
+
+    return null;
+  };
+
   const handlePromoteVideo = async () => {
-    if (!user || !profile) {
-      Alert.alert('Error', 'Please log in to promote videos');
+    // Input validation
+    if (!youtubeUrl || !title || !userSetDuration || !targetViews) {
+      setError('Please fill in all required fields');
       return;
     }
 
-    const videoId = extractVideoId(youtubeUrl);
-    if (!videoId) {
-      Alert.alert('Error', 'Please enter a valid YouTube URL');
+    if (!validateYouTubeUrl(youtubeUrl)) {
+      setError('Please enter a valid YouTube URL');
       return;
     }
 
-    if (!videoTitle.trim()) {
-      Alert.alert('Error', 'Please enter a video title');
+    const durationError = validateDuration();
+    if (durationError) {
+      setError(durationError);
       return;
     }
 
-    const coinCost = calculateCoinCost();
-    if (profile.coins < coinCost) {
-      Alert.alert('Insufficient Coins', `You need ${coinCost} coins to promote this video. You currently have ${profile.coins} coins.`);
+    const views = targetViews;
+
+    if (isNaN(views) || views < 1 || views > 1000) {
+      setError('Target views must be between 1 and 1000');
       return;
     }
 
-    setIsPromoting(true);
-    promoteButtonScale.value = withSequence(
-      withSpring(0.95),
-      withSpring(1)
-    );
+    if (!user) {
+      setError('User not authenticated');
+      return;
+    }
+
+    if (!profile || profile.coins < totalCost) {
+      setError(`You need 🪙${totalCost} coins to promote this video. You have 🪙${profile?.coins || 0} coins.`);
+      return;
+    }
+
+    // Check if video embedability was tested
+    if (!videoData || !embedabilityTested) {
+      setError('Please test the video compatibility using the preview before promoting.');
+      return;
+    }
+
+    if (!videoData.embeddable) {
+      setError('This video cannot be embedded. Please make it embeddable first or choose a different video.');
+      return;
+    }
+
+    if (videoData.isLive) {
+      setError('Live videos cannot be promoted. Please choose a regular video.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
 
     try {
-      // Deduct coins first
-      const { error: coinError } = await supabase
+      console.log('Promoting video with data:', {
+        userId: user.id,
+        totalCost,
+        title,
+        duration: userSetDuration,
+        targetViews: views,
+        videoId: videoData.id,
+        embeddable: videoData.embeddable
+      });
+
+      // Use the database function to deduct coins safely
+      const { data: coinUpdateResult, error: coinError } = await supabase
         .rpc('update_user_coins', {
           user_uuid: user.id,
-          coin_amount: -coinCost,
+          coin_amount: -totalCost,
           transaction_type_param: 'video_promotion',
-          description_param: `Promoted video: ${videoTitle}`,
-          reference_uuid: null
+          description_param: `Promoted: ${title}`,
         });
 
-      if (coinError) throw coinError;
+      if (coinError) {
+        console.error('Error deducting coins:', coinError);
+        throw new Error(`Failed to deduct coins: ${coinError.message}`);
+      }
 
-      // Create video promotion with 10-minute hold
-      const { data: videoData, error: videoError } = await supabase
+      if (!coinUpdateResult) {
+        throw new Error('Insufficient coins or failed to deduct coins');
+      }
+
+      console.log('Coins deducted successfully');
+
+      // Create video promotion with 10-minute hold using the enhanced function
+      const { data: videoResult, error: insertError } = await supabase
         .rpc('create_video_with_hold', {
           user_uuid: user.id,
-          youtube_url_param: videoId,
-          title_param: videoTitle,
-          description_param: '',
-          duration_seconds_param: selectedDuration,
-          coin_cost_param: coinCost,
+          youtube_url_param: videoData.id, // Store only the video ID
+          title_param: title,
+          description_param: `Embed URL: ${videoData.embedUrl} | Original URL: ${videoData.originalUrl} | Auto-detected title: ${videoData.autoDetectedTitle || 'N/A'} | User-set duration: ${userSetDuration}s | Video ID: ${videoData.id}`,
+          duration_seconds_param: userSetDuration,
+          coin_cost_param: totalCost,
           coin_reward_param: 3, // Fixed reward per view
-          target_views_param: selectedViews
+          target_views_param: views
         });
 
-      if (videoError) throw videoError;
+      if (insertError) {
+        console.error('Error creating video promotion:', insertError);
+        throw new Error(`Failed to create video promotion: ${insertError.message}`);
+      }
 
-      // Refresh profile to update coin balance
+      console.log('Video promotion created successfully with hold period:', videoResult);
+      console.log(`Video ${videoData.id} status changed to Pending`);
+
+      // Refresh profile to get updated coin balance
       await refreshProfile();
-      
-      // Clear video queue to refresh with new videos
       clearQueue();
 
-      // Animate coin update
-      coinBounce.value = withSequence(
-        withSpring(1.3, { damping: 15, stiffness: 150 }),
-        withSpring(1, { damping: 15, stiffness: 150 })
-      );
-
+      // Show enhanced success alert with hold period information
       Alert.alert(
-        'Success! 🎉',
-        `Your video has been submitted for promotion! It will be active in the queue after a 10-minute hold period.\n\nTarget: ${selectedViews} views\nDuration: ${selectedDuration} seconds\nCost: ${coinCost} coins`,
-        [
-          {
-            text: 'View Analytics',
-            onPress: () => router.push('/(tabs)/analytics')
-          },
-          { text: 'OK' }
-        ]
+        'Video Promoted Successfully!',
+        `Your video has been promoted and is now on hold for 10 minutes.\n\n` +
+        `Status Flow:\n` +
+        `• PENDING (0-10 minutes): Video is on hold\n` +
+        `• ACTIVE (After 10 minutes): Video enters view queue\n` +
+        `• COMPLETED (Target reached): Video promotion finished\n\n` +
+        `Cost: 🪙${totalCost} coins deducted`,
+        [{ text: 'OK', onPress: () => {} }]
       );
-
+      
       // Reset form
-      setYoutubeUrl('');
-      setVideoTitle('');
-      setVideoInfo(null);
-      setSelectedViews(50);
-      setSelectedDuration(30);
+      resetForm();
 
     } catch (error: any) {
       console.error('Error promoting video:', error);
-      Alert.alert('Error', 'Failed to promote video. Please try again.');
+      setError(error.message || 'Failed to promote video. Please try again.');
     } finally {
-      setIsPromoting(false);
+      setLoading(false);
     }
   };
 
-  const coinAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: coinBounce.value }],
-  }));
+  const resetForm = () => {
+    setYoutubeUrl('');
+    setTitle('');
+    setUserSetDuration(null);
+    setTargetViews(null);
+    setVideoData(null);
+    setError(null);
+    setShowIframe(false);
+    setIframeLoaded(false);
+    setEmbedabilityTested(false);
+    setIsPlaying(false);
+    setTestingPlayback(false);
+    setRetryCount(0);
+    setLoadingTimeout(false);
+  };
 
-  const promoteButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: promoteButtonScale.value }],
-  }));
+  const openDropdown = (type: 'views' | 'duration') => {
+    if (type === 'views') {
+      setShowDurationDropdown(false);
+      setShowViewsDropdown(true);
+    } else {
+      setShowViewsDropdown(false);
+      setShowDurationDropdown(true);
+    }
+  };
 
-  const coinCost = calculateCoinCost();
-  const canAfford = (profile?.coins || 0) >= coinCost;
+  const closeDropdowns = () => {
+    setShowViewsDropdown(false);
+    setShowDurationDropdown(false);
+  };
+
+  const getSelectedViewsLabel = () => {
+    const option = VIEW_OPTIONS.find(opt => opt.value === targetViews);
+    return option ? option.label : 'Select views';
+  };
+
+  const getSelectedDurationLabel = () => {
+    const option = DURATION_OPTIONS.find(opt => opt.value === userSetDuration);
+    return option ? option.label : 'Select duration';
+  };
+
+  const handleUpgradeToVip = () => {
+    Alert.alert(
+      'Upgrade to VIP',
+      'VIP membership gives you 10% discount on all promotions and other exclusive benefits!',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Learn More', onPress: () => Alert.alert('VIP Benefits', 'Coming soon!') }
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
       <GlobalHeader title="Promote" showCoinDisplay={true} />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <LinearGradient
-          colors={['#800080', '#9B59B6']}
-          style={styles.heroSection}
-        >
-          <View style={styles.heroContent}>
-            <TrendingUp color="white" size={isSmallScreen ? 40 : 48} />
-            <Text style={styles.heroTitle}>Promote Your Video</Text>
-            <Text style={styles.heroSubtitle}>
-              Get real views from our community and grow your channel
-            </Text>
-          </View>
-        </LinearGradient>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {/* Error Display */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <AlertCircle color="#D32F2F" size={20} style={styles.errorIcon} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
 
-        {/* Form Section */}
-        <View style={styles.formSection}>
-          {/* YouTube URL Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>YouTube URL *</Text>
-            <View style={styles.inputContainer}>
-              <Link color="#666" size={20} style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="https://youtu.be/dQw4w9WgXcQ"
-                placeholderTextColor="#999"
-                value={youtubeUrl}
-                onChangeText={handleUrlChange}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {isLoadingVideo && (
-                <ActivityIndicator size="small" color="#800080" style={styles.loadingIcon} />
+          {/* Form */}
+          <View style={styles.form}>
+            {/* YouTube URL */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>YouTube URL *</Text>
+              <View style={styles.inputContainer}>
+                <Link color="#666" size={20} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://youtu.be/fCtFxT3n_l0"
+                  value={youtubeUrl}
+                  onChangeText={setYoutubeUrl}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <TouchableOpacity
+                  style={[styles.fetchButton, fetchingVideo && styles.fetchButtonDisabled]}
+                  onPress={fetchVideoData}
+                  disabled={fetchingVideo || !youtubeUrl.trim()}
+                >
+                  <Search color={fetchingVideo ? "#999" : "#800080"} size={20} />
+                </TouchableOpacity>
+              </View>
+              {fetchingVideo && (
+                <Text style={styles.helperText}>Checking video compatibility...</Text>
               )}
             </View>
-          </View>
 
-          {/* Video Title Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Video Title *</Text>
-            <View style={styles.inputContainer}>
-              <Play color="#666" size={20} style={styles.inputIcon} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter video title"
-                placeholderTextColor="#999"
-                value={videoTitle}
-                onChangeText={setVideoTitle}
-                multiline
-                numberOfLines={2}
-              />
-            </View>
-          </View>
-
-          {/* Number of Views Dropdown */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Number of Views *</Text>
-            <Pressable
-              style={styles.dropdownButton}
-              onPress={() => setShowViewsDropdown(true)}
-              android_ripple={{ color: '#F0F0F0' }}
-            >
-              <Eye color="#666" size={20} style={styles.inputIcon} />
-              <Text style={styles.dropdownButtonText}>
-                {selectedViews} views
-              </Text>
-              <ChevronDown color="#666" size={20} />
-            </Pressable>
-          </View>
-
-          {/* Duration Dropdown */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Set Duration (seconds) *</Text>
-            <Pressable
-              style={styles.dropdownButton}
-              onPress={() => setShowDurationDropdown(true)}
-              android_ripple={{ color: '#F0F0F0' }}
-            >
-              <Clock color="#666" size={20} style={styles.inputIcon} />
-              <Text style={styles.dropdownButtonText}>
-                {selectedDuration} seconds
-              </Text>
-              <ChevronDown color="#666" size={20} />
-            </Pressable>
-          </View>
-
-          {/* Cost Display */}
-          <View style={styles.costSection}>
-            <View style={styles.costCard}>
-              <View style={styles.costHeader}>
-                <DollarSign color="#800080" size={24} />
-                <Text style={styles.costTitle}>Promotion Cost</Text>
+            {/* Iframe Preview */}
+            {videoData && (
+              <View style={styles.iframeSection}>
+                <TouchableOpacity
+                  style={styles.iframeToggle}
+                  onPress={() => setShowIframe(!showIframe)}
+                >
+                  <View style={styles.iframeToggleContent}>
+                    <Text style={styles.iframeToggleTitle}>
+                      Compatibility Test {embedabilityTested && (videoData.embeddable ? '✅' : '❌')}
+                      {videoData.isLive && ' (Live Video)'}
+                      {loadingTimeout && ' (Timeout)'}
+                    </Text>
+                    {showIframe ? <ChevronUp color="#666" size={20} /> : <ChevronDown color="#666" size={20} />}
+                  </View>
+                </TouchableOpacity>
+                
+                {showIframe && (
+                  <View style={styles.iframeContainer}>
+                    <View style={styles.webviewContainer}>
+                      <WebView
+                        ref={webviewRef}
+                        source={{ html: createIframeHTML(videoData.embedUrl) }}
+                        style={styles.webview}
+                        onMessage={handleWebViewMessage}
+                        javaScriptEnabled={true}
+                        domStorageEnabled={true}
+                        allowsInlineMediaPlayback={true}
+                        mediaPlaybackRequiresUserAction={false}
+                        mixedContentMode="compatibility"
+                        originWhitelist={['*']}
+                        allowsFullscreenVideo={false}
+                      />
+                    </View>
+                    
+                    {embedabilityTested && (
+                      <View style={[
+                        styles.embedabilityResult,
+                        videoData.embeddable ? styles.embedabilitySuccess : styles.embedabilityError
+                      ]}>
+                        {videoData.embeddable ? (
+                          <>
+                            <CheckCircle color="#2ECC71" size={20} />
+                            <Text style={styles.embedabilityText}>
+                              ✅ Video is embeddable and ready for promotion!
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle color="#E74C3C" size={20} />
+                            <Text style={styles.embedabilityText}>
+                              ❌ Video is not embeddable{videoData.isLive ? ' (Live video)' : ''}. Please make it embeddable first.
+                            </Text>
+                          </>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
-              <Animated.View style={[styles.costAmount, coinAnimatedStyle]}>
-                <Text style={styles.costValue}>🪙{coinCost}</Text>
-              </Animated.View>
-              <Text style={styles.costDescription}>
-                {selectedViews} views × {selectedDuration}s duration
-              </Text>
-              {!canAfford && (
-                <View style={styles.insufficientFunds}>
-                  <AlertCircle color="#E74C3C" size={16} />
-                  <Text style={styles.insufficientText}>
-                    Insufficient coins (Need {coinCost - (profile?.coins || 0)} more)
+            )}
+
+            {/* Title */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Video Title *</Text>
+              <View style={styles.inputContainer}>
+                <Type color="#666" size={20} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter video title"
+                  value={title}
+                  onChangeText={setTitle}
+                  maxLength={100}
+                />
+              </View>
+              {videoData?.autoDetectedTitle && (
+                <TouchableOpacity
+                  style={styles.autoTitleButton}
+                  onPress={() => setTitle(videoData.autoDetectedTitle || '')}
+                >
+                  <Text style={styles.autoTitleText}>
+                    Use auto-detected: "{videoData.autoDetectedTitle}"
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Number of Views Dropdown */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Number of Views *</Text>
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                onPress={() => openDropdown('views')}
+              >
+                <Eye color="#666" size={20} style={styles.inputIcon} />
+                <Text style={[
+                  styles.dropdownTriggerText,
+                  targetViews && styles.dropdownTriggerTextSelected
+                ]}>
+                  {getSelectedViewsLabel()}
+                </Text>
+                <ChevronDown color="#666" size={20} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Duration Dropdown */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Set Duration (seconds) *</Text>
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                onPress={() => openDropdown('duration')}
+              >
+                <Clock color="#666" size={20} style={styles.inputIcon} />
+                <Text style={[
+                  styles.dropdownTriggerText,
+                  userSetDuration && styles.dropdownTriggerTextSelected
+                ]}>
+                  {getSelectedDurationLabel()}
+                </Text>
+                <ChevronDown color="#666" size={20} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Enhanced Cost Calculation */}
+            {userSetDuration && targetViews && (
+              <View style={styles.costCard}>
+                <Text style={styles.costTitle}>Promotion Cost</Text>
+                
+                <View style={styles.costRow}>
+                  <Text style={styles.costLabel}>Base Cost:</Text>
+                  <Text style={styles.costValue}>🪙{baseCost}</Text>
+                </View>
+                
+                {profile?.is_vip && (
+                  <View style={styles.costRow}>
+                    <Text style={styles.costLabel}>VIP Discount (10%):</Text>
+                    <Text style={styles.discountValue}>-🪙{vipDiscount}</Text>
+                  </View>
+                )}
+                
+                <View style={styles.finalCostRow}>
+                  <Text style={styles.finalCostLabel}>Final Cost:</Text>
+                  <Text style={styles.finalCostValue}>🪙{totalCost}</Text>
+                </View>
+                
+                <View style={styles.costRow}>
+                  <Text style={styles.costLabel}>Your balance:</Text>
+                  <Text style={[
+                    styles.costValue, 
+                    (profile?.coins || 0) < totalCost && styles.insufficientBalance
+                  ]}>
+                    🪙{profile?.coins || 0}
                   </Text>
                 </View>
-              )}
-            </View>
-          </View>
+                {videoData && videoData.embeddable && (
+                  <View style={styles.costRow}>
+                    <Text style={styles.costLabel}>Compatibility:</Text>
+                    <Text style={[styles.costValue, { color: '#2ECC71' }]}>✓ Verified</Text>
+                  </View>
+                )}
+              </View>
+            )}
 
-          {/* Promote Button */}
-          <Animated.View style={promoteButtonAnimatedStyle}>
+            {/* VIP Discount and Upgrade Feature */}
+            {!profile?.is_vip && userSetDuration && targetViews && (
+              <TouchableOpacity style={styles.vipPrompt} onPress={handleUpgradeToVip}>
+                <Crown color="#FFA726" size={20} />
+                <Text style={styles.vipPromptText}>
+                  VIP members save 🪙{vipDiscount || Math.ceil(baseCost * 0.1)} on this promotion - Become VIP?
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Promote Button */}
             <TouchableOpacity
               style={[
                 styles.promoteButton,
-                (!canAfford || isPromoting || !youtubeUrl || !videoTitle) && styles.promoteButtonDisabled
+                (loading || !youtubeUrl || !title || !userSetDuration || !targetViews || (profile?.coins || 0) < totalCost || validateDuration() || !videoData?.embeddable) && styles.buttonDisabled
               ]}
               onPress={handlePromoteVideo}
-              disabled={!canAfford || isPromoting || !youtubeUrl || !videoTitle}
+              disabled={loading || !youtubeUrl || !title || !userSetDuration || !targetViews || (profile?.coins || 0) < totalCost || !!validateDuration() || !videoData?.embeddable}
             >
-              <TrendingUp color="white" size={20} />
+              <TrendingUp color="white" size={20} style={styles.buttonIcon} />
               <Text style={styles.promoteButtonText}>
-                {isPromoting ? 'Promoting...' : 'Promote Video'}
+                {loading ? 'Promoting...' : 'Promote Video'}
               </Text>
             </TouchableOpacity>
-          </Animated.View>
-
-          {/* Info Section */}
-          <View style={styles.infoSection}>
-            <Text style={styles.infoTitle}>How it works:</Text>
-            <View style={styles.infoList}>
-              <Text style={styles.infoItem}>• Your video enters a 10-minute hold period</Text>
-              <Text style={styles.infoItem}>• After hold, it becomes active in our viewing queue</Text>
-              <Text style={styles.infoItem}>• Users earn coins by watching your video</Text>
-              <Text style={styles.infoItem}>• You get real engagement from our community</Text>
-              <Text style={styles.infoItem}>• Track progress in the Analytics tab</Text>
-            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-      {/* Enhanced Dropdowns */}
-      <EnhancedDropdown
+      {/* Fixed Futuristic Dropdowns */}
+      <FuturisticDropdown
+        options={VIEW_OPTIONS}
+        selectedValue={targetViews}
+        onSelect={setTargetViews}
+        placeholder="Select Number of Views"
         visible={showViewsDropdown}
-        onClose={() => setShowViewsDropdown(false)}
-        options={viewsOptions}
-        selectedValue={selectedViews}
-        onSelect={setSelectedViews}
-        title="Select Number of Views"
+        onClose={closeDropdowns}
       />
 
-      <EnhancedDropdown
+      <FuturisticDropdown
+        options={DURATION_OPTIONS}
+        selectedValue={userSetDuration}
+        onSelect={setUserSetDuration}
+        placeholder="Select Duration (seconds)"
         visible={showDurationDropdown}
-        onClose={() => setShowDurationDropdown(false)}
-        options={durationOptions}
-        selectedValue={selectedDuration}
-        onSelect={setSelectedDuration}
-        title="Select Duration"
+        onClose={closeDropdowns}
       />
     </View>
   );
@@ -512,40 +1239,41 @@ export default function PromoteTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F5F5F5',
+  },
+  keyboardView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
   },
-  heroSection: {
-    padding: isSmallScreen ? 24 : 32,
+  errorContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    margin: 16,
+    backgroundColor: '#FFE5E5',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#800080',
   },
-  heroContent: {
-    alignItems: 'center',
+  errorIcon: {
+    marginRight: 8,
   },
-  heroTitle: {
-    fontSize: isSmallScreen ? 24 : 28,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
   },
-  heroSubtitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  formSection: {
+  form: {
     padding: 16,
   },
   inputGroup: {
     marginBottom: 20,
   },
-  inputLabel: {
-    fontSize: isSmallScreen ? 14 : 16,
+  label: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
@@ -556,139 +1284,344 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minHeight: 52,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.05,
         shadowRadius: 4,
       },
       android: {
         elevation: 2,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
       },
     }),
   },
   inputIcon: {
     marginRight: 12,
   },
-  textInput: {
+  input: {
     flex: 1,
-    fontSize: isSmallScreen ? 14 : 16,
+    height: 52,
+    fontSize: 16,
     color: '#333',
-    paddingVertical: 16,
   },
-  loadingIcon: {
-    marginLeft: 8,
+  fetchButton: {
+    padding: 8,
   },
-  dropdownButton: {
+  fetchButtonDisabled: {
+    opacity: 0.5,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  dropdownTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minHeight: 52,
+    height: 52,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.05,
         shadowRadius: 4,
       },
       android: {
         elevation: 2,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
       },
     }),
   },
-  dropdownButtonText: {
+  dropdownTriggerText: {
     flex: 1,
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#333',
-    marginLeft: 12,
+    fontSize: 16,
+    color: '#999',
   },
-  costSection: {
-    marginBottom: 24,
+  dropdownTriggerTextSelected: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  // FIXED: Enhanced Modal Styles for Android Transparency Issue
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Solid semi-transparent overlay
+    justifyContent: 'flex-end',
+  },
+  dropdownBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Explicit background for Android
+  },
+  dropdownContainer: {
+    backgroundColor: '#FFFFFF', // Explicit white background
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: screenHeight * 0.7,
+    overflow: 'hidden',
+    ...Platform.select({
+      android: {
+        elevation: 16,
+        backgroundColor: '#FFFFFF', // Double ensure white background on Android
+      },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        backgroundColor: '#FFFFFF',
+      },
+      web: {
+        boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.25)',
+        backgroundColor: '#FFFFFF',
+      },
+    }),
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 16,
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  dropdownScrollView: {
+    maxHeight: screenHeight * 0.5,
+    backgroundColor: '#FFFFFF', // Explicit white background for scroll view
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    minHeight: 56,
+    backgroundColor: '#FFFFFF', // Explicit white background for each option
+  },
+  dropdownOptionSelected: {
+    backgroundColor: '#FFF8F8',
+  },
+  dropdownOptionLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownOptionText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  dropdownOptionTextSelected: {
+    color: '#800080',
+    fontWeight: '600',
+  },
+  iframeSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginBottom: 20,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+      },
+    }),
+  },
+  iframeToggle: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  iframeToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  iframeToggleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  iframeContainer: {
+    padding: 16,
+  },
+  webviewContainer: {
+    height: isSmallScreen ? 180 : 220,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  webview: {
+    flex: 1,
+  },
+  embedabilityResult: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8,
+  },
+  embedabilitySuccess: {
+    backgroundColor: '#E8F5E8',
+  },
+  embedabilityError: {
+    backgroundColor: '#FFE5E5',
+  },
+  embedabilityText: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  autoTitleButton: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4A90E2',
+  },
+  autoTitleText: {
+    fontSize: 12,
+    color: '#4A90E2',
+    fontWeight: '500',
   },
   costCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: isSmallScreen ? 16 : 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#800080',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
     ...Platform.select({
       ios: {
-        shadowColor: '#800080',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 4,
+        elevation: 2,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(128, 0, 128, 0.15)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
       },
     }),
   },
-  costHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   costTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginLeft: 8,
+    marginBottom: 12,
   },
-  costAmount: {
+  costRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
+  costLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
   costValue: {
-    fontSize: isSmallScreen ? 24 : 28,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  discountValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2ECC71',
+  },
+  finalCostRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  finalCostLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  finalCostValue: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#800080',
   },
-  costDescription: {
-    fontSize: isSmallScreen ? 12 : 14,
-    color: '#666',
-    textAlign: 'center',
+  insufficientBalance: {
+    color: '#800080',
   },
-  insufficientFunds: {
+  vipPrompt: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
+    backgroundColor: '#FFF4E6',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
   },
-  insufficientText: {
-    fontSize: 12,
-    color: '#E74C3C',
-    marginLeft: 6,
+  vipPromptText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#E65100',
     fontWeight: '500',
+    flex: 1,
   },
   promoteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#800080',
-    paddingVertical: 16,
     borderRadius: 12,
+    height: 52,
     marginBottom: 24,
-    gap: 8,
     ...Platform.select({
       ios: {
         shadowColor: '#800080',
@@ -704,149 +1637,15 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  promoteButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    opacity: 0.6,
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   promoteButtonText: {
     color: 'white',
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-  },
-  infoSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: isSmallScreen ? 16 : 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  infoTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  infoList: {
-    gap: 8,
-  },
-  infoItem: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  
-  // Enhanced Modal Styles for Android Fix
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black overlay
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: isVerySmallScreen ? 10 : 20,
-  },
-  modalContainer: {
-    width: '100%',
-    maxWidth: isVerySmallScreen ? screenWidth - 20 : 400,
-    maxHeight: isSmallScreen ? '80%' : '70%',
-    backgroundColor: 'white', // Solid white background
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...Platform.select({
-      android: {
-        elevation: 10,
-        backgroundColor: '#FFFFFF', // Ensure solid white on Android
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        backgroundColor: '#FFFFFF',
-      },
-      web: {
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-        backgroundColor: '#FFFFFF',
-      },
-    }),
-  },
-  modalContent: {
-    flex: 1,
-    backgroundColor: '#FFFFFF', // Explicit white background
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#800080',
-    paddingHorizontal: isVerySmallScreen ? 15 : 20,
-    paddingVertical: isVerySmallScreen ? 12 : 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 16,
-  },
-  modalTitle: {
-    fontSize: isVerySmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: 'white',
-    flex: 1,
-    marginRight: 10,
-  },
-  closeButton: {
-    padding: isVerySmallScreen ? 6 : 8,
-    borderRadius: 20,
-    minWidth: 32,
-    minHeight: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  closeButtonText: {
-    fontSize: isVerySmallScreen ? 18 : 20,
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  modalList: {
-    flex: 1,
-    backgroundColor: '#FFFFFF', // Explicit white background
-  },
-  modalListContent: {
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF', // Explicit white background
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: isVerySmallScreen ? 15 : 20,
-    paddingVertical: isVerySmallScreen ? 12 : 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    minHeight: isVerySmallScreen ? 48 : 56,
-    backgroundColor: '#FFFFFF', // Explicit white background
-  },
-  selectedDropdownItem: {
-    backgroundColor: '#F0F8FF',
-  },
-  dropdownItemText: {
-    fontSize: isVerySmallScreen ? 14 : 16,
-    color: '#333',
-    flex: 1,
-    fontWeight: '500',
-  },
-  selectedDropdownItemText: {
-    color: '#800080',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
