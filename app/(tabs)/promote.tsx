@@ -137,7 +137,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
           ]}
         >
           <LinearGradient
-            colors={['#FF4757', '#FF6B8A', '#FFA726']}
+            colors={['#800080', '#9B59B6']}
             style={styles.dropdownHeader}
           >
             <Text style={styles.dropdownTitle}>{placeholder}</Text>
@@ -168,7 +168,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
                   {option.label}
                 </Text>
                 {selectedValue === option.value && (
-                  <CheckCircle color="#FF4757" size={20} />
+                  <CheckCircle color="#800080" size={20} />
                 )}
               </TouchableOpacity>
             ))}
@@ -240,19 +240,15 @@ export default function PromoteTab() {
     const vipDiscount = profile?.is_vip ? Math.ceil(baseCost * 0.1) : 0;
     const totalCost = baseCost - vipDiscount;
     
-    // Reward per view: 80% of base cost per view
-    const rewardPerView = Math.ceil((baseCost / views) * 0.8) || 0;
-    
     return { 
       baseCost, 
       totalCost, 
-      rewardPerView, 
       vipDiscount,
       costPerView: Math.ceil(baseCost / views) || 0
     };
   };
 
-  const { baseCost, totalCost, rewardPerView, vipDiscount, costPerView } = calculateCosts();
+  const { baseCost, totalCost, vipDiscount, costPerView } = calculateCosts();
 
   // Auto-fetch video data when URL changes (with debounce)
   useEffect(() => {
@@ -654,26 +650,6 @@ export default function PromoteTab() {
             }
           }
           
-          // Manual control functions
-          window.testPlayback = function() {
-            if (player && player.playVideo && isPlayerReady && !hasError) {
-              try {
-                console.log('Manual playback test triggered');
-                player.playVideo();
-              } catch (error) {
-                console.error('Error in manual playback:', error);
-              }
-            }
-          };
-          
-          window.detectTitle = function() {
-            try {
-              detectTitle();
-            } catch (error) {
-              console.error('Error in manual title detection:', error);
-            }
-          };
-          
           // Handle page errors
           window.onerror = function(msg, url, lineNo, columnNo, error) {
             console.error('Page error:', msg);
@@ -896,7 +872,7 @@ export default function PromoteTab() {
           description_param: `Embed URL: ${videoData.embedUrl} | Original URL: ${videoData.originalUrl} | Auto-detected title: ${videoData.autoDetectedTitle || 'N/A'} | User-set duration: ${userSetDuration}s | Video ID: ${videoData.id}`,
           duration_seconds_param: userSetDuration,
           coin_cost_param: totalCost,
-          coin_reward_param: rewardPerView,
+          coin_reward_param: 3, // Fixed reward per view
           target_views_param: views
         });
 
@@ -919,8 +895,7 @@ export default function PromoteTab() {
         `• PENDING (0-10 minutes): Video is on hold\n` +
         `• ACTIVE (After 10 minutes): Video enters view queue\n` +
         `• COMPLETED (Target reached): Video promotion finished\n\n` +
-        `Cost: 🪙${totalCost} coins deducted\n` +
-        `Reward: 🪙${rewardPerView} per view`,
+        `Cost: 🪙${totalCost} coins deducted`,
         [{ text: 'OK', onPress: () => {} }]
       );
       
@@ -949,18 +924,6 @@ export default function PromoteTab() {
     setTestingPlayback(false);
     setRetryCount(0);
     setLoadingTimeout(false);
-  };
-
-  const testPlaybackManually = () => {
-    if (webviewRef.current) {
-      webviewRef.current.injectJavaScript('window.testPlayback && window.testPlayback(); true;');
-    }
-  };
-
-  const detectTitleManually = () => {
-    if (webviewRef.current) {
-      webviewRef.current.injectJavaScript('window.detectTitle && window.detectTitle(); true;');
-    }
   };
 
   const openDropdown = (type: 'views' | 'duration') => {
@@ -1001,14 +964,15 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header with coin icon */}
+      {/* Updated Header with Purple Theme */}
       <LinearGradient
-        colors={['#FF4757', '#FF6B8A']}
+        colors={['#800080', '#9B59B6']}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>Promote Your Video</Text>
+        <Text style={styles.headerTitle}>Promote</Text>
         <View style={styles.coinDisplay}>
-          <Text style={styles.coinCount}>🪙{profile?.coins || 0}</Text>
+          <Text style={styles.coinEmoji}>🪙</Text>
+          <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
         </View>
       </LinearGradient>
 
@@ -1045,7 +1009,7 @@ export default function PromoteTab() {
                   onPress={fetchVideoData}
                   disabled={fetchingVideo || !youtubeUrl.trim()}
                 >
-                  <Search color={fetchingVideo ? "#999" : "#FF4757"} size={20} />
+                  <Search color={fetchingVideo ? "#999" : "#800080"} size={20} />
                 </TouchableOpacity>
               </View>
               {fetchingVideo && (
@@ -1053,7 +1017,7 @@ export default function PromoteTab() {
               )}
             </View>
 
-            {/* Iframe Preview */}
+            {/* Iframe Preview - Removed Test Play and Get Title buttons */}
             {videoData && (
               <View style={styles.iframeSection}>
                 <TouchableOpacity
@@ -1072,27 +1036,6 @@ export default function PromoteTab() {
                 
                 {showIframe && (
                   <View style={styles.iframeContainer}>
-                    <View style={styles.iframeControls}>
-                      <TouchableOpacity
-                        style={styles.controlButton}
-                        onPress={testPlaybackManually}
-                        disabled={testingPlayback || !iframeLoaded}
-                      >
-                        <Play color="#FF4757" size={16} />
-                        <Text style={styles.controlButtonText}>
-                          {testingPlayback ? 'Testing...' : 'Test Play'}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.controlButton}
-                        onPress={detectTitleManually}
-                        disabled={!iframeLoaded}
-                      >
-                        <Type color="#FF4757" size={16} />
-                        <Text style={styles.controlButtonText}>Get Title</Text>
-                      </TouchableOpacity>
-                    </View>
-                  
                     <View style={styles.webviewContainer}>
                       <WebView
                         ref={webviewRef}
@@ -1197,7 +1140,7 @@ export default function PromoteTab() {
               </TouchableOpacity>
             </View>
 
-            {/* Enhanced Cost Calculation */}
+            {/* Enhanced Cost Calculation - Removed reward per view */}
             {userSetDuration && targetViews && (
               <View style={styles.costCard}>
                 <Text style={styles.costTitle}>Promotion Cost</Text>
@@ -1219,10 +1162,6 @@ export default function PromoteTab() {
                   <Text style={styles.finalCostValue}>🪙{totalCost}</Text>
                 </View>
                 
-                <View style={styles.costRow}>
-                  <Text style={styles.costLabel}>Reward per view:</Text>
-                  <Text style={styles.costValue}>🪙{rewardPerView}</Text>
-                </View>
                 <View style={styles.costRow}>
                   <Text style={styles.costLabel}>Your balance:</Text>
                   <Text style={[
@@ -1305,8 +1244,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: 'white',
   },
   coinDisplay: {
@@ -1317,73 +1256,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
+  coinEmoji: {
+    fontSize: 16,
+    marginRight: 4,
+  },
   coinCount: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-  },
-  holdInfoCard: {
-    backgroundColor: 'white',
-    margin: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F39C12',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  holdInfoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  holdInfoText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  statusFlow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statusStep: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginBottom: 4,
-  },
-  statusStepText: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  statusArrow: {
-    paddingHorizontal: 8,
-  },
-  statusArrowText: {
-    fontSize: 16,
-    color: '#999',
-    fontWeight: 'bold',
   },
   keyboardView: {
     flex: 1,
@@ -1547,7 +1427,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   dropdownOptionSelected: {
-    backgroundColor: '#FFF8F8',
+    backgroundColor: '#F8F0FF',
   },
   dropdownOptionLast: {
     borderBottomWidth: 0,
@@ -1558,7 +1438,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   dropdownOptionTextSelected: {
-    color: '#FF4757',
+    color: '#800080',
     fontWeight: '600',
   },
   iframeSection: {
@@ -1598,25 +1478,6 @@ const styles = StyleSheet.create({
   },
   iframeContainer: {
     padding: 16,
-  },
-  iframeControls: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  controlButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  controlButtonText: {
-    fontSize: 12,
-    color: '#FF4757',
-    fontWeight: '500',
   },
   webviewContainer: {
     height: isSmallScreen ? 180 : 220,
@@ -1724,7 +1585,7 @@ const styles = StyleSheet.create({
   finalCostValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FF4757',
+    color: '#800080',
   },
   insufficientBalance: {
     color: '#FF4757',
@@ -1750,13 +1611,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF4757',
+    backgroundColor: '#800080',
     borderRadius: 12,
     height: 52,
     marginBottom: 24,
     ...Platform.select({
       ios: {
-        shadowColor: '#FF4757',
+        shadowColor: '#800080',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -1765,7 +1626,7 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(255, 71, 87, 0.3)',
+        boxShadow: '0 4px 8px rgba(128, 0, 128, 0.3)',
       },
     }),
   },
