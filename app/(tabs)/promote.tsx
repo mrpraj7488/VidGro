@@ -122,23 +122,15 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
     onClose();
   };
 
-  const handleBackdropPress = () => {
-    onClose();
-  };
   return (
     <Modal
       visible={visible}
       transparent
       animationType="none"
       onRequestClose={onClose}
-      statusBarTranslucent={Platform.OS === 'android'}
     >
       <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
-        <TouchableOpacity 
-          style={styles.dropdownBackdrop} 
-          onPress={handleBackdropPress}
-          activeOpacity={1}
-        />
+        <TouchableOpacity style={styles.dropdownBackdrop} onPress={onClose} />
         <Animated.View 
           style={[
             styles.dropdownContainer,
@@ -150,11 +142,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
             style={styles.dropdownHeader}
           >
             <Text style={styles.dropdownTitle}>{placeholder}</Text>
-            <TouchableOpacity 
-              onPress={onClose} 
-              style={styles.closeButton}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </LinearGradient>
@@ -163,7 +151,6 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
             style={styles.dropdownScrollView}
             showsVerticalScrollIndicator={false}
             bounces={true}
-            nestedScrollEnabled={true}
           >
             {options.map((option, index) => (
               <TouchableOpacity
@@ -174,8 +161,6 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
                   index === options.length - 1 && styles.dropdownOptionLast
                 ]}
                 onPress={() => handleSelect(option.value)}
-                activeOpacity={0.7}
-                delayPressIn={0}
               >
                 <Text style={[
                   styles.dropdownOptionText,
@@ -1372,20 +1357,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: screenHeight * 0.7,
     overflow: 'hidden',
-    ...Platform.select({
-      android: {
-        elevation: 10,
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-      },
-      web: {
-        boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.25)',
-      },
-    }),
   },
   dropdownHeader: {
     flexDirection: 'row',
@@ -1393,11 +1364,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    ...Platform.select({
-      android: {
-        paddingTop: 20,
-      },
-    }),
   },
   dropdownTitle: {
     fontSize: 18,
@@ -1411,11 +1377,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      android: {
-        elevation: 2,
-      },
-    }),
   },
   closeButtonText: {
     color: 'white',
@@ -1424,11 +1385,6 @@ const styles = StyleSheet.create({
   },
   dropdownScrollView: {
     maxHeight: screenHeight * 0.5,
-    ...Platform.select({
-      android: {
-        paddingBottom: 20,
-      },
-    }),
   },
   dropdownOption: {
     flexDirection: 'row',
@@ -1438,20 +1394,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
-    minHeight: 56,
-    ...Platform.select({
-      android: {
-        elevation: 1,
-      },
-    }),
   },
   dropdownOptionSelected: {
     backgroundColor: '#F8F0FF',
-    ...Platform.select({
-      android: {
-        elevation: 2,
-      },
-    }),
   },
   dropdownOptionLast: {
     borderBottomWidth: 0,
