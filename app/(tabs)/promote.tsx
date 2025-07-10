@@ -1279,6 +1279,40 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   hamburgerIcon: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  hamburgerLine: {
+    width: 18,
+    height: 2,
+    backgroundColor: 'white',
+    borderRadius: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  coinDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  coinEmoji: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  coinCount: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  keyboardView: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },
