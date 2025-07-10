@@ -187,24 +187,22 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
       <Modal
         visible={menuVisible}
         transparent
-        animationType="none"
+        animationType="slide"
         onRequestClose={handleCloseMenu}
-        statusBarTranslucent
+        statusBarTranslucent={Platform.OS === 'android'}
       >
         <Pressable style={styles.modalOverlay} onPress={handleCloseMenu}>
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
-              {/* User Profile Section */}
-              <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
-                <View style={styles.avatar}>
-                  <User color="white" size={isSmallScreen ? 24 : 28} />
-                </View>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{profile?.username || 'User'}</Text>
-                  <Text style={styles.userEmail}>{user?.email || ''}</Text>
-                </View>
-              </LinearGradient>
-
+            {/* User Profile Section */}
+            <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
+              <View style={styles.avatar}>
+                <User color="white" size={isSmallScreen ? 24 : 28} />
+              </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{profile?.username || 'User'}</Text>
+                <Text style={styles.userEmail}>{user?.email || ''}</Text>
+              </View>
+            </LinearGradient>
               {/* Menu Items */}
               <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
                 {menuItems.map((item, index) => (
@@ -237,34 +235,32 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    minHeight: Platform.OS === 'ios' ? 100 : 90,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flex: 1,
-  },
-  leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuButton: {
-    padding: 8,
-    marginRight: 16,
-  },
-  hamburgerIcon: {
-    width: 20,
-    height: 16,
-    justifyContent: 'space-between',
-  },
-  hamburgerLine: {
+            {/* Menu Items */}
+            <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
+              {menuItems.map((item, index) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.menuItem,
+                    index === menuItems.length - 1 && styles.lastMenuItem,
+                  ]}
+                  onPress={item.onPress}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuItemIcon}>
+                    {item.icon}
+                  </View>
+                  <Text style={[
+                    styles.menuItemText,
+                    item.destructive && styles.destructiveText
+                  ]}>
+                    {item.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        </Pressable>
     width: 20,
     height: 2,
     backgroundColor: 'white',
@@ -294,15 +290,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
   slideMenu: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
     width: isSmallScreen ? 280 : 320,
+    height: '100%',
     backgroundColor: 'white',
     ...Platform.select({
       ios: {
