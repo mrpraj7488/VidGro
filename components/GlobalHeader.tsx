@@ -204,9 +204,12 @@ export default function GlobalHeader({ title, showCoinDisplay = true }: GlobalHe
         transparent
         animationType="none"
         onRequestClose={handleCloseMenu}
+        // SOLUTION: Lower z-index for GlobalHeader Modal to avoid conflicts with dropdowns
         statusBarTranslucent={Platform.OS === 'android'}
+        presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
       >
-        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle]}>
+        {/* SOLUTION: Lower z-index overlay to ensure dropdowns can render above */}
+        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle, { zIndex: 1000 }]}>
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             {/* User Profile Section */}
@@ -305,10 +308,14 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: 'bold',
   },
+  // SOLUTION: Lower z-index for GlobalHeader Modal overlay
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flexDirection: 'row',
+    // Lower z-index to allow dropdowns to render above
+    zIndex: 1000,
+    elevation: 1000, // Android elevation
   },
   overlayPressable: {
     flex: 1,
@@ -317,6 +324,7 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 280 : 320,
     height: '100%',
     backgroundColor: 'white',
+    // Standard shadow/elevation for slide menu
     ...Platform.select({
       ios: {
         shadowColor: '#000',

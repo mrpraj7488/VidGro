@@ -125,15 +125,20 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
   const handleBackdropPress = () => {
     onClose();
   };
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="none"
       onRequestClose={onClose}
+      // SOLUTION: Enhanced Modal props for better isolation from GlobalHeader
       statusBarTranslucent={Platform.OS === 'android'}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+      hardwareAccelerated={Platform.OS === 'android'}
     >
-      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
+      {/* SOLUTION: Higher z-index overlay to ensure dropdown renders above GlobalHeader */}
+      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim, zIndex: 9999 }]}>
         <TouchableOpacity 
           style={styles.dropdownBackdrop} 
           onPress={handleBackdropPress}
@@ -1218,7 +1223,7 @@ export default function PromoteTab() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Futuristic Dropdowns */}
+      {/* SOLUTION: Futuristic Dropdowns with enhanced Modal isolation */}
       <FuturisticDropdown
         options={VIEW_OPTIONS}
         selectedValue={targetViews}
@@ -1356,10 +1361,14 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
+  // SOLUTION: Enhanced dropdown styles with higher z-index and better isolation
   dropdownOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Slightly darker for better visibility
     justifyContent: 'flex-end',
+    // Higher z-index to ensure dropdown renders above GlobalHeader
+    zIndex: 9999,
+    elevation: 9999, // Android elevation
   },
   dropdownBackdrop: {
     flex: 1,
@@ -1372,18 +1381,19 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: screenHeight * 0.7,
     overflow: 'hidden',
+    // Enhanced shadow and elevation for better visibility
     ...Platform.select({
       android: {
-        elevation: 10,
+        elevation: 20, // Higher elevation for Android
       },
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: -8 }, // Stronger shadow
+        shadowOpacity: 0.35, // More opaque shadow
+        shadowRadius: 20, // Larger shadow radius
       },
       web: {
-        boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.25)',
+        boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.35)', // Enhanced web shadow
       },
     }),
   },
@@ -1439,6 +1449,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     minHeight: 56,
+    backgroundColor: 'white', // Ensure solid background
     ...Platform.select({
       android: {
         elevation: 1,
