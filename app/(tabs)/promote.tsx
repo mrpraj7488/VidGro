@@ -51,14 +51,15 @@ interface DropdownOption {
 }
 
 const VIEW_OPTIONS: DropdownOption[] = [
-  { value: 10, label: '10 views' },
-  { value: 25, label: '25 views' },
-  { value: 35, label: '35 views' },
-  { value: 50, label: '50 views' },
-  { value: 100, label: '100 views' },
-  { value: 200, label: '200 views' },
-  { value: 300, label: '300 views' },
-  { value: 500, label: '500 views' },
+  { label: '35 views', value: 35 },
+  { label: '50 views', value: 50 },
+  { label: '100 views', value: 100 },
+  { label: '200 views', value: 200 },
+  { label: '300 views', value: 300 },
+  { label: '400 views', value: 400 },
+  { label: '500 views', value: 500 },
+  { label: '750 views', value: 750 },
+  { label: '1000 views', value: 1000 },
 ];
 
 const DURATION_OPTIONS: DropdownOption[] = [
