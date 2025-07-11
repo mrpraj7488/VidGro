@@ -37,6 +37,7 @@ interface QuickAction {
 
 export default function OthersTab() {
   const { user, profile, signOut } = useAuth();
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const handleBuyCoins = () => {
     router.push('/buy-coins');
@@ -82,7 +83,7 @@ export default function OthersTab() {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader title="More" showCoinDisplay={true} />
+      <GlobalHeader title="More" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
 
       <ScrollView 
         style={styles.scrollView} 

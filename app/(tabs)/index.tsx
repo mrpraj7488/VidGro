@@ -50,6 +50,9 @@ export default function ViewTab() {
     handleVideoError 
   } = useVideoStore();
 
+  // Menu state for GlobalHeader
+  const [menuVisible, setMenuVisible] = useState(false);
+
   // State management
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -932,7 +935,7 @@ export default function ViewTab() {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader title="VidGro" showCoinDisplay={true} />
+      <GlobalHeader title="VidGro" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Video Player Container */}

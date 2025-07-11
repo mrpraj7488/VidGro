@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Video, ChevronDown, ChevronUp, CreditCard as Edit3, RotateCcw, Eye, Clock, Timer, Activity, DollarSign } from 'lucide-react-native';
+import { Video, ChevronDown, ChevronUp, CreditCard as Edit3, RotateCcw, Eye, Clock, Timer, Activity, DollarSign, Play } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 import Animated, { 
   useSharedValue, 
@@ -58,6 +58,7 @@ interface PromotedVideo {
 export default function AnalyticsTab() {
   const { user, profile, refreshProfile } = useAuth();
   const { clearQueue } = useVideoStore();
+  const [menuVisible, setMenuVisible] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalVideosPromoted: 0,
     totalCoinsEarned: 0,
@@ -340,7 +341,7 @@ export default function AnalyticsTab() {
 
   return (
     <View style={styles.container}>
-      <GlobalHeader title="Analytics" showCoinDisplay={true} />
+      <GlobalHeader title="Analytics" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
 
       <ScrollView 
         style={styles.scrollView} 
