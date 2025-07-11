@@ -58,16 +58,6 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
     setTimeout(() => setMenuVisible(false), 300);
   };
 
-  const handleLogout = () => {
-    handleCloseMenu();
-    setTimeout(() => signOut(), 100);
-  };
-
-  const handleDeleteAccount = () => {
-    handleCloseMenu();
-    setTimeout(() => router.push('/delete-account'), 100);
-  };
-
   const handleReferFriend = () => {
     handleCloseMenu();
     setTimeout(() => router.push('/refer-friend'), 100);
@@ -96,6 +86,16 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   const handleContactSupport = () => {
     handleCloseMenu();
     setTimeout(() => router.push('/contact-support'), 100);
+  };
+
+  const handleLogout = () => {
+    handleCloseMenu();
+    setTimeout(() => signOut(), 100);
+  };
+
+  const handleDeleteAccount = () => {
+    handleCloseMenu();
+    setTimeout(() => router.push('/delete-account'), 100);
   };
 
   const menuItems = [
@@ -145,16 +145,13 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             <SafeAreaView style={styles.menuContainer}>
-              <View style={styles.headerSection}>
-                <Text style={styles.headerText}>Menu</Text>
-              </View>
               <View style={styles.userSection}>
                 <TouchableOpacity style={styles.closeButton} onPress={handleCloseMenu} activeOpacity={0.7}>
                   <Text style={styles.closeButtonText}>✕</Text>
                 </TouchableOpacity>
                 <View style={styles.userContent}>
                   <View style={styles.avatar}>
-                    <User color="white" size={isSmallScreen ? 24 : 28} />
+                    <User color="#800080" size={isSmallScreen ? 24 : 28} />
                   </View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{profile?.username || 'User'}</Text>
@@ -260,7 +257,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: isSmallScreen ? 240 : 280,
     height: '100%',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: 'white', // Single white background
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.15, shadowRadius: 12 },
       android: { elevation: 12 },
@@ -270,19 +267,10 @@ const styles = StyleSheet.create({
   menuContainer: {
     flex: 1,
   },
-  headerSection: {
-    padding: isSmallScreen ? 12 : 16,
-    backgroundColor: '#800080',
-  },
-  headerText: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-  },
   userSection: {
     padding: isSmallScreen ? 12 : 16,
-    backgroundColor: '#800080',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
   closeButton: {
     position: 'absolute',
@@ -291,7 +279,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#800080',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
@@ -310,7 +298,7 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 50 : 60,
     height: isSmallScreen ? 50 : 60,
     borderRadius: isSmallScreen ? 25 : 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#F0F0F0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: isSmallScreen ? 8 : 12,
@@ -321,27 +309,18 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 2,
+    color: '#333',
   },
   userEmail: {
     fontSize: isSmallScreen ? 12 : 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#666',
   },
   menuScrollView: {
     flex: 1,
   },
   menuItemsContainer: {
-    backgroundColor: 'white',
-    marginHorizontal: isSmallScreen ? 12 : 16,
-    marginTop: isSmallScreen ? 12 : 16,
-    borderRadius: 10,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-      android: { elevation: 4 },
-      web: { boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' },
-    }),
+    flex: 1,
+    backgroundColor: 'transparent', // No separate white layer
   },
   menuItem: {
     flexDirection: 'row',
@@ -349,9 +328,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: isSmallScreen ? 12 : 20,
     paddingVertical: isSmallScreen ? 12 : 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    backgroundColor: 'white',
-    minHeight: isSmallScreen ? 48 : 56,
+    borderBottomColor: '#E0E0E0',
   },
   lastMenuItem: {
     borderBottomWidth: 0,
