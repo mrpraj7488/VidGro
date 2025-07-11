@@ -146,7 +146,6 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             <SafeAreaView style={styles.menuContainer}>
               <View style={styles.headerSection}>
-                <Text style={styles.headerText}>Meu</Text>
               </View>
               <View style={styles.userSection}>
                 <TouchableOpacity style={styles.closeButton} onPress={handleCloseMenu} activeOpacity={0.7}>
