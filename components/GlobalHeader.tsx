@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     flexDirection: 'row',
   },
   overlayPressable: {
@@ -326,6 +326,8 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 280 : 320,
     height: '100%',
     backgroundColor: 'white',
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -334,7 +336,7 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
       },
       android: {
-        elevation: 100,
+        elevation: 16,
       },
       web: {
         boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)',
@@ -345,7 +347,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 50,
+    paddingTop: Platform.OS === 'ios' ? 60 : (Platform.OS === 'android' ? 50 : 20),
+    backgroundColor: 'transparent',
   },
   avatar: {
     width: isSmallScreen ? 50 : 60,
@@ -371,6 +374,7 @@ const styles = StyleSheet.create({
   },
   menuScrollView: {
     flex: 1,
+    backgroundColor: 'white',
   },
   menuItem: {
     flexDirection: 'row',
@@ -379,6 +383,7 @@ const styles = StyleSheet.create({
     paddingVertical: isSmallScreen ? 16 : 18,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    backgroundColor: 'white',
   },
   lastMenuItem: {
     borderBottomWidth: 0,
