@@ -24,7 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Link, Search, Eye, Clock, TrendingUp, ChevronDown, Check, ChevronUp, Play, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Type, Crown, DollarSign } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
-import Animated as ReanimatedAnimated, {
+import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
