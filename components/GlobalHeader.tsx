@@ -19,7 +19,6 @@ import { Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
@@ -44,16 +43,33 @@ interface MenuItem {
 
 export default function GlobalHeader({ title, showCoinDisplay = true, menuVisible, setMenuVisible }: GlobalHeaderProps) {
   const { user, profile, signOut } = useAuth();
-  
+
   // Animation values
-  const coinBounce = useSharedValue(1);
+  const slideX = useSharedValue(screenWidth);
+  const overlayOpacity = useSharedValue(0);
 
   const handleMenuPress = () => {
     setMenuVisible(true);
+    slideX.value = withTiming(0, {
+      duration: 300,
+      easing: Easing.out(Easing.quad),
+    });
+    overlayOpacity.value = withTiming(0.5, {
+      duration: 300,
+      easing: Easing.out(Easing.quad),
+    });
   };
 
   const handleCloseMenu = () => {
-    setMenuVisible(false);
+    slideX.value = withTiming(screenWidth, {
+      duration: 300,
+      easing: Easing.in(Easing.quad),
+    });
+    overlayOpacity.value = withTiming(0, {
+      duration: 300,
+      easing: Easing.in(Easing.quad),
+    });
+    setTimeout(() => setMenuVisible(false), 300);
   };
 
   const handleLogout = () => {
@@ -141,14 +157,18 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
     },
   ];
 
-  const coinAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: coinBounce.value }],
+  const slideAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideX.value }],
+  }));
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
   }));
 
   return (
     <>
       <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
-        <View style={styles.headerContent}>
+        <SafeAreaView style={styles.headerContent}>
           {/* Left Section - Menu + Title */}
           <View style={styles.leftSection}>
             <TouchableOpacity
@@ -168,77 +188,74 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
           
           {/* Right Section - Coin Display */}
           {showCoinDisplay && (
-            <Animated.View style={[styles.coinDisplay, coinAnimatedStyle]}>
+            <View style={styles.coinDisplay}>
               <Text style={styles.coinEmoji}>🪙</Text>
               <Text style={styles.coinCount}>{profile?.coins?.toLocaleString() || '0'}</Text>
-            </Animated.View>
+            </View>
           )}
-        </View>
+        </SafeAreaView>
       </LinearGradient>
 
       <Modal
         visible={menuVisible}
-        transparent={false}
-        animationType="slide"
+        transparent={true}
+        animationType="none"
         onRequestClose={handleCloseMenu}
         statusBarTranslucent={Platform.OS === 'android'}
-        presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'fullScreen'}
       >
-        <View style={styles.modalContainer}>
-          <StatusBar 
-            barStyle="light-content" 
-            backgroundColor="#800080"
-            translucent={false}
-          />
-          
-          {/* User Profile Section */}
-          <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
-            <TouchableOpacity 
-              style={styles.closeButton}
-              onPress={handleCloseMenu}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
+        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle]}>
+          <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
+          <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
+            <StatusBar barStyle="light-content" backgroundColor="#800080" translucent={false} />
+            {/* User Profile Section */}
+            <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={handleCloseMenu}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.userContent}>
+                <View style={styles.avatar}>
+                  <User color="white" size={isSmallScreen ? 24 : 28} />
+                </View>
+                <View style={styles.userInfo}>
+                  <Text style={styles.userName}>{profile?.username || 'User'}</Text>
+                  <Text style={styles.userEmail}>{user?.email || ''}</Text>
+                </View>
+              </View>
+            </LinearGradient>
             
-            <View style={styles.userContent}>
-              <View style={styles.avatar}>
-                <User color="white" size={isSmallScreen ? 24 : 28} />
+            {/* Menu Items */}
+            <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
+              <View style={styles.menuItemsContainer}>
+                {menuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.menuItem,
+                      index === menuItems.length - 1 && styles.lastMenuItem,
+                    ]}
+                    onPress={item.onPress}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuItemIcon}>
+                      {item.icon}
+                    </View>
+                    <Text style={[
+                      styles.menuItemText,
+                      item.destructive && styles.destructiveText,
+                    ]}>
+                      {item.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{profile?.username || 'User'}</Text>
-                <Text style={styles.userEmail}>{user?.email || ''}</Text>
-              </View>
-            </View>
-          </LinearGradient>
-          
-          {/* Menu Items */}
-          <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
-            <View style={styles.menuItemsContainer}>
-              {menuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.menuItem,
-                    index === menuItems.length - 1 && styles.lastMenuItem,
-                  ]}
-                  onPress={item.onPress}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuItemIcon}>
-                    {item.icon}
-                  </View>
-                  <Text style={[
-                    styles.menuItemText,
-                    item.destructive && styles.destructiveText,
-                  ]}>
-                    {item.title}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -298,9 +315,36 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: 'bold',
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'transparent',
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  overlayPressable: {
+    flex: 1,
+  },
+  slideMenu: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: isSmallScreen ? 280 : 320,
+    height: '100%',
     backgroundColor: '#F8F9FA',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 2, height: 0 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)',
+      },
+    }),
   },
   userSection: {
     paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
@@ -354,7 +398,6 @@ const styles = StyleSheet.create({
   },
   menuScrollView: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   menuItemsContainer: {
     backgroundColor: 'white',
