@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,11 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  Pressable,
   Platform,
   Dimensions,
   StatusBar,
-  Alert,
+  SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -19,9 +20,11 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  Easing,
 } from 'react-native-reanimated';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
 
 interface GlobalHeaderProps {
@@ -54,23 +57,10 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: () => {
-            handleCloseMenu();
-            setTimeout(() => {
-              signOut();
-            }, 100);
-          }
-        }
-      ]
-    );
+    handleCloseMenu();
+    setTimeout(() => {
+      signOut();
+    }, 100);
   };
 
   const handleDeleteAccount = () => {
@@ -188,12 +178,18 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
 
       <Modal
         visible={menuVisible}
+        transparent={true}
         animationType="slide"
-        presentationStyle="fullScreen"
         onRequestClose={handleCloseMenu}
+        statusBarTranslucent={true}
+        presentationStyle={Platform.OS === 'android' ? 'overFullScreen' : 'fullScreen'}
       >
-        <View style={styles.modalContainer}>
-          <StatusBar barStyle="light-content" backgroundColor="#800080" />
+        <SafeAreaView style={styles.modalContainer}>
+          <StatusBar 
+            barStyle="light-content" 
+            backgroundColor={Platform.OS === 'android' ? 'rgba(128, 0, 128, 0.9)' : '#800080'} 
+            translucent={Platform.OS === 'android'}
+          />
           
           {/* User Profile Section */}
           <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
@@ -242,7 +238,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
               ))}
             </View>
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
     </>
   );
@@ -304,17 +300,23 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(248, 249, 250, 0.95)' : '#F8F9FA',
+    ...(Platform.OS === 'android' && {
+      paddingTop: StatusBar.currentHeight || 0,
+    }),
   },
   userSection: {
-    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
     paddingBottom: 24,
     paddingHorizontal: 20,
     position: 'relative',
+    ...(Platform.OS === 'android' && {
+      marginTop: -1, // Prevent gap on Android
+    }),
   },
   closeButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
+    top: Platform.OS === 'ios' ? 50 : 16,
     right: 20,
     width: 40,
     height: 40,
@@ -323,6 +325,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
+    ...(Platform.OS === 'android' && {
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+    }),
   },
   closeButtonText: {
     color: 'white',
@@ -342,6 +349,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    ...(Platform.OS === 'android' && {
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      borderWidth: 2,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    }),
   },
   userInfo: {
     flex: 1,
@@ -351,14 +363,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
     marginBottom: 4,
+    ...(Platform.OS === 'android' && {
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 1, height: 1 },
+      textShadowRadius: 2,
+    }),
   },
   userEmail: {
     fontSize: isSmallScreen ? 13 : 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    ...(Platform.OS === 'android' && {
+      textShadowColor: 'rgba(0, 0, 0, 0.2)',
+      textShadowOffset: { width: 1, height: 1 },
+      textShadowRadius: 1,
+    }),
   },
   menuScrollView: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: Platform.OS === 'android' ? 'transparent' : '#F8F9FA',
   },
   menuItemsContainer: {
     backgroundColor: 'white',
@@ -374,7 +396,11 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
       },
       android: {
-        elevation: 4,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
       },
       web: {
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
@@ -389,6 +415,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     backgroundColor: 'white',
+    ...(Platform.OS === 'android' && {
+      minHeight: 56, // Ensure consistent touch target size on Android
+    }),
   },
   lastMenuItem: {
     borderBottomWidth: 0,
