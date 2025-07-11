@@ -44,7 +44,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   const { user, profile, signOut } = useAuth();
 
   // Animation values
-  const slideX = useSharedValue(screenWidth);
+  const slideX = useSharedValue(-screenWidth); // Start from left off-screen
   const overlayOpacity = useSharedValue(0);
 
   const handleMenuPress = () => {
@@ -60,7 +60,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   };
 
   const handleCloseMenu = () => {
-    slideX.value = withTiming(screenWidth, {
+    slideX.value = withTiming(-screenWidth, {
       duration: 300,
       easing: Easing.in(Easing.quad),
     });
@@ -199,54 +199,55 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
         <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle]}>
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
-            <StatusBar barStyle="light-content" backgroundColor="#800080" translucent={false} />
-            {/* User Profile Section */}
-            <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={handleCloseMenu}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
+            <SafeAreaView style={styles.menuContainer}>
+              {/* User Profile Section */}
+              <View style={styles.userSection}>
+                <TouchableOpacity 
+                  style={styles.closeButton}
+                  onPress={handleCloseMenu}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+                
+                <View style={styles.userContent}>
+                  <View style={styles.avatar}>
+                    <User color="white" size={isSmallScreen ? 24 : 28} />
+                  </View>
+                  <View style={styles.userInfo}>
+                    <Text style={styles.userName}>{profile?.username || 'User'}</Text>
+                    <Text style={styles.userEmail}>{user?.email || ''}</Text>
+                  </View>
+                </View>
+              </View>
               
-              <View style={styles.userContent}>
-                <View style={styles.avatar}>
-                  <User color="white" size={isSmallScreen ? 24 : 28} />
+              {/* Menu Items */}
+              <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
+                <View style={styles.menuItemsContainer}>
+                  {menuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.menuItem,
+                        index === menuItems.length - 1 && styles.lastMenuItem,
+                      ]}
+                      onPress={item.onPress}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuItemIcon}>
+                        {item.icon}
+                      </View>
+                      <Text style={[
+                        styles.menuItemText,
+                        item.destructive && styles.destructiveText,
+                      ]}>
+                        {item.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{profile?.username || 'User'}</Text>
-                  <Text style={styles.userEmail}>{user?.email || ''}</Text>
-                </View>
-              </View>
-            </LinearGradient>
-            
-            {/* Menu Items */}
-            <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
-              <View style={styles.menuItemsContainer}>
-                {menuItems.map((item, index) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.menuItem,
-                      index === menuItems.length - 1 && styles.lastMenuItem,
-                    ]}
-                    onPress={item.onPress}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.menuItemIcon}>
-                      {item.icon}
-                    </View>
-                    <Text style={[
-                      styles.menuItemText,
-                      item.destructive && styles.destructiveText,
-                    ]}>
-                      {item.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+              </ScrollView>
+            </SafeAreaView>
           </Animated.View>
         </Animated.View>
       )}
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Stronger opacity for visibility
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     zIndex: 2000,
     elevation: 2000,
   },
@@ -324,8 +325,8 @@ const styles = StyleSheet.create({
   slideMenu: {
     position: 'absolute',
     top: 0,
-    right: 0,
-    width: isSmallScreen ? 280 : 320,
+    left: 0, // Align to left
+    width: isSmallScreen ? 240 : 280, // Adjusted width for responsiveness
     height: '100%',
     backgroundColor: '#F8F9FA',
     ...Platform.select({
@@ -343,16 +344,19 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  menuContainer: {
+    flex: 1,
+  },
   userSection: {
     paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    position: 'relative',
+    paddingBottom: 16,
+    paddingHorizontal: isSmallScreen ? 12 : 20,
+    backgroundColor: '#800080',
   },
   closeButton: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
-    right: 20,
+    right: isSmallScreen ? 12 : 20,
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -369,28 +373,28 @@ const styles = StyleSheet.create({
   userContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
+    paddingVertical: isSmallScreen ? 8 : 12,
   },
   avatar: {
-    width: isSmallScreen ? 60 : 70,
-    height: isSmallScreen ? 60 : 70,
-    borderRadius: isSmallScreen ? 30 : 35,
+    width: isSmallScreen ? 50 : 60,
+    height: isSmallScreen ? 50 : 60,
+    borderRadius: isSmallScreen ? 25 : 30,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: isSmallScreen ? 8 : 12,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: isSmallScreen ? 18 : 20,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   userEmail: {
-    fontSize: isSmallScreen ? 13 : 14,
+    fontSize: isSmallScreen ? 12 : 14,
     color: 'rgba(255, 255, 255, 0.8)',
   },
   menuScrollView: {
@@ -398,9 +402,9 @@ const styles = StyleSheet.create({
   },
   menuItemsContainer: {
     backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
+    marginHorizontal: isSmallScreen ? 12 : 16,
+    marginTop: isSmallScreen ? 12 : 16,
+    borderRadius: 10,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
@@ -420,23 +424,23 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: isSmallScreen ? 16 : 18,
+    paddingHorizontal: isSmallScreen ? 12 : 20,
+    paddingVertical: isSmallScreen ? 12 : 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     backgroundColor: 'white',
-    minHeight: 56,
+    minHeight: isSmallScreen ? 48 : 56,
   },
   lastMenuItem: {
     borderBottomWidth: 0,
   },
   menuItemIcon: {
-    marginRight: 16,
+    marginRight: isSmallScreen ? 8 : 16,
     width: 24,
     alignItems: 'center',
   },
   menuItemText: {
-    fontSize: isSmallScreen ? 15 : 16,
+    fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '500',
     color: '#333',
     flex: 1,
