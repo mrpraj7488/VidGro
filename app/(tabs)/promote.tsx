@@ -18,19 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { 
-  Link, 
-  Search, 
-  Eye, 
-  Clock, 
-  TrendingUp, 
-  ChevronDown, 
-  Check,
-  ChevronUp,
-  Play,
-  AlertCircle,
-  CheckCircle
-} from 'lucide-react-native';
+import { Link, Search, Eye, Clock, TrendingUp, ChevronDown, Check, ChevronUp, Play, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 import Animated, {
   useSharedValue,
