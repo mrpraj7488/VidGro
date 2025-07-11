@@ -12,13 +12,21 @@ import {
   ToastAndroid,
   Dimensions,
   Modal,
-  Animated,
+  Pressable,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign } from 'lucide-react-native';
+import { Link, Type, Clock, TrendingUp, Eye, Search, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChevronDown, ChevronUp, Play, Pause, Crown, DollarSign, Check } from 'lucide-react-native';
+import GlobalHeader from '@/components/GlobalHeader';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -67,59 +75,52 @@ const DURATION_OPTIONS: DropdownOption[] = [
 ];
 
 interface FuturisticDropdownProps {
-  options: DropdownOption[];
-  selectedValue: number | null;
-  onSelect: (value: number) => void;
-  placeholder: string;
   visible: boolean;
   onClose: () => void;
+  options: DropdownOption[];
+  selectedValue: number;
+  onSelect: (value: number) => void;
+  title: string;
 }
 
 const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
+  visible,
+  onClose,
   options,
   selectedValue,
   onSelect,
-  placeholder,
-  visible,
-  onClose,
+  title,
 }) => {
-  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const slideY = useSharedValue(screenWidth);
+  const overlayOpacity = useSharedValue(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      overlayOpacity.value = withTiming(1, { duration: 300 });
+      slideY.value = withSpring(0, {
+        damping: 20,
+        stiffness: 100,
+      });
     } else {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: screenHeight,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      overlayOpacity.value = withTiming(0, { duration: 200 });
+      slideY.value = withTiming(screenWidth, { duration: 250 });
     }
   }, [visible]);
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  const modalStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: slideY.value }],
+  }));
 
   const handleSelect = (value: number) => {
     onSelect(value);
     onClose();
   };
+
+  if (!visible) return null;
 
   return (
     <Modal
@@ -127,48 +128,40 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
       transparent
       animationType="none"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <Animated.View style={[styles.dropdownOverlay, { opacity: opacityAnim }]}>
-        <TouchableOpacity style={styles.dropdownBackdrop} onPress={onClose} />
-        <Animated.View 
-          style={[
-            styles.dropdownContainer,
-            { transform: [{ translateY: slideAnim }] }
-          ]}
-        >
+      <Animated.View style={[styles.dropdownOverlay, overlayStyle]}>
+        <Pressable style={styles.overlayPressable} onPress={onClose} />
+        <Animated.View style={[styles.dropdownModal, modalStyle]}>
           <LinearGradient
             colors={['#800080', '#9B59B6']}
             style={styles.dropdownHeader}
           >
-            <Text style={styles.dropdownTitle}>{placeholder}</Text>
+            <Text style={styles.dropdownTitle}>{title}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </LinearGradient>
           
-          <ScrollView 
-            style={styles.dropdownScrollView}
-            showsVerticalScrollIndicator={false}
-            bounces={true}
-          >
-            {options.map((option, index) => (
+          <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
+            {options.map((option) => (
               <TouchableOpacity
                 key={option.value}
                 style={[
-                  styles.dropdownOption,
-                  selectedValue === option.value && styles.dropdownOptionSelected,
-                  index === options.length - 1 && styles.dropdownOptionLast
+                  styles.optionItem,
+                  selectedValue === option.value && styles.selectedOption,
                 ]}
                 onPress={() => handleSelect(option.value)}
+                activeOpacity={0.7}
               >
                 <Text style={[
-                  styles.dropdownOptionText,
-                  selectedValue === option.value && styles.dropdownOptionTextSelected
+                  styles.optionText,
+                  selectedValue === option.value && styles.selectedOptionText,
                 ]}>
                   {option.label}
                 </Text>
                 {selectedValue === option.value && (
-                  <CheckCircle color="#800080" size={20} />
+                  <Check color="#800080" size={20} />
                 )}
               </TouchableOpacity>
             ))}
@@ -965,36 +958,7 @@ export default function PromoteTab() {
 
   return (
     <View style={styles.container}>
-      {/* Header with Menu Icon and Purple Theme */}
-      <LinearGradient
-        colors={['#800080', '#9B59B6']}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          {/* Left Section - Menu + Title */}
-          <View style={styles.leftSection}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => setMenuVisible(true)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.hamburgerIcon}>
-                <View style={styles.hamburgerLine} />
-                <View style={styles.hamburgerLine} />
-                <View style={styles.hamburgerLine} />
-              </View>
-            </TouchableOpacity>
-            
-            <Text style={styles.headerTitle}>Promote</Text>
-          </View>
-          
-          {/* Right Section - Coin Display */}
-          <View style={styles.coinDisplay}>
-            <Text style={styles.coinEmoji}>🪙</Text>
-            <Text style={styles.coinCount}>{profile?.coins || 0}</Text>
-          </View>
-        </View>
-      </LinearGradient>
+      <GlobalHeader title="Promote" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1228,23 +1192,23 @@ export default function PromoteTab() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Futuristic Dropdowns */}
+      {/* Futuristic Dropdowns with proper z-index */}
       <FuturisticDropdown
-        options={VIEW_OPTIONS}
-        selectedValue={targetViews}
-        onSelect={setTargetViews}
-        placeholder="Select Number of Views"
         visible={showViewsDropdown}
         onClose={closeDropdowns}
+        options={VIEW_OPTIONS}
+        selectedValue={targetViews || 0}
+        onSelect={setTargetViews}
+        title="Select Number of Views"
       />
 
       <FuturisticDropdown
-        options={DURATION_OPTIONS}
-        selectedValue={userSetDuration}
-        onSelect={setUserSetDuration}
-        placeholder="Select Duration (seconds)"
         visible={showDurationDropdown}
         onClose={closeDropdowns}
+        options={DURATION_OPTIONS}
+        selectedValue={userSetDuration || 0}
+        onSelect={setUserSetDuration}
+        title="Select Duration (seconds)"
       />
     </View>
   );
@@ -1254,61 +1218,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    minHeight: Platform.OS === 'ios' ? 100 : 90,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flex: 1,
-  },
-  leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  menuButton: {
-    padding: 8,
-    marginRight: 16,
-  },
-  hamburgerIcon: {
-    width: 20,
-    height: 16,
-    justifyContent: 'space-between',
-  },
-  hamburgerLine: {
-    width: 20,
-    height: 2,
-    backgroundColor: 'white',
-    borderRadius: 1,
-  },
-  headerTitle: {
-    fontSize: isSmallScreen ? 20 : 24,
-    fontWeight: 'bold',
-    color: 'white',
-    letterSpacing: 0.5,
-  },
-  coinDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: isSmallScreen ? 10 : 12,
-    paddingVertical: isSmallScreen ? 6 : 8,
-    borderRadius: 20,
-  },
-  coinEmoji: {
-    fontSize: isSmallScreen ? 16 : 18,
-    marginRight: 4,
-  },
-  coinCount: {
-    color: 'white',
-    fontSize: isSmallScreen ? 14 : 16,
-    fontWeight: 'bold',
   },
   keyboardView: {
     flex: 1,
@@ -1419,20 +1328,37 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
+  // Dropdown Modal Styles with proper z-index
   dropdownOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+    zIndex: 1000, // Higher than GlobalHeader modal
+    elevation: 1000, // Higher than GlobalHeader modal
   },
-  dropdownBackdrop: {
+  overlayPressable: {
     flex: 1,
   },
-  dropdownContainer: {
+  dropdownModal: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: screenHeight * 0.7,
-    overflow: 'hidden',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    minHeight: '50%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 1000, // Higher than GlobalHeader modal
+      },
+      web: {
+        boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.15)',
+      },
+    }),
   },
   dropdownHeader: {
     flexDirection: 'row',
@@ -1440,29 +1366,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   dropdownTitle: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
     color: 'white',
+    flex: 1,
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    padding: 8,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   closeButtonText: {
-    color: 'white',
     fontSize: 18,
+    color: 'white',
     fontWeight: 'bold',
   },
-  dropdownScrollView: {
-    maxHeight: screenHeight * 0.5,
+  optionsList: {
+    flex: 1,
   },
-  dropdownOption: {
+  optionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1471,18 +1397,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  dropdownOptionSelected: {
-    backgroundColor: '#F8F0FF',
+  selectedOption: {
+    backgroundColor: '#F3E8FF',
   },
-  dropdownOptionLast: {
-    borderBottomWidth: 0,
-  },
-  dropdownOptionText: {
-    fontSize: 16,
+  optionText: {
+    fontSize: isSmallScreen ? 14 : 16,
     color: '#333',
-    fontWeight: '500',
+    flex: 1,
   },
-  dropdownOptionTextSelected: {
+  selectedOptionText: {
     color: '#800080',
     fontWeight: '600',
   },
