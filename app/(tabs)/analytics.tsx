@@ -58,7 +58,19 @@ interface PromotedVideo {
 export default function AnalyticsTab() {
   const { user, profile, refreshProfile } = useAuth();
   const { clearQueue } = useVideoStore();
+  
+  // Menu state for GlobalHeader - use ref to prevent unwanted state changes
   const [menuVisible, setMenuVisible] = useState(false);
+  const menuStateRef = useRef(false);
+  
+  // Prevent menu state changes during operations
+  const handleSetMenuVisible = useCallback((visible: boolean) => {
+    if (menuStateRef.current !== visible) {
+      menuStateRef.current = visible;
+      setMenuVisible(visible);
+    }
+  }, []);
+  
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalVideosPromoted: 0,
     totalCoinsEarned: 0,
@@ -342,6 +354,7 @@ export default function AnalyticsTab() {
   return (
     <View style={styles.container}>
       <GlobalHeader title="Analytics" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
+      <GlobalHeader title="Analytics" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={handleSetMenuVisible} />
 
       <ScrollView 
         style={styles.scrollView} 

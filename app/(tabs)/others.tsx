@@ -37,7 +37,18 @@ interface QuickAction {
 
 export default function OthersTab() {
   const { user, profile, signOut } = useAuth();
+  
+  // Menu state for GlobalHeader - use ref to prevent unwanted state changes
   const [menuVisible, setMenuVisible] = useState(false);
+  const menuStateRef = useRef(false);
+  
+  // Prevent menu state changes during operations
+  const handleSetMenuVisible = useCallback((visible: boolean) => {
+    if (menuStateRef.current !== visible) {
+      menuStateRef.current = visible;
+      setMenuVisible(visible);
+    }
+  }, []);
 
   const handleBuyCoins = () => {
     router.push('/buy-coins');
@@ -84,6 +95,7 @@ export default function OthersTab() {
   return (
     <View style={styles.container}>
       <GlobalHeader title="More" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
+      <GlobalHeader title="More" showCoinDisplay={true} menuVisible={menuVisible} setMenuVisible={handleSetMenuVisible} />
 
       <ScrollView 
         style={styles.scrollView} 
