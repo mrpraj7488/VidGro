@@ -15,7 +15,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   ToastAndroid,
-  Animated,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -134,9 +133,9 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <ReanimatedAnimated.View style={[styles.dropdownOverlay, overlayStyle]}>
+      <Animated.View style={[styles.dropdownOverlay, overlayStyle]}>
         <Pressable style={styles.overlayPressable} onPress={onClose} />
-        <ReanimatedAnimated.View style={[styles.dropdownModal, modalStyle]}>
+        <Animated.View style={[styles.dropdownModal, modalStyle]}>
           <LinearGradient
             colors={['#800080', '#9B59B6']}
             style={styles.dropdownHeader}
@@ -170,8 +169,8 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </ReanimatedAnimated.View>
-      </ReanimatedAnimated.View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -1087,7 +1086,7 @@ export default function PromoteTab() {
 
           {/* Compatibility Test Results */}
           {showCompatibilityTest && validationResult && (
-            <ReanimatedAnimated.View style={[styles.compatibilitySection, validationAnimatedStyle]}>
+            <Animated.View style={[styles.compatibilitySection, validationAnimatedStyle]}>
               <TouchableOpacity
                 style={styles.compatibilityHeader}
                 onPress={() => setShowIframe(!showIframe)}
@@ -1144,7 +1143,7 @@ export default function PromoteTab() {
                   )}
                 </View>
               )}
-            </ReanimatedAnimated.View>
+            </Animated.View>
           )}
 
           {/* Video Title Input */}
@@ -1243,7 +1242,7 @@ export default function PromoteTab() {
           )}
 
           {/* Promote Button */}
-          <ReanimatedAnimated.View style={buttonAnimatedStyle}>
+          <Animated.View style={buttonAnimatedStyle}>
             <TouchableOpacity
               style={[
                 styles.promoteButton,
@@ -1257,7 +1256,7 @@ export default function PromoteTab() {
                 {isPromoting ? 'Promoting Video...' : 'Promote Video'}
               </Text>
             </TouchableOpacity>
-          </ReanimatedAnimated.View>
+          </Animated.View>
 
           {/* Info Section */}
           <View style={styles.infoSection}>
