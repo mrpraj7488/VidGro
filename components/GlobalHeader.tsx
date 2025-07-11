@@ -44,7 +44,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   const { user, profile, signOut } = useAuth();
 
   // Animation values
-  const slideX = useSharedValue(-screenWidth); // Slide from left
+  const slideX = useSharedValue(-screenWidth); // Start from left off-screen
   const overlayOpacity = useSharedValue(0);
 
   const handleMenuPress = () => {
@@ -200,11 +200,6 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             <SafeAreaView style={styles.menuContainer}>
-              {/* Header Section */}
-              <LinearGradient colors={['#800080', '#9B59B6']} style={styles.headerMenu}>
-                <Text style={styles.headerMenuText}>Menu</Text>
-              </LinearGradient>
-
               {/* User Profile Section */}
               <View style={styles.userSection}>
                 <TouchableOpacity 
@@ -262,7 +257,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
 
 const styles = StyleSheet.create({
   header: {
-    width: '100',
+    width: '100%',
     paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
     paddingBottom: 16,
   },
@@ -330,8 +325,8 @@ const styles = StyleSheet.create({
   slideMenu: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    width: isSmallScreen ? 240 : 280,
+    left: 0, // Align to left
+    width: isSmallScreen ? 240 : 280, // Adjusted width for responsiveness
     height: '100%',
     backgroundColor: '#F8F9FA',
     ...Platform.select({
@@ -352,50 +347,39 @@ const styles = StyleSheet.create({
   menuContainer: {
     flex: 1,
   },
-  headerMenu: {
-    paddingVertical: isSmallScreen ? 12 : 16,
-    paddingHorizontal: isSmallScreen ? 12 : 20,
-    alignItems: 'center',
-  },
-  headerMenuText: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: 'white',
-    letterSpacing: 0.5,
-  },
   userSection: {
-    paddingVertical: isSmallScreen ? 12 : 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
+    paddingBottom: 16,
     paddingHorizontal: isSmallScreen ? 12 : 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#800080',
   },
   closeButton: {
     position: 'absolute',
-    top: isSmallScreen ? 12 : 16,
+    top: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
     right: isSmallScreen ? 12 : 20,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
   },
   closeButtonText: {
     color: 'white',
-    fontSize: isSmallScreen ? 16 : 18,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   userContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: isSmallScreen ? 8 : 12,
   },
   avatar: {
-    width: isSmallScreen ? 40 : 50,
-    height: isSmallScreen ? 40 : 50,
-    borderRadius: isSmallScreen ? 20 : 25,
-    backgroundColor: '#E0E0E0',
+    width: isSmallScreen ? 50 : 60,
+    height: isSmallScreen ? 50 : 60,
+    borderRadius: isSmallScreen ? 25 : 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: isSmallScreen ? 8 : 12,
@@ -406,12 +390,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
     marginBottom: 2,
   },
   userEmail: {
     fontSize: isSmallScreen ? 12 : 14,
-    color: '#666',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   menuScrollView: {
     flex: 1,
