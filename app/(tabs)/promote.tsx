@@ -156,6 +156,7 @@ const FuturisticDropdown: React.FC<FuturisticDropdownProps> = ({
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   
   // Form state
   const [youtubeUrl, setYoutubeUrl] = useState('');
