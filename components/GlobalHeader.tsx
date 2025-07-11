@@ -9,6 +9,7 @@ import {
   Pressable,
   Platform,
   Dimensions,
+  StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -22,7 +23,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
 
 interface GlobalHeaderProps {
@@ -45,45 +46,27 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   
   // Animation values
   const coinBounce = useSharedValue(1);
-  const slideX = useSharedValue(-screenWidth);
-  const overlayOpacity = useSharedValue(0);
 
   const handleMenuPress = () => {
     setMenuVisible(true);
-    slideX.value = withTiming(0, {
-      duration: 300,
-      easing: Easing.out(Easing.quad),
-    });
-    overlayOpacity.value = withTiming(0.5, {
-      duration: 300,
-      easing: Easing.out(Easing.quad),
-    });
   };
 
   const handleCloseMenu = () => {
-    slideX.value = withTiming(-screenWidth, {
-      duration: 300,
-      easing: Easing.in(Easing.quad),
-    });
-    overlayOpacity.value = withTiming(0, {
-      duration: 300,
-      easing: Easing.in(Easing.quad),
-    });
-    setTimeout(() => setMenuVisible(false), 300);
+    setMenuVisible(false);
   };
 
   const handleLogout = () => {
     handleCloseMenu();
     setTimeout(() => {
       signOut();
-    }, 300);
+    }, 100);
   };
 
   const handleDeleteAccount = () => {
     handleCloseMenu();
     setTimeout(() => {
       router.push('/delete-account');
-    }, 300);
+    }, 100);
   };
 
   const menuItems: MenuItem[] = [
@@ -93,7 +76,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
       icon: <Share2 color="#800080" size={20} />,
       onPress: () => {
         handleCloseMenu();
-        setTimeout(() => router.push('/refer-friend'), 300);
+        setTimeout(() => router.push('/refer-friend'), 100);
       },
     },
     {
@@ -102,7 +85,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
       icon: <Shield color="#800080" size={20} />,
       onPress: () => {
         handleCloseMenu();
-        setTimeout(() => router.push('/privacy-policy'), 300);
+        setTimeout(() => router.push('/privacy-policy'), 100);
       },
     },
     {
@@ -111,7 +94,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
       icon: <FileText color="#800080" size={20} />,
       onPress: () => {
         handleCloseMenu();
-        setTimeout(() => router.push('/terms'), 300);
+        setTimeout(() => router.push('/terms'), 100);
       },
     },
     {
@@ -120,7 +103,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
       icon: <Globe color="#800080" size={20} />,
       onPress: () => {
         handleCloseMenu();
-        setTimeout(() => router.push('/languages'), 300);
+        setTimeout(() => router.push('/languages'), 100);
       },
     },
     {
@@ -129,7 +112,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
       icon: <Settings color="#800080" size={20} />,
       onPress: () => {
         handleCloseMenu();
-        setTimeout(() => router.push('/configure-ads'), 300);
+        setTimeout(() => router.push('/configure-ads'), 100);
       },
     },
     {
@@ -138,7 +121,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
       icon: <MessageCircle color="#800080" size={20} />,
       onPress: () => {
         handleCloseMenu();
-        setTimeout(() => router.push('/contact-support'), 300);
+        setTimeout(() => router.push('/contact-support'), 100);
       },
     },
     {
@@ -159,14 +142,6 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
 
   const coinAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: coinBounce.value }],
-  }));
-
-  const slideAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: slideX.value }],
-  }));
-
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
   }));
 
   return (
@@ -202,24 +177,26 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
 
       <Modal
         visible={menuVisible}
-        transparent
-        animationType="none"
+        transparent={false}
+        animationType="slide"
         onRequestClose={handleCloseMenu}
-        statusBarTranslucent={Platform.OS === 'android'}
-        presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+        statusBarTranslucent={false}
+        presentationStyle="fullScreen"
       >
-        <Animated.View style={[
-          styles.modalOverlay,
-          overlayAnimatedStyle,
-          {
-            zIndex: 100, // Lower z-index than dropdown's 1000
-            elevation: 100, // Lower elevation than dropdown's 1000
-          },
-        ]}>
-          <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
-          <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
-            {/* User Profile Section */}
-            <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
+        <View style={styles.modalContainer}>
+          <StatusBar barStyle="light-content" backgroundColor="#800080" />
+          
+          {/* User Profile Section */}
+          <LinearGradient colors={['#800080', '#9B59B6']} style={styles.userSection}>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={handleCloseMenu}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.userContent}>
               <View style={styles.avatar}>
                 <User color="white" size={isSmallScreen ? 24 : 28} />
               </View>
@@ -227,10 +204,12 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
                 <Text style={styles.userName}>{profile?.username || 'User'}</Text>
                 <Text style={styles.userEmail}>{user?.email || ''}</Text>
               </View>
-            </LinearGradient>
-            
-            {/* Menu Items */}
-            <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
+            </View>
+          </LinearGradient>
+          
+          {/* Menu Items */}
+          <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
+            <View style={styles.menuItemsContainer}>
               {menuItems.map((item, index) => (
                 <TouchableOpacity
                   key={item.id}
@@ -252,9 +231,9 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
+            </View>
+          </ScrollView>
+        </View>
       </Modal>
     </>
   );
@@ -263,7 +242,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
 const styles = StyleSheet.create({
   header: {
     width: '100%',
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
     paddingBottom: 16,
   },
   headerContent: {
@@ -314,46 +293,42 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: 'bold',
   },
-  modalOverlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    flexDirection: 'row',
-  },
-  overlayPressable: {
-    flex: 1,
-  },
-  slideMenu: {
-    width: isSmallScreen ? 280 : 320,
-    height: '100%',
-    backgroundColor: 'white',
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 2, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 16,
-      },
-      web: {
-        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)',
-      },
-    }),
+    backgroundColor: '#F8F9FA',
   },
   userSection: {
+    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  userContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : (Platform.OS === 'android' ? 50 : 20),
-    backgroundColor: 'transparent',
+    marginTop: 20,
   },
   avatar: {
-    width: isSmallScreen ? 50 : 60,
-    height: isSmallScreen ? 50 : 60,
-    borderRadius: isSmallScreen ? 25 : 30,
+    width: isSmallScreen ? 60 : 70,
+    height: isSmallScreen ? 60 : 70,
+    borderRadius: isSmallScreen ? 30 : 35,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -363,18 +338,39 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: isSmallScreen ? 16 : 18,
+    fontSize: isSmallScreen ? 18 : 20,
     fontWeight: 'bold',
     color: 'white',
     marginBottom: 4,
   },
   userEmail: {
-    fontSize: isSmallScreen ? 12 : 14,
+    fontSize: isSmallScreen ? 13 : 14,
     color: 'rgba(255, 255, 255, 0.8)',
   },
   menuScrollView: {
     flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  menuItemsContainer: {
     backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
   menuItem: {
     flexDirection: 'row',
