@@ -9,6 +9,7 @@ import {
   Platform,
   Dimensions,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -52,7 +53,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
       duration: 300,
       easing: Easing.out(Easing.quad),
     });
-    overlayOpacity.value = withTiming(0.5, {
+    overlayOpacity.value = withTiming(1, {
       duration: 300,
       easing: Easing.out(Easing.quad),
     });
@@ -166,7 +167,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   return (
     <>
       <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
-        <View style={styles.headerContent}>
+        <SafeAreaView style={styles.headerContent}>
           {/* Left Section - Menu + Title */}
           <View style={styles.leftSection}>
             <TouchableOpacity
@@ -191,11 +192,11 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
               <Text style={styles.coinCount}>{profile?.coins?.toLocaleString() || '0'}</Text>
             </View>
           )}
-        </View>
+        </SafeAreaView>
       </LinearGradient>
 
       {menuVisible && (
-        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle, { zIndex: 1000 }]}>
+        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle]}>
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             <StatusBar barStyle="light-content" backgroundColor="#800080" translucent={false} />
@@ -313,9 +314,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1000,
-    elevation: 1000,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Stronger opacity for visibility
+    zIndex: 2000,
+    elevation: 2000,
   },
   overlayPressable: {
     flex: 1,
@@ -335,7 +336,7 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
       },
       android: {
-        elevation: 10,
+        elevation: 12,
       },
       web: {
         boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)',
