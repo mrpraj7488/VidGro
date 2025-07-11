@@ -4,13 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   ScrollView,
   Pressable,
   Platform,
   Dimensions,
   StatusBar,
-  SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -168,7 +166,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   return (
     <>
       <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
-        <SafeAreaView style={styles.headerContent}>
+        <View style={styles.headerContent}>
           {/* Left Section - Menu + Title */}
           <View style={styles.leftSection}>
             <TouchableOpacity
@@ -193,17 +191,11 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
               <Text style={styles.coinCount}>{profile?.coins?.toLocaleString() || '0'}</Text>
             </View>
           )}
-        </SafeAreaView>
+        </View>
       </LinearGradient>
 
-      <Modal
-        visible={menuVisible}
-        transparent={true}
-        animationType="none"
-        onRequestClose={handleCloseMenu}
-        statusBarTranslucent={Platform.OS === 'android'}
-      >
-        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle]}>
+      {menuVisible && (
+        <Animated.View style={[styles.modalOverlay, overlayAnimatedStyle, { zIndex: 1000 }]}>
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             <StatusBar barStyle="light-content" backgroundColor="#800080" translucent={false} />
@@ -256,7 +248,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
             </ScrollView>
           </Animated.View>
         </Animated.View>
-      </Modal>
+      )}
     </>
   );
 }
@@ -316,8 +308,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 1000,
     elevation: 1000,
   },
