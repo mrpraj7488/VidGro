@@ -361,7 +361,7 @@ export default function AnalyticsTab() {
             <View style={[styles.metricIcon, { backgroundColor: '#FF4757' }]}>
               <Video color="white" size={24} />
             </View>
-            <Text style={styles.metricValue}>{analytics.totalVideosPromoted}</Text>
+            <Text style={styles.metricValue}>{String(analytics.totalVideosPromoted)}</Text>
             <Text style={styles.metricLabel}>Videos Promoted</Text>
           </View>
           
@@ -369,7 +369,7 @@ export default function AnalyticsTab() {
             <Animated.View style={[styles.metricIcon, { backgroundColor: '#2ECC71' }, coinAnimatedStyle]}>
               <Text style={styles.coinIcon}>🪙</Text>
             </Animated.View>
-            <Text style={styles.metricValue}>🪙{analytics.totalCoinsEarned}</Text>
+            <Text style={styles.metricValue}>{`🪙${String(analytics.totalCoinsEarned)}`}</Text>
             <Text style={styles.metricLabel}>Coins Earned</Text>
           </View>
         </View>
