@@ -151,7 +151,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
                 </TouchableOpacity>
                 <View style={styles.userContent}>
                   <View style={styles.avatar}>
-                    <User color="#800080" size={isSmallScreen ? 24 : 28} />
+                    <User color="#800080" size={isSmallScreen ? 20 : 24} />
                   </View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{profile?.username || 'User'}</Text>
@@ -201,22 +201,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuButton: {
-    padding: 8,
-    marginRight: 12,
+    padding: isSmallScreen ? 6 : 8,
+    marginRight: isSmallScreen ? 8 : 12,
   },
   hamburgerIcon: {
-    width: 24,
-    height: 18,
+    width: isSmallScreen ? 20 : 24,
+    height: isSmallScreen ? 15 : 18,
     justifyContent: 'space-between',
   },
   hamburgerLine: {
-    width: 20,
-    height: 2,
+    width: isSmallScreen ? 16 : 20,
+    height: isSmallScreen ? 1.5 : 2,
     backgroundColor: 'white',
     borderRadius: 1,
   },
   headerTitle: {
-    fontSize: isSmallScreen ? 20 : 24,
+    fontSize: isSmallScreen ? 18 : 24,
     fontWeight: 'bold',
     color: 'white',
     letterSpacing: 0.5,
@@ -225,17 +225,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: isSmallScreen ? 10 : 12,
-    paddingVertical: isSmallScreen ? 6 : 8,
-    borderRadius: 20,
+    paddingHorizontal: isSmallScreen ? 8 : 12,
+    paddingVertical: isSmallScreen ? 4 : 8,
+    borderRadius: 16,
   },
   coinEmoji: {
-    fontSize: isSmallScreen ? 16 : 18,
-    marginRight: 4,
+    fontSize: isSmallScreen ? 14 : 18,
+    marginRight: isSmallScreen ? 2 : 4,
   },
   coinCount: {
     color: 'white',
-    fontSize: isSmallScreen ? 14 : 16,
+    fontSize: isSmallScreen ? 12 : 16,
     fontWeight: 'bold',
   },
   modalOverlay: {
@@ -255,9 +255,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: isSmallScreen ? 240 : 280,
+    width: isSmallScreen ? 200 : 280, // Narrower for small screens
     height: '100%',
-    backgroundColor: 'white', // Single white background
+    backgroundColor: 'white',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.15, shadowRadius: 12 },
       android: { elevation: 12 },
@@ -268,17 +268,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userSection: {
-    padding: isSmallScreen ? 12 : 16,
+    padding: isSmallScreen ? 8 : 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
   closeButton: {
     position: 'absolute',
-    top: isSmallScreen ? 12 : 16,
-    right: isSmallScreen ? 12 : 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    top: isSmallScreen ? 8 : 16,
+    right: isSmallScreen ? 8 : 16,
+    width: isSmallScreen ? 32 : 40,
+    height: isSmallScreen ? 32 : 40,
+    borderRadius: 16,
     backgroundColor: '#800080',
     justifyContent: 'center',
     alignItems: 'center',
@@ -286,33 +286,33 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
   },
   userContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: isSmallScreen ? 8 : 12,
+    paddingVertical: isSmallScreen ? 4 : 12,
   },
   avatar: {
-    width: isSmallScreen ? 50 : 60,
-    height: isSmallScreen ? 50 : 60,
-    borderRadius: isSmallScreen ? 25 : 30,
+    width: isSmallScreen ? 40 : 60,
+    height: isSmallScreen ? 40 : 60,
+    borderRadius: isSmallScreen ? 20 : 30,
     backgroundColor: '#F0F0F0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: isSmallScreen ? 8 : 12,
+    marginRight: isSmallScreen ? 6 : 12,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: isSmallScreen ? 16 : 18,
+    fontSize: isSmallScreen ? 14 : 18,
     fontWeight: 'bold',
     color: '#333',
   },
   userEmail: {
-    fontSize: isSmallScreen ? 12 : 14,
+    fontSize: isSmallScreen ? 10 : 14,
     color: '#666',
   },
   menuScrollView: {
@@ -320,13 +320,13 @@ const styles = StyleSheet.create({
   },
   menuItemsContainer: {
     flex: 1,
-    backgroundColor: 'transparent', // No separate white layer
+    backgroundColor: 'transparent',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: isSmallScreen ? 12 : 20,
-    paddingVertical: isSmallScreen ? 12 : 16,
+    paddingHorizontal: isSmallScreen ? 8 : 20,
+    paddingVertical: isSmallScreen ? 8 : 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
@@ -334,12 +334,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   menuItemIcon: {
-    marginRight: isSmallScreen ? 8 : 16,
+    marginRight: isSmallScreen ? 6 : 16,
     width: 24,
     alignItems: 'center',
   },
   menuItemText: {
-    fontSize: isSmallScreen ? 14 : 16,
+    fontSize: isSmallScreen ? 12 : 16,
     fontWeight: '500',
     color: '#333',
     flex: 1,
