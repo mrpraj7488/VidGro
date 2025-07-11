@@ -43,117 +43,70 @@ interface MenuItem {
 export default function GlobalHeader({ title, showCoinDisplay = true, menuVisible, setMenuVisible }: GlobalHeaderProps) {
   const { user, profile, signOut } = useAuth();
 
-  // Animation values
-  const slideX = useSharedValue(-screenWidth); // Start from left off-screen
+  const slideX = useSharedValue(-screenWidth);
   const overlayOpacity = useSharedValue(0);
 
   const handleMenuPress = () => {
     setMenuVisible(true);
-    slideX.value = withTiming(0, {
-      duration: 300,
-      easing: Easing.out(Easing.quad),
-    });
-    overlayOpacity.value = withTiming(1, {
-      duration: 300,
-      easing: Easing.out(Easing.quad),
-    });
+    slideX.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.quad) });
+    overlayOpacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.quad) });
   };
 
   const handleCloseMenu = () => {
-    slideX.value = withTiming(-screenWidth, {
-      duration: 300,
-      easing: Easing.in(Easing.quad),
-    });
-    overlayOpacity.value = withTiming(0, {
-      duration: 300,
-      easing: Easing.in(Easing.quad),
-    });
+    slideX.value = withTiming(-screenWidth, { duration: 300, easing: Easing.in(Easing.quad) });
+    overlayOpacity.value = withTiming(0, { duration: 300, easing: Easing.in(Easing.quad) });
     setTimeout(() => setMenuVisible(false), 300);
   };
 
   const handleLogout = () => {
     handleCloseMenu();
-    setTimeout(() => {
-      signOut();
-    }, 100);
+    setTimeout(() => signOut(), 100);
   };
 
   const handleDeleteAccount = () => {
     handleCloseMenu();
-    setTimeout(() => {
-      router.push('/delete-account');
-    }, 100);
+    setTimeout(() => router.push('/delete-account'), 100);
   };
 
-  const menuItems: MenuItem[] = [
-    {
-      id: 'refer-friend',
-      title: 'Refer a Friend',
-      icon: <Share2 color="#800080" size={20} />,
-      onPress: () => {
-        handleCloseMenu();
-        setTimeout(() => router.push('/refer-friend'), 100);
-      },
-    },
-    {
-      id: 'privacy-policy',
-      title: 'Privacy Policy',
-      icon: <Shield color="#800080" size={20} />,
-      onPress: () => {
-        handleCloseMenu();
-        setTimeout(() => router.push('/privacy-policy'), 100);
-      },
-    },
-    {
-      id: 'terms',
-      title: 'Terms of Service',
-      icon: <FileText color="#800080" size={20} />,
-      onPress: () => {
-        handleCloseMenu();
-        setTimeout(() => router.push('/terms'), 100);
-      },
-    },
-    {
-      id: 'languages',
-      title: 'Languages',
-      icon: <Globe color="#800080" size={20} />,
-      onPress: () => {
-        handleCloseMenu();
-        setTimeout(() => router.push('/languages'), 100);
-      },
-    },
-    {
-      id: 'configure-ads',
-      title: 'Configure Ads',
-      icon: <Settings color="#800080" size={20} />,
-      onPress: () => {
-        handleCloseMenu();
-        setTimeout(() => router.push('/configure-ads'), 100);
-      },
-    },
-    {
-      id: 'contact-support',
-      title: 'Contact Support',
-      icon: <MessageCircle color="#800080" size={20} />,
-      onPress: () => {
-        handleCloseMenu();
-        setTimeout(() => router.push('/contact-support'), 100);
-      },
-    },
-    {
-      id: 'logout',
-      title: 'Log Out',
-      icon: <LogOut color="#E74C3C" size={20} />,
-      onPress: handleLogout,
-      destructive: true,
-    },
-    {
-      id: 'delete-account',
-      title: 'Delete Account',
-      icon: <Trash2 color="#E74C3C" size={20} />,
-      onPress: handleDeleteAccount,
-      destructive: true,
-    },
+  const handleReferFriend = () => {
+    handleCloseMenu();
+    setTimeout(() => router.push('/refer-friend'), 100);
+  };
+
+  const handlePrivacyPolicy = () => {
+    handleCloseMenu();
+    setTimeout(() => router.push('/privacy-policy'), 100);
+  };
+
+  const handleTerms = () => {
+    handleCloseMenu();
+    setTimeout(() => router.push('/terms'), 100);
+  };
+
+  const handleLanguages = () => {
+    handleCloseMenu();
+    setTimeout(() => router.push('/languages'), 100);
+  };
+
+  const handleConfigureAds = () => {
+    handleCloseMenu();
+    setTimeout(() => router.push('/configure-ads'), 100);
+  };
+
+  const handleContactSupport = () => {
+    handleCloseMenu();
+    setTimeout(() => router.push('/contact-support'), 100);
+  };
+
+  const menuItems = [
+    { id: 'refer-friend', title: 'Refer a Friend', icon: <Share2 color="#800080" size={20} />, onPress: handleReferFriend },
+    { id: 'privacy-policy', title: 'Privacy Policy', icon: <Shield color="#800080" size={20} />, onPress: handlePrivacyPolicy },
+    { id: 'terms', title: 'Terms of Service', icon: <FileText color="#800080" size={20} />, onPress: handleTerms },
+    { id: 'languages', title: 'Languages', icon: <Globe color="#800080" size={20} />, onPress: handleLanguages },
+    { id: 'configure-ads', title: 'Configure Ads', icon: <Settings color="#800080" size={20} />, onPress: handleConfigureAds },
+    { id: 'contact-support', title: 'Contact Support', icon: <MessageCircle color="#800080" size={20} />, onPress: handleContactSupport },
+    { id: 'logout', title: 'Log Out', icon: <LogOut color="#E74C3C" size={20} />, onPress: handleLogout, destructive: true },
+    { id: 'delete-account', title: 'Delete Account', icon: <Trash2 color="#E74C3C" size={20} />, onPress: handleDeleteAccount, destructive: true },
   ];
 
   const slideAnimatedStyle = useAnimatedStyle(() => ({
@@ -168,24 +121,16 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
     <>
       <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
         <SafeAreaView style={styles.headerContent}>
-          {/* Left Section - Menu + Title */}
           <View style={styles.leftSection}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={handleMenuPress}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={styles.menuButton} onPress={handleMenuPress} activeOpacity={0.7}>
               <View style={styles.hamburgerIcon}>
                 <View style={styles.hamburgerLine} />
                 <View style={styles.hamburgerLine} />
                 <View style={styles.hamburgerLine} />
               </View>
             </TouchableOpacity>
-            
             <Text style={styles.headerTitle}>{title}</Text>
           </View>
-          
-          {/* Right Section - Coin Display */}
           {showCoinDisplay && (
             <View style={styles.coinDisplay}>
               <Text style={styles.coinEmoji}>🪙</Text>
@@ -200,16 +145,13 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
           <Pressable style={styles.overlayPressable} onPress={handleCloseMenu} />
           <Animated.View style={[styles.slideMenu, slideAnimatedStyle]}>
             <SafeAreaView style={styles.menuContainer}>
-              {/* User Profile Section */}
+              <View style={styles.headerSection}>
+                <Text style={styles.headerText}>Menu</Text>
+              </View>
               <View style={styles.userSection}>
-                <TouchableOpacity 
-                  style={styles.closeButton}
-                  onPress={handleCloseMenu}
-                  activeOpacity={0.7}
-                >
+                <TouchableOpacity style={styles.closeButton} onPress={handleCloseMenu} activeOpacity={0.7}>
                   <Text style={styles.closeButtonText}>✕</Text>
                 </TouchableOpacity>
-                
                 <View style={styles.userContent}>
                   <View style={styles.avatar}>
                     <User color="white" size={isSmallScreen ? 24 : 28} />
@@ -220,27 +162,17 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
                   </View>
                 </View>
               </View>
-              
-              {/* Menu Items */}
               <ScrollView style={styles.menuScrollView} showsVerticalScrollIndicator={false}>
                 <View style={styles.menuItemsContainer}>
                   {menuItems.map((item, index) => (
                     <TouchableOpacity
                       key={item.id}
-                      style={[
-                        styles.menuItem,
-                        index === menuItems.length - 1 && styles.lastMenuItem,
-                      ]}
+                      style={[styles.menuItem, index === menuItems.length - 1 && styles.lastMenuItem]}
                       onPress={item.onPress}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.menuItemIcon}>
-                        {item.icon}
-                      </View>
-                      <Text style={[
-                        styles.menuItemText,
-                        item.destructive && styles.destructiveText,
-                      ]}>
+                      <View style={styles.menuItemIcon}>{item.icon}</View>
+                      <Text style={[styles.menuItemText, item.destructive && styles.destructiveText]}>
                         {item.title}
                       </Text>
                     </TouchableOpacity>
@@ -325,38 +257,37 @@ const styles = StyleSheet.create({
   slideMenu: {
     position: 'absolute',
     top: 0,
-    left: 0, // Align to left
-    width: isSmallScreen ? 240 : 280, // Adjusted width for responsiveness
+    left: 0,
+    width: isSmallScreen ? 240 : 280,
     height: '100%',
     backgroundColor: '#F8F9FA',
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 2, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 12,
-      },
-      web: {
-        boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)',
-      },
+      ios: { shadowColor: '#000', shadowOffset: { width: 2, height: 0 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      android: { elevation: 12 },
+      web: { boxShadow: '2px 0 12px rgba(0, 0, 0, 0.15)' },
     }),
   },
   menuContainer: {
     flex: 1,
   },
+  headerSection: {
+    padding: isSmallScreen ? 12 : 16,
+    backgroundColor: '#800080',
+  },
+  headerText: {
+    fontSize: isSmallScreen ? 18 : 20,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+  },
   userSection: {
-    paddingTop: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
-    paddingBottom: 16,
-    paddingHorizontal: isSmallScreen ? 12 : 20,
+    padding: isSmallScreen ? 12 : 16,
     backgroundColor: '#800080',
   },
   closeButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : (StatusBar.currentHeight || 0) + 16,
-    right: isSmallScreen ? 12 : 20,
+    top: isSmallScreen ? 12 : 16,
+    right: isSmallScreen ? 12 : 16,
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -407,18 +338,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+      android: { elevation: 4 },
+      web: { boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' },
     }),
   },
   menuItem: {
