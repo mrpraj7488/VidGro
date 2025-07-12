@@ -1,22 +1,20 @@
 import { Platform } from 'react-native';
 
-// Platform-specific imports for Android-only app
+// Platform-specific imports to avoid Metro errors on web
 let RewardedAd: any = null;
 let RewardedAdEventType: any = null;
 let TestIds: any = null;
-let GoogleMobileAds: any = null;
 
-// Only import Google Mobile Ads on Android platform
-if (Platform.OS === 'android') {
+if (Platform.OS === 'ios' || Platform.OS === 'android') {
   try {
-    const GoogleMobileAdsModule = require('react-native-google-mobile-ads');
-    RewardedAd = GoogleMobileAdsModule.RewardedAd;
-    RewardedAdEventType = GoogleMobileAdsModule.RewardedAdEventType;
-    TestIds = GoogleMobileAdsModule.TestIds;
-    GoogleMobileAds = GoogleMobileAdsModule.default;
+    // Use eval to prevent Metro's static analysis from bundling on web
+    const GoogleMobileAds = eval('require')('react-native-google-mobile-ads');
+    RewardedAd = GoogleMobileAds.RewardedAd;
+    RewardedAdEventType = GoogleMobileAds.RewardedAdEventType;
+    TestIds = GoogleMobileAds.TestIds;
   } catch (error) {
-    console.warn('Google Mobile Ads not available on this platform:', error);
+    console.warn('Google Mobile Ads not available:', error);
   }
 }
 
-export { RewardedAd, RewardedAdEventType, TestIds, GoogleMobileAds };
+export { RewardedAd, RewardedAdEventType, TestIds };

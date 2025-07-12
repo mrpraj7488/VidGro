@@ -20,7 +20,8 @@
       "package": "com.vidgro.watchearn"
     },
     "web": {
-      "bundler": "webpack",
+      "bundler": "metro",
+      "output": "server",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
