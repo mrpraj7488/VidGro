@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Video, ChevronDown, ChevronUp, Edit3, RotateCcw, Eye, Clock, Timer, Activity, DollarSign, Play } from 'lucide-react-native';
+import { Video, ChevronDown, ChevronUp, CreditCard as Edit3, RotateCcw, Eye, Clock, Timer, Activity, DollarSign, Play } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 import Animated, { 
   useSharedValue, 
