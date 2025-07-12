@@ -7,7 +7,9 @@ let TestIds: any = null;
 
 if (Platform.OS === 'ios' || Platform.OS === 'android') {
   try {
-    const GoogleMobileAds = require('react-native-google-mobile-ads');
+    // Use non-literal string to prevent Metro's static analysis from bundling on web
+    const moduleName = 'react-native-google-mobile-ads';
+    const GoogleMobileAds = require(moduleName);
     RewardedAd = GoogleMobileAds.RewardedAd;
     RewardedAdEventType = GoogleMobileAds.RewardedAdEventType;
     TestIds = GoogleMobileAds.TestIds;
