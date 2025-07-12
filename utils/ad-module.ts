@@ -1,61 +1,44 @@
 import { Platform } from 'react-native';
 
-// Platform-specific imports to avoid Metro errors on web
-let RewardedAd: any = null;
-let RewardedAdEventType: any = null;
-let TestIds: any = null;
-let initialize: any = null;
-let setRequestConfiguration: any = null;
+// Simple mock implementations for all platforms
+// This ensures consistent behavior and no bundling issues
 
-if (Platform.OS === 'web') {
-  // Web platform - use mock implementations
-  RewardedAd = null;
-  RewardedAdEventType = {
-    LOADED: 'loaded',
-    EARNED_REWARD: 'earned_reward',
-    CLOSED: 'closed',
-    ERROR: 'error'
-  };
-  TestIds = {
-    REWARDED: 'ca-app-pub-3940256099942544/5224354917',
-    BANNER: 'ca-app-pub-3940256099942544/6300978111',
-    INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712'
-  };
-  initialize = () => Promise.resolve();
-  setRequestConfiguration = () => {};
-} else {
-  // Native platforms - import the actual module
-  try {
-    const GoogleMobileAds = require('react-native-google-mobile-ads');
-    RewardedAd = GoogleMobileAds.RewardedAd;
-    RewardedAdEventType = GoogleMobileAds.RewardedAdEventType;
-    TestIds = GoogleMobileAds.TestIds;
-    initialize = GoogleMobileAds.default?.initialize;
-    setRequestConfiguration = GoogleMobileAds.default?.setRequestConfiguration;
-  } catch (error) {
-    console.warn('Google Mobile Ads not available on this platform:', error);
-    // Provide fallback objects to prevent crashes
-    RewardedAd = null;
-    RewardedAdEventType = {
-      LOADED: 'loaded',
-      EARNED_REWARD: 'earned_reward',
-      CLOSED: 'closed',
-      ERROR: 'error'
-    };
-    TestIds = {
-      REWARDED: 'ca-app-pub-3940256099942544/5224354917',
-      BANNER: 'ca-app-pub-3940256099942544/6300978111',
-      INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712'
-    };
-    initialize = () => Promise.resolve();
-    setRequestConfiguration = () => {};
-  }
-}
+export const RewardedAd = null;
 
-export { 
-  RewardedAd, 
-  RewardedAdEventType, 
-  TestIds, 
-  initialize, 
-  setRequestConfiguration 
+export const RewardedAdEventType = {
+  LOADED: 'loaded',
+  EARNED_REWARD: 'earned_reward',
+  CLOSED: 'closed',
+  ERROR: 'error'
+};
+
+export const TestIds = {
+  REWARDED: 'ca-app-pub-3940256099942544/5224354917',
+  BANNER: 'ca-app-pub-3940256099942544/6300978111',
+  INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712'
+};
+
+// Mock functions that work on all platforms
+export const initialize = () => {
+  console.log('Ad module initialized (mock)');
+  return Promise.resolve();
+};
+
+export const setRequestConfiguration = () => {
+  console.log('Ad request configuration set (mock)');
+};
+
+// Check if platform supports ads (for future native implementation)
+export const isAdSupportedPlatform = () => {
+  return Platform.OS === 'ios' || Platform.OS === 'android';
+};
+
+// Default export for compatibility
+export default {
+  RewardedAd,
+  RewardedAdEventType,
+  TestIds,
+  initialize,
+  setRequestConfiguration,
+  isAdSupportedPlatform
 };

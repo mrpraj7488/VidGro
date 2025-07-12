@@ -112,16 +112,8 @@ export default function BecomeVIPScreen() {
   useEffect(() => {
     setIsMounted(true);
     
-    // Initialize In-App Purchases only on native platforms
-    if (Platform.OS === 'ios' || Platform.OS === 'android') {
-      try {
-        const InAppPurchasesModule = require('expo-in-app-purchases');
-        setInAppPurchases(InAppPurchasesModule);
-      } catch (error) {
-        console.warn('In-app purchases not available:', error);
-      }
-      initializeInAppPurchases();
-    }
+    // Note: In-app purchases would be initialized here for production
+    // For now, we'll use mock implementations
 
     // Check VIP status
     checkVIPStatus();
@@ -140,18 +132,9 @@ export default function BecomeVIPScreen() {
   }, []);
 
   const initializeInAppPurchases = async () => {
-    if (!InAppPurchases || !isMounted) {
-      return;
-    }
-    
-    try {
-      await InAppPurchases.connectAsync();
-      if (isMounted) {
-        setIsConnected(true);
-      }
-    } catch (error) {
-      console.error('Failed to connect to in-app purchases:', error);
-    }
+    // Mock implementation for development
+    console.log('In-app purchases would be initialized here');
+    setIsConnected(true);
   };
 
   const checkVIPStatus = async () => {
@@ -189,17 +172,12 @@ export default function BecomeVIPScreen() {
 
   const handleSubscribe = async (plan: VIPPlan) => {
     // Handle web platform
-    if (Platform.OS === 'web') {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
       Alert.alert(
         'Feature Not Available',
-        'VIP subscriptions are only available on mobile devices. Please use the mobile app to subscribe.',
+        'VIP subscriptions are only available on mobile devices (iOS/Android). Please use the mobile app to subscribe.',
         [{ text: 'OK' }]
       );
-      return;
-    }
-
-    if (!InAppPurchases || !isConnected) {
-      Alert.alert('Error', 'In-app purchases not available. Please try again later.');
       return;
     }
 
@@ -223,33 +201,20 @@ export default function BecomeVIPScreen() {
     }
 
     try {
-      // Get available products
-      const { results } = await InAppPurchases.getProductsAsync([plan.productId]);
+      // Simulate purchase process for development
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      if (results.length === 0) {
-        throw new Error(`VIP product ${plan.productId} not available`);
-      }
-
-      // Purchase the VIP subscription
-      const { results: purchaseResults } = await InAppPurchases.purchaseItemAsync(plan.productId);
+      // Update database with VIP subscription
+      await updateVIPSubscription(plan);
       
-      if (purchaseResults && purchaseResults.length > 0 && isMounted) {
-        const purchase = purchaseResults[0];
-        
-        if (purchase.acknowledged) {
-          // Update database with VIP subscription
-          await updateVIPSubscription(plan);
-          
-          Alert.alert(
-            'Welcome to VIP! 👑',
-            `Your ${plan.period}ly VIP subscription is now active. Enjoy all the premium benefits!`,
-            [{ text: 'Awesome!', onPress: () => {
-              checkVIPStatus();
-              refreshProfile();
-            }}]
-          );
-        }
-      }
+      Alert.alert(
+        'Welcome to VIP! 👑',
+        `Your ${plan.period}ly VIP subscription is now active. Enjoy all the premium benefits!`,
+        [{ text: 'Awesome!', onPress: () => {
+          checkVIPStatus();
+          refreshProfile();
+        }}]
+      );
     } catch (error) {
       console.error('Purchase failed:', error);
       if (isMounted) {

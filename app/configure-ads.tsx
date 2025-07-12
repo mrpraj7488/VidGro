@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Shield, Check, Play, Clock, Timer } from 'lucide-react-native';
-import { RewardedAd, RewardedAdEventType, TestIds } from '@/utils/ad-module';
+import { isAdSupportedPlatform } from '@/utils/ad-module';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -47,7 +47,6 @@ export default function ConfigureAdsScreen() {
   const [adFreeTimeLeft, setAdFreeTimeLeft] = useState(0); // in seconds
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [rewardedAd, setRewardedAd] = useState<any>(null);
   
   // All useSharedValue hooks next - maintain consistent order
   const fadeIn = useSharedValue(0);
@@ -166,11 +165,6 @@ export default function ConfigureAdsScreen() {
   useEffect(() => {
     setIsMounted(true);
     
-    // Initialize Google Mobile Ads only on native platforms
-    if (Platform.OS === 'ios' || Platform.OS === 'android') {
-      initializeGoogleMobileAds();
-    }
-
     // Fade in animation
     fadeIn.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.quad) });
 
@@ -216,59 +210,6 @@ export default function ConfigureAdsScreen() {
     };
   }, [isAdFreeActive, adFreeTimeLeft, isMounted, selectedOption]);
 
-  const initializeGoogleMobileAds = async () => {
-    if (Platform.OS === 'web' || !RewardedAd || !isMounted) {
-      console.log('Google Mobile Ads not available on this platform');
-      return;
-    }
-    
-    try {
-      // Use test ad unit ID for development
-      const adUnitId = TestIds.REWARDED; // Always use test ads for now
-      
-      const rewarded = RewardedAd.createForAdRequest(adUnitId);
-      
-      // Set up event listeners
-      const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => {
-        if (isMounted) {
-          console.log('Rewarded ad loaded');
-        }
-      });
-
-      const unsubscribeEarned = rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, (reward: any) => {
-        if (isMounted) {
-          handleAdReward();
-        }
-      });
-
-      const unsubscribeClosed = rewarded.addAdEventListener(RewardedAdEventType.CLOSED, () => {
-        if (isMounted) {
-          handleAdClose();
-        }
-      });
-
-      const unsubscribeError = rewarded.addAdEventListener(RewardedAdEventType.ERROR, (error: any) => {
-        if (isMounted) {
-          handleAdError(error);
-        }
-      });
-
-      // Load the ad
-      rewarded.load();
-      setRewardedAd(rewarded);
-
-      // Cleanup function
-      return () => {
-        unsubscribeLoaded();
-        unsubscribeEarned();
-        unsubscribeClosed();
-        unsubscribeError();
-      };
-    } catch (error) {
-      console.error('Failed to initialize Google Mobile Ads:', error);
-    }
-  };
-
   const handleAdReward = () => {
     if (!isMounted) return;
     
@@ -310,7 +251,6 @@ export default function ConfigureAdsScreen() {
   };
 
   const handleAdError = (error: any) => {
-    console.error('Ad failed to load:', error);
     if (isMounted) {
       Alert.alert('Ad Not Available', 'Please try again later.');
       setIsWatchingAds(false);
@@ -321,51 +261,23 @@ export default function ConfigureAdsScreen() {
   };
 
   const handleAdClose = () => {
-    if (isMounted && rewardedAd) {
-      // Load next ad
-      rewardedAd.load();
-    }
+    // Mock implementation - in real app, this would load next ad
+    console.log('Ad closed');
   };
 
   const showNextAd = async () => {
-    if (!rewardedAd || !isMounted || Platform.OS === 'web') {
-      Alert.alert('Error', 'Ad service not available. Please try again later.');
+    if (!isMounted || !isAdSupportedPlatform()) {
+      Alert.alert('Error', 'Ads are not available on this platform.');
       return;
     }
 
-    try {
-      const isLoaded = rewardedAd.loaded;
-      
-      if (isLoaded) {
-        rewardedAd.show();
-      } else {
-        // Load and show ad
-        rewardedAd.load();
-        
-        // Wait for ad to load
-        setTimeout(() => {
-          if (rewardedAd.loaded) {
-            rewardedAd.show();
-          } else {
-            throw new Error('Ad not ready');
-          }
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Failed to show ad:', error);
+    // Simulate ad loading and showing
+    setTimeout(() => {
       if (isMounted) {
-        Alert.alert(
-          'Ad Unavailable',
-          'No ads are available right now. Please try again later.',
-          [{ text: 'OK', onPress: () => {
-            setIsWatchingAds(false);
-            setAdsWatched(0);
-            setTotalAdsRequired(0);
-            progressWidth.value = withTiming(0, { duration: 500 });
-          }}]
-        );
+        // Simulate successful ad completion
+        handleAdReward();
       }
-    }
+    }, 2000);
   };
 
   const getCardAnimatedStyle = (index: number) => {
@@ -438,10 +350,10 @@ export default function ConfigureAdsScreen() {
 
   const handleWatchAds = () => {
     // Handle web platform
-    if (Platform.OS === 'web') {
+    if (!isAdSupportedPlatform()) {
       Alert.alert(
         'Feature Not Available',
-        'Ad rewards are only available on mobile devices. Please use the mobile app to watch ads.',
+        'Ad rewards are only available on mobile devices (iOS/Android). Please use the mobile app to watch ads.',
         [{ text: 'OK' }]
       );
       return;

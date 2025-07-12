@@ -21,6 +21,7 @@ import {
   Play
 } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
+import { isAdSupportedPlatform } from '@/utils/ad-module';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -81,10 +82,10 @@ export default function MoreTab() {
 
   const handleFreeCoins = () => {
     // Handle web platform
-    if (Platform.OS === 'web') {
+    if (!isAdSupportedPlatform()) {
       Alert.alert(
         'Feature Not Available',
-        'Ad rewards are only available on mobile devices. Please use the mobile app to watch ads and earn coins.',
+        'Ad rewards are only available on mobile devices (iOS/Android). Please use the mobile app to watch ads and earn coins.',
         [{ text: 'OK' }]
       );
       return;
