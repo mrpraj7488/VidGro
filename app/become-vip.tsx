@@ -24,16 +24,6 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 
-// Conditionally import InAppPurchases only on native platforms
-let InAppPurchases: any = null;
-if (Platform.OS === 'ios' || Platform.OS === 'android') {
-  try {
-    InAppPurchases = require('expo-in-app-purchases');
-  } catch (error) {
-    console.warn('In-app purchases not available:', error);
-  }
-}
-
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
 const isVerySmallScreen = screenWidth < 360;
@@ -60,6 +50,7 @@ export default function BecomeVIPScreen() {
   const [isSubscribing, setIsSubscribing] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [InAppPurchases, setInAppPurchases] = useState<any>(null);
   const [vipStatus, setVipStatus] = useState<{
     isActive: boolean;
     expiresAt: string | null;
@@ -123,6 +114,12 @@ export default function BecomeVIPScreen() {
     
     // Initialize In-App Purchases only on native platforms
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      try {
+        const InAppPurchasesModule = require('expo-in-app-purchases');
+        setInAppPurchases(InAppPurchasesModule);
+      } catch (error) {
+        console.warn('In-app purchases not available:', error);
+      }
       initializeInAppPurchases();
     }
 

@@ -23,22 +23,6 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 
-// Conditionally import Google Mobile Ads only on native platforms
-let RewardedAd: any = null;
-let RewardedAdEventType: any = null;
-let TestIds: any = null;
-
-if (Platform.OS === 'ios' || Platform.OS === 'android') {
-  try {
-    const GoogleMobileAds = require('react-native-google-mobile-ads');
-    RewardedAd = GoogleMobileAds.RewardedAd;
-    RewardedAdEventType = GoogleMobileAds.RewardedAdEventType;
-    TestIds = GoogleMobileAds.TestIds;
-  } catch (error) {
-    console.warn('Google Mobile Ads not available:', error);
-  }
-}
-
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
 
@@ -63,6 +47,9 @@ export default function ConfigureAdsScreen() {
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [rewardedAd, setRewardedAd] = useState<any>(null);
+  const [RewardedAd, setRewardedAd] = useState<any>(null);
+  const [RewardedAdEventType, setRewardedAdEventType] = useState<any>(null);
+  const [TestIds, setTestIds] = useState<any>(null);
   
   // All useSharedValue hooks next - maintain consistent order
   const fadeIn = useSharedValue(0);
@@ -183,6 +170,14 @@ export default function ConfigureAdsScreen() {
     
     // Initialize Google Mobile Ads only on native platforms
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      try {
+        const GoogleMobileAds = require('react-native-google-mobile-ads');
+        setRewardedAd(GoogleMobileAds.RewardedAd);
+        setRewardedAdEventType(GoogleMobileAds.RewardedAdEventType);
+        setTestIds(GoogleMobileAds.TestIds);
+      } catch (error) {
+        console.warn('Google Mobile Ads not available:', error);
+      }
       initializeGoogleMobileAds();
     }
 
