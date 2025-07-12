@@ -15,9 +15,7 @@ import {
   DollarSign, 
   Crown, 
   Gift, 
-  Star, 
   User, 
-  Coins,
 } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 

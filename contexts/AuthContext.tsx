@@ -224,7 +224,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
-      console.log('Refreshing profile for user:', user.id, 'at', new Date().toLocaleTimeString());
       const oldCoins = profile?.coins || 0;
       
       try {
@@ -243,12 +242,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (freshProfile) {
           setProfile(freshProfile);
           const newCoins = freshProfile.coins || 0;
-          console.log('Profile refresh completed at', new Date().toLocaleTimeString());
-          console.log('Coin balance change:', oldCoins, '->', newCoins);
           if (newCoins !== oldCoins) {
-            console.log('✅ Coin balance updated successfully!');
-          } else {
-            console.log('⚠️ No coin balance change detected');
+            // Coin balance updated
           }
         }
       } catch (error) {
@@ -281,7 +276,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     
     // The auth state change listener will handle the rest
-    console.log('User signed up successfully:', data.user?.id);
   };
 
   const signOut = async () => {
