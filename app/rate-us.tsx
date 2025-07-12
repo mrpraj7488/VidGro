@@ -17,10 +17,15 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withSequence,
+  withRepeat,
+  withTiming,
+  interpolate,
+  Easing,
 } from 'react-native-reanimated';
 
 const { width: screenWidth } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 375;
+const isSmallScreen = screenWidth < 480;
+const isVerySmallScreen = screenWidth < 375;
 
 export default function RateUsScreen() {
   const [selectedRating, setSelectedRating] = useState(0);
@@ -29,6 +34,28 @@ export default function RateUsScreen() {
   // Animation values
   const buttonScale = useSharedValue(1);
   const starScales = Array.from({ length: 5 }, () => useSharedValue(1));
+  const shimmer = useSharedValue(0);
+  const fadeIn = useSharedValue(0);
+  const coinGlow = useSharedValue(1);
+
+  React.useEffect(() => {
+    // Shimmer effect
+    shimmer.value = withRepeat(
+      withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true
+    );
+
+    // Fade in animation
+    fadeIn.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.quad) });
+
+    // Coin glow effect
+    coinGlow.value = withRepeat(
+      withTiming(1.2, { duration: 1500, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true
+    );
+  }, []);
 
   const handleStarPress = (rating: number) => {
     setSelectedRating(rating);
@@ -72,10 +99,27 @@ export default function RateUsScreen() {
     }));
   };
 
+  const shimmerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 0.3 + (shimmer.value * 0.7),
+  }));
+
+  const fadeInStyle = useAnimatedStyle(() => ({
+    opacity: fadeIn.value,
+    transform: [
+      {
+        translateY: interpolate(fadeIn.value, [0, 1], [20, 0])
+      }
+    ]
+  }));
+
+  const coinGlowStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: coinGlow.value }],
+  }));
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={['#800080', '#9B59B6']} style={styles.header}>
+      <LinearGradient colors={['#800080', '#4b004b']} style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft color="white" size={24} />
         </TouchableOpacity>
@@ -83,108 +127,153 @@ export default function RateUsScreen() {
         <View style={styles.placeholder} />
       </LinearGradient>
 
+      {/* Background gradient */}
+      <LinearGradient
+        colors={['rgba(128, 0, 128, 0.05)', 'transparent']}
+        style={styles.backgroundGradient}
+      />
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroIcon}>
-            <Star color="#800080" size={64} />
-          </View>
-          <Text style={styles.heroTitle}>Rate VidGro</Text>
-          <Text style={styles.heroSubtitle}>
-            Help us improve by sharing your experience with other users
-          </Text>
-        </View>
-
-        {/* Rating Section */}
-        <View style={styles.ratingSection}>
-          <Text style={styles.ratingTitle}>How would you rate VidGro?</Text>
-          <Text style={styles.ratingSubtitle}>
-            Tap the stars to rate your experience
-          </Text>
-          
-          <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5].map((rating) => (
-              <Animated.View key={rating} style={getStarAnimatedStyle(rating - 1)}>
-                <TouchableOpacity
-                  style={styles.starButton}
-                  onPress={() => handleStarPress(rating)}
-                  activeOpacity={0.7}
-                >
-                  <Star
-                    color={rating <= selectedRating ? '#FFD700' : '#E5E7EB'}
-                    fill={rating <= selectedRating ? '#FFD700' : 'transparent'}
-                    size={isSmallScreen ? 40 : 48}
-                  />
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </View>
-          
-          {selectedRating > 0 && (
-            <Text style={styles.ratingText}>
-              {selectedRating === 1 && 'We appreciate your feedback!'}
-              {selectedRating === 2 && 'Thanks for your input!'}
-              {selectedRating === 3 && 'Good to know your thoughts!'}
-              {selectedRating === 4 && 'Great! We\'re glad you like VidGro!'}
-              {selectedRating === 5 && 'Awesome! You love VidGro! 🎉'}
+        <Animated.View style={fadeInStyle}>
+          {/* Hero Section */}
+          <LinearGradient
+            colors={['#800080', '#9B59B6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroSection}
+          >
+            <Animated.View style={[styles.heroIcon, shimmerAnimatedStyle]}>
+              <Star color="#FFD700" size={isVerySmallScreen ? 48 : 64} />
+            </Animated.View>
+            <Text style={styles.heroTitle}>Rate VidGro</Text>
+            <Text style={styles.heroSubtitle}>
+              Help us improve by sharing your experience with other users
             </Text>
-          )}
-        </View>
+          </LinearGradient>
 
-        {/* Reward Section */}
-        <View style={styles.rewardSection}>
-          <View style={styles.rewardIcon}>
-            <Text style={styles.coinEmoji}>🪙</Text>
+          {/* Rating Section */}
+          <View style={styles.ratingSection}>
+            <Text style={styles.ratingTitle}>How would you rate VidGro?</Text>
+            <Text style={styles.ratingSubtitle}>
+              Tap the stars to rate your experience
+            </Text>
+            
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((rating) => (
+                <Animated.View key={rating} style={getStarAnimatedStyle(rating - 1)}>
+                  <TouchableOpacity
+                    style={styles.starButton}
+                    onPress={() => handleStarPress(rating)}
+                    activeOpacity={0.7}
+                  >
+                    <LinearGradient
+                      colors={rating <= selectedRating ? ['#FFD700', '#FFA500'] : ['#E5E7EB', '#D1D5DB']}
+                      style={styles.starGradient}
+                    >
+                      <Star
+                        color={rating <= selectedRating ? '#800080' : '#9CA3AF'}
+                        fill={rating <= selectedRating ? '#800080' : 'transparent'}
+                        size={isVerySmallScreen ? 32 : isSmallScreen ? 40 : 48}
+                      />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </View>
+            
+            {selectedRating > 0 && (
+              <LinearGradient
+                colors={['rgba(128, 0, 128, 0.1)', 'rgba(255, 215, 0, 0.1)']}
+                style={styles.ratingFeedback}
+              >
+                <Text style={styles.ratingText}>
+                  {selectedRating === 1 && 'We appreciate your feedback!'}
+                  {selectedRating === 2 && 'Thanks for your input!'}
+                  {selectedRating === 3 && 'Good to know your thoughts!'}
+                  {selectedRating === 4 && 'Great! We\'re glad you like VidGro!'}
+                  {selectedRating === 5 && 'Awesome! You love VidGro! 🎉'}
+                </Text>
+              </LinearGradient>
+            )}
           </View>
-          <Text style={styles.rewardTitle}>Get 400 Coins!</Text>
-          <Text style={styles.rewardDescription}>
-            Submit your rating and receive 400 coins as a thank you for helping us improve VidGro
-          </Text>
-        </View>
 
-        {/* Benefits Section */}
-        <View style={styles.benefitsSection}>
-          <Text style={styles.benefitsTitle}>Why Rate Us?</Text>
-          
-          <View style={styles.benefitItem}>
-            <Heart color="#800080" size={20} />
-            <Text style={styles.benefitText}>Help other users discover VidGro</Text>
-          </View>
-          
-          <View style={styles.benefitItem}>
-            <ThumbsUp color="#800080" size={20} />
-            <Text style={styles.benefitText}>Support app development and improvements</Text>
-          </View>
-          
-          <View style={styles.benefitItem}>
-            <Star color="#800080" size={20} />
-            <Text style={styles.benefitText}>Earn 400 coins instantly</Text>
-          </View>
-        </View>
+          {/* Reward Section */}
+          <LinearGradient
+            colors={['#FFD700', '#FFA500']}
+            style={styles.rewardSection}
+          >
+            <Animated.View style={[styles.rewardIcon, coinGlowStyle]}>
+              <Text style={styles.coinEmoji}>🪙</Text>
+            </Animated.View>
+            <Text style={styles.rewardTitle}>Get 400 Coins!</Text>
+            <Text style={styles.rewardDescription}>
+              Submit your rating and receive 400 coins as a thank you for helping us improve VidGro
+            </Text>
+          </LinearGradient>
 
-        {/* Submit Button */}
-        <View style={styles.submitSection}>
-          <Animated.View style={buttonAnimatedStyle}>
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                selectedRating === 0 && styles.submitButtonDisabled,
-                isSubmitting && styles.submittingButton
-              ]}
-              onPress={handleSubmitRating}
-              disabled={selectedRating === 0 || isSubmitting}
+          {/* Benefits Section */}
+          <View style={styles.benefitsSection}>
+            <Text style={styles.benefitsTitle}>Why Rate Us?</Text>
+            
+            <LinearGradient
+              colors={['rgba(128, 0, 128, 0.05)', 'rgba(255, 255, 255, 0.9)']}
+              style={styles.benefitItem}
             >
-              <Star color="white" size={20} />
-              <Text style={styles.submitButtonText}>
-                {isSubmitting ? 'Submitting...' : 'Rate Now & Get 400 Coins'}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-          
-          <Text style={styles.submitNote}>
-            Your rating will be submitted to the app store and coins will be added to your account
-          </Text>
-        </View>
+              <View style={styles.benefitIconContainer}>
+                <Heart color="#800080" size={isVerySmallScreen ? 16 : 20} />
+              </View>
+              <Text style={styles.benefitText}>Help other users discover VidGro</Text>
+            </LinearGradient>
+            
+            <LinearGradient
+              colors={['rgba(128, 0, 128, 0.05)', 'rgba(255, 255, 255, 0.9)']}
+              style={styles.benefitItem}
+            >
+              <View style={styles.benefitIconContainer}>
+                <ThumbsUp color="#800080" size={isVerySmallScreen ? 16 : 20} />
+              </View>
+              <Text style={styles.benefitText}>Support app development and improvements</Text>
+            </LinearGradient>
+            
+            <LinearGradient
+              colors={['rgba(128, 0, 128, 0.05)', 'rgba(255, 255, 255, 0.9)']}
+              style={styles.benefitItem}
+            >
+              <View style={styles.benefitIconContainer}>
+                <Star color="#800080" size={isVerySmallScreen ? 16 : 20} />
+              </View>
+              <Text style={styles.benefitText}>Earn 400 coins instantly</Text>
+            </LinearGradient>
+          </View>
+
+          {/* Submit Button */}
+          <View style={styles.submitSection}>
+            <Animated.View style={buttonAnimatedStyle}>
+              <LinearGradient
+                colors={selectedRating === 0 ? ['#9CA3AF', '#6B7280'] : ['#800080', '#9B59B6']}
+                style={[
+                  styles.submitButton,
+                  isSubmitting && styles.submittingButton
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.submitButtonInner}
+                  onPress={handleSubmitRating}
+                  disabled={selectedRating === 0 || isSubmitting}
+                >
+                  <Star color="#FFD700" size={20} />
+                  <Text style={styles.submitButtonText}>
+                    {isSubmitting ? 'Submitting...' : 'Rate Now & Get 400 Coins'}
+                  </Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </Animated.View>
+            
+            <Text style={styles.submitNote}>
+              Your rating will be submitted to the app store and coins will be added to your account
+            </Text>
+          </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -207,59 +296,98 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
+    fontSize: isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
     fontWeight: 'bold',
     color: 'white',
   },
   placeholder: {
     width: 40,
   },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+  },
   content: {
     flex: 1,
   },
   heroSection: {
     alignItems: 'center',
-    padding: isSmallScreen ? 24 : 32,
-    backgroundColor: 'white',
-    marginBottom: 16,
+    padding: isVerySmallScreen ? 20 : isSmallScreen ? 24 : 32,
+    margin: 16,
+    borderRadius: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#800080',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 12,
+      },
+      web: {
+        boxShadow: '0 8px 24px rgba(128, 0, 128, 0.3)',
+      },
+    }),
   },
   heroIcon: {
-    width: isSmallScreen ? 100 : 120,
-    height: isSmallScreen ? 100 : 120,
-    borderRadius: isSmallScreen ? 50 : 60,
-    backgroundColor: '#FFF9E6',
+    width: isVerySmallScreen ? 80 : isSmallScreen ? 100 : 120,
+    height: isVerySmallScreen ? 80 : isSmallScreen ? 100 : 120,
+    borderRadius: isVerySmallScreen ? 40 : isSmallScreen ? 50 : 60,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#FFD700',
   },
   heroTitle: {
-    fontSize: isSmallScreen ? 24 : 28,
+    fontSize: isVerySmallScreen ? 20 : isSmallScreen ? 24 : 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
     textAlign: 'center',
     marginBottom: 8,
   },
   heroSubtitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#666',
+    fontSize: isVerySmallScreen ? 12 : isSmallScreen ? 14 : 16,
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     lineHeight: 22,
   },
   ratingSection: {
     backgroundColor: 'white',
-    padding: isSmallScreen ? 20 : 24,
+    padding: isVerySmallScreen ? 16 : isSmallScreen ? 20 : 24,
+    margin: 16,
+    borderRadius: 16,
     marginBottom: 16,
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
   ratingTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
+    fontSize: isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
     marginBottom: 8,
   },
   ratingSubtitle: {
-    fontSize: isSmallScreen ? 13 : 14,
+    fontSize: isVerySmallScreen ? 11 : isSmallScreen ? 13 : 14,
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
@@ -267,57 +395,99 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: isSmallScreen ? 8 : 12,
+    gap: isVerySmallScreen ? 6 : isSmallScreen ? 8 : 12,
     marginBottom: 16,
   },
   starButton: {
-    padding: 4,
+    padding: isVerySmallScreen ? 2 : 4,
+  },
+  starGradient: {
+    borderRadius: isVerySmallScreen ? 20 : 24,
+    padding: isVerySmallScreen ? 6 : 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ratingFeedback: {
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
   },
   ratingText: {
-    fontSize: isSmallScreen ? 14 : 16,
+    fontSize: isVerySmallScreen ? 12 : isSmallScreen ? 14 : 16,
     color: '#800080',
     fontWeight: '500',
     textAlign: 'center',
   },
   rewardSection: {
-    backgroundColor: '#FFF9E6',
-    padding: isSmallScreen ? 20 : 24,
+    padding: isVerySmallScreen ? 16 : isSmallScreen ? 20 : 24,
+    margin: 16,
+    borderRadius: 16,
     marginBottom: 16,
     alignItems: 'center',
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFD700',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFD700',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+      },
+    }),
   },
   rewardIcon: {
-    width: isSmallScreen ? 60 : 70,
-    height: isSmallScreen ? 60 : 70,
-    borderRadius: isSmallScreen ? 30 : 35,
-    backgroundColor: 'white',
+    width: isVerySmallScreen ? 50 : isSmallScreen ? 60 : 70,
+    height: isVerySmallScreen ? 50 : isSmallScreen ? 60 : 70,
+    borderRadius: isVerySmallScreen ? 25 : isSmallScreen ? 30 : 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   coinEmoji: {
-    fontSize: isSmallScreen ? 32 : 36,
+    fontSize: isVerySmallScreen ? 28 : isSmallScreen ? 32 : 36,
   },
   rewardTitle: {
-    fontSize: isSmallScreen ? 20 : 24,
+    fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
     fontWeight: 'bold',
-    color: '#F59E0B',
+    color: 'white',
     marginBottom: 8,
   },
   rewardDescription: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#92400E',
+    fontSize: isVerySmallScreen ? 11 : isSmallScreen ? 13 : 14,
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     lineHeight: 20,
   },
   benefitsSection: {
     backgroundColor: 'white',
-    padding: isSmallScreen ? 16 : 20,
+    padding: isVerySmallScreen ? 12 : isSmallScreen ? 16 : 20,
+    margin: 16,
+    borderRadius: 16,
     marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
   benefitsTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
+    fontSize: isVerySmallScreen ? 14 : isSmallScreen ? 16 : 18,
     fontWeight: '600',
     color: '#333',
     marginBottom: 16,
@@ -325,27 +495,31 @@ const styles = StyleSheet.create({
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: isVerySmallScreen ? 10 : 12,
+    borderRadius: 8,
     marginBottom: 12,
   },
+  benefitIconContainer: {
+    width: isVerySmallScreen ? 28 : 32,
+    height: isVerySmallScreen ? 28 : 32,
+    borderRadius: isVerySmallScreen ? 14 : 16,
+    backgroundColor: 'rgba(128, 0, 128, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   benefitText: {
-    fontSize: isSmallScreen ? 13 : 14,
+    fontSize: isVerySmallScreen ? 11 : isSmallScreen ? 13 : 14,
     color: '#666',
-    marginLeft: 12,
     flex: 1,
   },
   submitSection: {
-    padding: isSmallScreen ? 16 : 20,
+    padding: isVerySmallScreen ? 12 : isSmallScreen ? 16 : 20,
     paddingBottom: 32,
   },
   submitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#800080',
-    paddingVertical: 16,
     borderRadius: 12,
     marginBottom: 12,
-    gap: 8,
     ...Platform.select({
       ios: {
         shadowColor: '#800080',
@@ -361,20 +535,23 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    opacity: 0.6,
+  submitButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
   },
   submittingButton: {
     opacity: 0.8,
   },
   submitButtonText: {
     color: 'white',
-    fontSize: isSmallScreen ? 14 : 16,
+    fontSize: isVerySmallScreen ? 12 : isSmallScreen ? 14 : 16,
     fontWeight: '600',
   },
   submitNote: {
-    fontSize: 12,
+    fontSize: isVerySmallScreen ? 10 : 12,
     color: '#666',
     textAlign: 'center',
     lineHeight: 16,
