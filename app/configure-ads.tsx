@@ -126,6 +126,7 @@ export default function ConfigureAdsScreen() {
       return;
     }
     
+    try {
         if (isMounted) {
           console.log('Rewarded ad loaded');
           setIsLoadingAd(false);
@@ -215,6 +216,8 @@ export default function ConfigureAdsScreen() {
           await AdMobRewarded.showAdAsync();
         } else {
           throw new Error('Ad not ready');
+        }
+      }
       if (isMounted) {
         setIsLoadingAd(false);
         Alert.alert(
