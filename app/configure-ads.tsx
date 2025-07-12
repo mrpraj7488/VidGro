@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Shield, Check, Play, Clock, Timer } from 'lucide-react-native';
+import { RewardedAd, RewardedAdEventType, TestIds } from '@/utils/ad-module';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -47,9 +48,6 @@ export default function ConfigureAdsScreen() {
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [rewardedAd, setRewardedAd] = useState<any>(null);
-  const [RewardedAd, setRewardedAdModule] = useState<any>(null);
-  const [RewardedAdEventType, setRewardedAdEventType] = useState<any>(null);
-  const [TestIds, setTestIds] = useState<any>(null);
   
   // All useSharedValue hooks next - maintain consistent order
   const fadeIn = useSharedValue(0);
@@ -170,14 +168,6 @@ export default function ConfigureAdsScreen() {
     
     // Initialize Google Mobile Ads only on native platforms
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
-      try {
-        const GoogleMobileAds = require('react-native-google-mobile-ads');
-        setRewardedAdModule(GoogleMobileAds.RewardedAd);
-        setRewardedAdEventType(GoogleMobileAds.RewardedAdEventType);
-        setTestIds(GoogleMobileAds.TestIds);
-      } catch (error) {
-        console.warn('Google Mobile Ads not available:', error);
-      }
       initializeGoogleMobileAds();
     }
 
