@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { CirclePlay as PlayCircle, Users, TrendingUp, ChartBar as BarChart3 } from 'lucide-react-native';
+import { CirclePlay as PlayCircle, Users, TrendingUp, ChartBar as BarChart3, Crown } from 'lucide-react-native';
 
 export default function TabLayout() {
   const { profile } = useAuth();
