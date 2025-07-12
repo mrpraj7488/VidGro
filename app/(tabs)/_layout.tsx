@@ -1,7 +1,14 @@
 import { Tabs } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 import { CirclePlay as PlayCircle, Users, TrendingUp, ChartBar as BarChart3 } from 'lucide-react-native';
 
 export default function TabLayout() {
+  const { profile } = useAuth();
+  
+  // Check if user has active VIP status
+  const isVIPActive = profile?.is_vip && profile?.vip_expires_at && 
+    new Date(profile.vip_expires_at) > new Date();
+
   return (
     <Tabs
       screenOptions={{
@@ -54,7 +61,11 @@ export default function TabLayout() {
         options={{
           title: 'More',
           tabBarIcon: ({ size, color }) => (
-            <Users size={size} color={color} />
+            isVIPActive ? (
+              <Crown size={size} color="#FFD700" />
+            ) : (
+              <Users size={size} color={color} />
+            )
           ),
         }}
       />
