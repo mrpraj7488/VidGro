@@ -74,16 +74,15 @@ export default function BecomeVIPScreen() {
     planType: null,
   });
   
-  // Animation values
-  const buttonScales = {
-    weekly: useSharedValue(1),
-    monthly: useSharedValue(1),
-  };
+  // Animation values - Initialize all values properly
+  const weeklyButtonScale = useSharedValue(1);
+  const monthlyButtonScale = useSharedValue(1);
   const crownPulse = useSharedValue(1);
   const shimmer = useSharedValue(0);
   const fadeIn = useSharedValue(0);
-  const badgeAnimations = Array.from({ length: 2 }, () => useSharedValue(0));
   const vipBadgeShimmer = useSharedValue(0);
+  const badgeAnimation1 = useSharedValue(0);
+  const badgeAnimation2 = useSharedValue(0);
 
   const vipPlans: VIPPlan[] = [
     {
@@ -164,12 +163,14 @@ export default function BecomeVIPScreen() {
     fadeIn.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.quad) });
 
     // Sequential badge animations
-    badgeAnimations.forEach((animation, index) => {
-      animation.value = withDelay(
-        index * 200,
-        withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.5)) })
-      );
-    });
+    badgeAnimation1.value = withDelay(
+      0,
+      withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.5)) })
+    );
+    badgeAnimation2.value = withDelay(
+      200,
+      withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.5)) })
+    );
 
     return () => {
       setIsMounted(false);
@@ -241,9 +242,17 @@ export default function BecomeVIPScreen() {
     }
 
     setIsSubscribing(plan.id);
-    buttonScales[plan.id as keyof typeof buttonScales].value = withSpring(0.95, {}, () => {
-      buttonScales[plan.id as keyof typeof buttonScales].value = withSpring(1);
-    });
+    
+    // Animate the correct button
+    if (plan.id === 'weekly') {
+      weeklyButtonScale.value = withSpring(0.95, {}, () => {
+        weeklyButtonScale.value = withSpring(1);
+      });
+    } else {
+      monthlyButtonScale.value = withSpring(0.95, {}, () => {
+        monthlyButtonScale.value = withSpring(1);
+      });
+    }
 
     try {
       // Get available products
@@ -337,7 +346,9 @@ export default function BecomeVIPScreen() {
 
   const getButtonAnimatedStyle = (planId: string) => {
     return useAnimatedStyle(() => ({
-      transform: [{ scale: buttonScales[planId as keyof typeof buttonScales].value }],
+      transform: [{ 
+        scale: planId === 'weekly' ? weeklyButtonScale.value : monthlyButtonScale.value 
+      }],
     }));
   };
 
@@ -364,11 +375,12 @@ export default function BecomeVIPScreen() {
   }));
 
   const getBadgeAnimatedStyle = (index: number) => {
+    const animationValue = index === 0 ? badgeAnimation1 : badgeAnimation2;
     return useAnimatedStyle(() => ({
-      opacity: badgeAnimations[index].value,
+      opacity: animationValue.value,
       transform: [
-        { scale: badgeAnimations[index].value },
-        { translateY: interpolate(badgeAnimations[index].value, [0, 1], [20, 0]) }
+        { scale: animationValue.value },
+        { translateY: interpolate(animationValue.value, [0, 1], [20, 0]) }
       ],
     }));
   };
