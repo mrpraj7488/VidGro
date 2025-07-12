@@ -12,7 +12,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ArrowLeft, Crown, Check, Star, Shield, Zap, Play } from 'lucide-react-native';
-import * as InAppPurchases from 'expo-in-app-purchases';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -24,6 +23,16 @@ import Animated, {
   withSequence,
   withDelay,
 } from 'react-native-reanimated';
+
+// Conditionally import InAppPurchases only on native platforms
+let InAppPurchases: any = null;
+if (Platform.OS === 'ios' || Platform.OS === 'android') {
+  try {
+    InAppPurchases = require('expo-in-app-purchases');
+  } catch (error) {
+    console.warn('In-app purchases not available:', error);
+  }
+}
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
@@ -38,6 +47,7 @@ interface VIPBenefit {
 export default function BecomeVIPScreen() {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   
   // Animation values
   const buttonScale = useSharedValue(1);
@@ -49,8 +59,12 @@ export default function BecomeVIPScreen() {
   const crownPulse = useSharedValue(1);
 
   useEffect(() => {
-    // Initialize In-App Purchases
-    initializeInAppPurchases();
+    setIsMounted(true);
+    
+    // Initialize In-App Purchases only on native platforms
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      initializeInAppPurchases();
+    }
 
     // Crown rotation animation
     crownRotation.value = withRepeat(
@@ -93,12 +107,22 @@ export default function BecomeVIPScreen() {
         withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.5)) })
       );
     });
+
+    return () => {
+      setIsMounted(false);
+    };
   }, []);
 
   const initializeInAppPurchases = async () => {
+    if (!InAppPurchases || !isMounted) {
+      return;
+    }
+    
     try {
       await InAppPurchases.connectAsync();
-      setIsConnected(true);
+      if (isMounted) {
+        setIsConnected(true);
+      }
     } catch (error) {
       console.error('Failed to connect to in-app purchases:', error);
     }
@@ -128,8 +152,22 @@ export default function BecomeVIPScreen() {
   ];
 
   const handleSubscribe = async () => {
-    if (!isConnected) {
+    // Handle web platform
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Feature Not Available',
+        'In-app purchases are only available on mobile devices. Please use the mobile app to subscribe to VIP.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (!InAppPurchases || !isConnected) {
       Alert.alert('Error', 'In-app purchases not available. Please try again later.');
+      return;
+    }
+
+    if (!isMounted) {
       return;
     }
 
@@ -149,7 +187,7 @@ export default function BecomeVIPScreen() {
       // Purchase the monthly VIP subscription
       const { results: purchaseResults } = await InAppPurchases.purchaseItemAsync('vip_monthly');
       
-      if (purchaseResults && purchaseResults.length > 0) {
+      if (purchaseResults && purchaseResults.length > 0 && isMounted) {
         const purchase = purchaseResults[0];
         
         if (purchase.acknowledged) {
@@ -162,13 +200,17 @@ export default function BecomeVIPScreen() {
       }
     } catch (error) {
       console.error('Purchase failed:', error);
-      Alert.alert(
-        'Purchase Failed',
-        'Unable to complete the VIP subscription. Please try again later.',
-        [{ text: 'OK' }]
-      );
+      if (isMounted) {
+        Alert.alert(
+          'Purchase Failed',
+          'Unable to complete the VIP subscription. Please try again later.',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
-      setIsSubscribing(false);
+      if (isMounted) {
+        setIsSubscribing(false);
+      }
     }
   };
 

@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowLeft, Shield, Play, Clock } from 'lucide-react-native';
 import { AdMobRewarded } from 'expo-ads-admob';
 import Animated, {
   useSharedValue,
@@ -23,6 +22,17 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 
+// Conditionally import AdMob only on native platforms
+let AdMobRewarded: any = null;
+if (Platform.OS === 'ios' || Platform.OS === 'android') {
+  try {
+    const AdMob = require('expo-ads-admob');
+    AdMobRewarded = AdMob.AdMobRewarded;
+  } catch (error) {
+    console.warn('AdMob not available:', error);
+  }
+}
+
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
 const isVerySmallScreen = screenWidth < 375;
@@ -31,6 +41,7 @@ export default function ConfigureAdsScreen() {
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [adFreeTimeLeft, setAdFreeTimeLeft] = useState(0); // in seconds
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   
   // Animation values
   const buttonScale = useSharedValue(1);
@@ -41,8 +52,12 @@ export default function ConfigureAdsScreen() {
   const countdownPulse = useSharedValue(1);
 
   useEffect(() => {
-    // Initialize AdMob
-    initializeAdMob();
+    setIsMounted(true);
+    
+    // Initialize AdMob only on native platforms
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      initializeAdMob();
+    }
 
     // Icon rotation animation
     iconRotation.value = withRepeat(
@@ -60,6 +75,10 @@ export default function ConfigureAdsScreen() {
       -1,
       false
     );
+
+    return () => {
+      setIsMounted(false);
+    };
 
     // Fade in animation
     fadeIn.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.quad) });
@@ -79,33 +98,45 @@ export default function ConfigureAdsScreen() {
 
   // Countdown timer effect
   useEffect(() => {
+    if (!isMounted) return;
+    
     let interval: NodeJS.Timeout;
     
     if (isAdFreeActive && adFreeTimeLeft > 0) {
       interval = setInterval(() => {
-        setAdFreeTimeLeft(prev => {
-          if (prev <= 1) {
-            setIsAdFreeActive(false);
-            return 0;
-          }
-          return prev - 1;
-        });
+        if (isMounted) {
+          setTimeRemaining(prev => {
+            if (prev <= 1) {
+              setIsAdFree(false);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }
       }, 1000);
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isAdFreeActive, adFreeTimeLeft]);
+  }, [isAdFree, timeRemaining, isMounted]);
 
   const initializeAdMob = async () => {
-    try {
-      // Set up rewarded ad
+    if (!AdMobRewarded || !isMounted) {
+      return;
+    }
+    
+        if (isMounted) {
+          console.log('Rewarded ad loaded');
+          setIsLoadingAd(false);
+        }
       AdMobRewarded.setAdUnitID(process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID || 'ca-app-pub-2892152842024866/2049185437');
       
       // Set up event listeners
-      AdMobRewarded.addEventListener('rewardedVideoDidRewardUser', handleAdReward);
-      AdMobRewarded.addEventListener('rewardedVideoDidFailToLoad', handleAdError);
+        if (isMounted) {
+          setIsLoadingAd(false);
+          Alert.alert('Error', 'Failed to load ad. Please try again later.');
+        }
       AdMobRewarded.addEventListener('rewardedVideoDidClose', handleAdClose);
       
       // Request ad
@@ -116,6 +147,8 @@ export default function ConfigureAdsScreen() {
   };
 
   const handleAdReward = () => {
+    if (!isMounted) return;
+    
     // Start 5-hour ad-free period (18000 seconds)
     setAdFreeTimeLeft(18000);
     setIsAdFreeActive(true);
@@ -143,6 +176,21 @@ export default function ConfigureAdsScreen() {
   };
 
   const handleWatchAd = async () => {
+    // Handle web platform
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Feature Not Available',
+        'Ad rewards are only available on mobile devices. Please use the mobile app to watch ads and earn rewards.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (!AdMobRewarded || !isMounted) {
+      Alert.alert('Error', 'Ad service not available. Please try again later.');
+      return;
+    }
+
     if (isAdFreeActive) {
       Alert.alert('Already Active', 'You already have an active ad-free period.');
       return;
@@ -167,12 +215,14 @@ export default function ConfigureAdsScreen() {
           await AdMobRewarded.showAdAsync();
         } else {
           throw new Error('Ad not ready');
-        }
+      if (isMounted) {
+        setIsLoadingAd(false);
+        Alert.alert(
+          'Ad Unavailable',
+          'No ads are available right now. Please try again later.',
+          [{ text: 'OK' }]
+        );
       }
-    } catch (error) {
-      console.error('Failed to show ad:', error);
-      Alert.alert('Ad Error', 'Unable to load ad. Please try again later.');
-      setIsWatchingAd(false);
     }
   };
 
