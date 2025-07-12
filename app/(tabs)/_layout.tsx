@@ -50,9 +50,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="others"
+        name="more"
         options={{
-          title: 'Others',
+          title: 'More',
           tabBarIcon: ({ size, color }) => (
             <Users size={size} color={color} />
           ),
