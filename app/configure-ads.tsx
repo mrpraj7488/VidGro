@@ -11,7 +11,7 @@ import {
   Pressable,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Shield, Check, Play, Clock } from 'lucide-react-native';
+import { ArrowLeft, Shield, Check, Play, Clock, Timer } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -48,6 +48,7 @@ interface AdOption {
 }
 
 export default function ConfigureAdsScreen() {
+  // All useState hooks first - maintain consistent order
   const [selectedOption, setSelectedOption] = useState('default');
   const [expandedOption, setExpandedOption] = useState<string | null>(null);
   const [isWatchingAds, setIsWatchingAds] = useState(false);
@@ -57,13 +58,23 @@ export default function ConfigureAdsScreen() {
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   
-  // Animation values
+  // All useSharedValue hooks next - maintain consistent order
   const fadeIn = useSharedValue(0);
   const buttonScale = useSharedValue(1);
   const progressWidth = useSharedValue(0);
   const timerProgress = useSharedValue(0);
-  const cardScales = Array.from({ length: 4 }, () => useSharedValue(1));
-  const expandAnimations = Array.from({ length: 4 }, () => useSharedValue(0));
+  const cardScales = [
+    useSharedValue(1),
+    useSharedValue(1),
+    useSharedValue(1),
+    useSharedValue(1)
+  ];
+  const expandAnimations = [
+    useSharedValue(0),
+    useSharedValue(0),
+    useSharedValue(0),
+    useSharedValue(0)
+  ];
 
   const adOptions: AdOption[] = [
     {
@@ -101,6 +112,7 @@ export default function ConfigureAdsScreen() {
     },
   ];
 
+  // All useEffect hooks - maintain consistent order
   useEffect(() => {
     setIsMounted(true);
     
@@ -287,7 +299,7 @@ export default function ConfigureAdsScreen() {
     
     // Animate card selection
     const index = adOptions.findIndex(opt => opt.id === optionId);
-    if (index !== -1) {
+    if (index !== -1 && index < cardScales.length) {
       cardScales[index].value = withSequence(
         withSpring(0.98, { damping: 15, stiffness: 150 }),
         withSpring(1, { damping: 15, stiffness: 150 })
@@ -362,14 +374,14 @@ export default function ConfigureAdsScreen() {
 
   const getCardAnimatedStyle = (index: number) => {
     return useAnimatedStyle(() => ({
-      transform: [{ scale: cardScales[index].value }],
+      transform: [{ scale: cardScales[index]?.value || 1 }],
     }));
   };
 
   const getExpandAnimatedStyle = (index: number) => {
     return useAnimatedStyle(() => ({
-      height: interpolate(expandAnimations[index].value, [0, 1], [0, 80]),
-      opacity: expandAnimations[index].value,
+      height: interpolate(expandAnimations[index]?.value || 0, [0, 1], [0, 80]),
+      opacity: expandAnimations[index]?.value || 0,
     }));
   };
 
