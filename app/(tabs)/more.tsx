@@ -298,18 +298,6 @@ export default function MoreTab() {
         contentContainerStyle={styles.scrollContent}
       >
         <Animated.View style={[styles.content, fadeInStyle]}>
-          {/* Hero section */}
-          <View style={styles.heroSection}>
-            <LinearGradient
-              colors={['#800080', '#9B59B6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.heroGradient}
-            >
-              <Text style={styles.heroTitle}>Discover More</Text>
-              <Text style={styles.heroSubtitle}>Unlock premium features and rewards</Text>
-            </LinearGradient>
-          </View>
 
           {/* Cards grid */}
           <View style={[
