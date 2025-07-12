@@ -17,7 +17,7 @@ import { Play, Pause, SkipForward, Clock, ExternalLink } from 'lucide-react-nati
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Eye, Clock, Timer, Play, SkipForward, ExternalLink, Pause } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import GlobalHeader from '@/components/GlobalHeader';
 import Animated, { 
   useSharedValue, 
@@ -27,6 +27,10 @@ import Animated, {
   Easing
 } from 'react-native-reanimated';
 
+interface Video {
+  id: string;
+  youtube_url: string;
+  title: string;
   duration_seconds: number;
   coin_reward: number;
 }
