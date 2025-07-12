@@ -217,7 +217,7 @@ export default function ConfigureAdsScreen() {
   }, [isAdFreeActive, adFreeTimeLeft, isMounted, selectedOption]);
 
   const initializeGoogleMobileAds = async () => {
-    if (!RewardedAd || !isMounted || Platform.OS === 'web') {
+    if (Platform.OS === 'web' || !RewardedAd || !isMounted) {
       console.log('Google Mobile Ads not available on this platform');
       return;
     }

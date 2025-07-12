@@ -84,7 +84,7 @@ export default function MoreTab() {
     if (Platform.OS === 'web') {
       Alert.alert(
         'Feature Not Available',
-        'Ad rewards are only available on mobile devices. Please use the mobile app to watch ads.',
+        'Ad rewards are only available on mobile devices. Please use the mobile app to watch ads and earn coins.',
         [{ text: 'OK' }]
       );
       return;
