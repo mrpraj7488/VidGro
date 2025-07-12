@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { AdMobRewarded } from 'expo-ads-admob';
+import { ArrowLeft, Shield, Clock, Play } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -76,10 +76,6 @@ export default function ConfigureAdsScreen() {
       false
     );
 
-    return () => {
-      setIsMounted(false);
-    };
-
     // Fade in animation
     fadeIn.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.quad) });
 
@@ -94,6 +90,10 @@ export default function ConfigureAdsScreen() {
         false
       );
     }
+
+    return () => {
+      setIsMounted(false);
+    };
   }, [isAdFreeActive]);
 
   // Countdown timer effect
@@ -105,9 +105,9 @@ export default function ConfigureAdsScreen() {
     if (isAdFreeActive && adFreeTimeLeft > 0) {
       interval = setInterval(() => {
         if (isMounted) {
-          setTimeRemaining(prev => {
+          setAdFreeTimeLeft(prev => {
             if (prev <= 1) {
-              setIsAdFree(false);
+              setIsAdFreeActive(false);
               return 0;
             }
             return prev - 1;
@@ -119,7 +119,7 @@ export default function ConfigureAdsScreen() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isAdFree, timeRemaining, isMounted]);
+  }, [isAdFreeActive, adFreeTimeLeft, isMounted]);
 
   const initializeAdMob = async () => {
     if (!AdMobRewarded || !isMounted) {
@@ -127,17 +127,16 @@ export default function ConfigureAdsScreen() {
     }
     
     try {
-        if (isMounted) {
-          console.log('Rewarded ad loaded');
-          setIsLoadingAd(false);
-        }
       AdMobRewarded.setAdUnitID(process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID || 'ca-app-pub-2892152842024866/2049185437');
       
       // Set up event listeners
+      AdMobRewarded.addEventListener('rewardedVideoDidRewardUser', handleAdReward);
+      AdMobRewarded.addEventListener('rewardedVideoDidLoad', () => {
         if (isMounted) {
-          setIsLoadingAd(false);
-          Alert.alert('Error', 'Failed to load ad. Please try again later.');
+          console.log('Rewarded ad loaded');
         }
+      });
+      AdMobRewarded.addEventListener('rewardedVideoDidFailToLoad', handleAdError);
       AdMobRewarded.addEventListener('rewardedVideoDidClose', handleAdClose);
       
       // Request ad
@@ -166,14 +165,20 @@ export default function ConfigureAdsScreen() {
 
   const handleAdError = (error: any) => {
     console.error('Ad failed to load:', error);
-    Alert.alert('Ad Not Available', 'Please try again later.');
-    setIsWatchingAd(false);
+    if (isMounted) {
+      Alert.alert('Ad Not Available', 'Please try again later.');
+      setIsWatchingAd(false);
+    }
   };
 
   const handleAdClose = () => {
-    setIsWatchingAd(false);
-    // Request next ad
-    AdMobRewarded.requestAdAsync();
+    if (isMounted) {
+      setIsWatchingAd(false);
+      // Request next ad
+      if (AdMobRewarded) {
+        AdMobRewarded.requestAdAsync();
+      }
+    }
   };
 
   const handleWatchAd = async () => {
@@ -218,8 +223,10 @@ export default function ConfigureAdsScreen() {
           throw new Error('Ad not ready');
         }
       }
+    } catch (error) {
+      console.error('Failed to show ad:', error);
       if (isMounted) {
-        setIsLoadingAd(false);
+        setIsWatchingAd(false);
         Alert.alert(
           'Ad Unavailable',
           'No ads are available right now. Please try again later.',
