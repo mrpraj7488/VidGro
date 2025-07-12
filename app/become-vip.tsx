@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowLeft, Crown, Check, Star, Shield, Zap } from 'lucide-react-native';
+import { ArrowLeft, Crown, Check, Star, Shield, Zap, Play } from 'lucide-react-native';
+import * as InAppPurchases from 'expo-in-app-purchases';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -20,6 +21,8 @@ import Animated, {
   withTiming,
   interpolate,
   Easing,
+  withSequence,
+  withDelay,
 } from 'react-native-reanimated';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -34,42 +37,83 @@ interface VIPBenefit {
 
 export default function BecomeVIPScreen() {
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   
   // Animation values
   const buttonScale = useSharedValue(1);
   const crownRotation = useSharedValue(0);
   const shimmer = useSharedValue(0);
   const fadeIn = useSharedValue(0);
+  const badgeAnimations = Array.from({ length: 4 }, () => useSharedValue(0));
+  const vipBadgeShimmer = useSharedValue(0);
+  const crownPulse = useSharedValue(1);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    // Initialize In-App Purchases
+    initializeInAppPurchases();
+
     // Crown rotation animation
     crownRotation.value = withRepeat(
-      withTiming(360, { duration: 3000, easing: Easing.linear }),
+      withTiming(360, { duration: 8000, easing: Easing.linear }),
       -1,
       false
     );
 
-    // Shimmer effect
+    // Shimmer effect for background
     shimmer.value = withRepeat(
+      withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true
+    );
+
+    // VIP badge shimmer
+    vipBadgeShimmer.value = withRepeat(
       withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.quad) }),
       -1,
       true
     );
 
+    // Crown pulse animation
+    crownPulse.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1000, easing: Easing.inOut(Easing.quad) }),
+        withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.quad) })
+      ),
+      -1,
+      false
+    );
+
     // Fade in animation
     fadeIn.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.quad) });
+
+    // Sequential badge animations
+    badgeAnimations.forEach((animation, index) => {
+      animation.value = withDelay(
+        index * 200,
+        withTiming(1, { duration: 600, easing: Easing.out(Easing.back(1.5)) })
+      );
+    });
   }, []);
+
+  const initializeInAppPurchases = async () => {
+    try {
+      await InAppPurchases.connectAsync();
+      setIsConnected(true);
+    } catch (error) {
+      console.error('Failed to connect to in-app purchases:', error);
+    }
+  };
 
   const vipBenefits: VIPBenefit[] = [
     {
       icon: <Shield color="#FFD700" size={isVerySmallScreen ? 20 : 24} />,
-      title: 'Ad-Free Experience',
+      title: 'Ad-Free Browsing',
       description: 'Enjoy uninterrupted video watching without any advertisements',
     },
     {
       icon: <Star color="#FFD700" size={isVerySmallScreen ? 20 : 24} />,
-      title: 'Exclusive Discounts',
-      description: 'Get special discounts on coin purchases and premium features',
+      title: 'Exclusive Content',
+      description: 'Access premium videos and special content reserved for VIP members',
     },
     {
       icon: <Zap color="#FFD700" size={isVerySmallScreen ? 20 : 24} />,
@@ -78,26 +122,54 @@ export default function BecomeVIPScreen() {
     },
     {
       icon: <Crown color="#FFD700" size={isVerySmallScreen ? 20 : 24} />,
-      title: 'VIP Badge',
-      description: 'Show off your VIP status with an exclusive badge',
+      title: 'Special Offers',
+      description: 'Receive exclusive discounts and early access to new features',
     },
   ];
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
+    if (!isConnected) {
+      Alert.alert('Error', 'In-app purchases not available. Please try again later.');
+      return;
+    }
+
     setIsSubscribing(true);
     buttonScale.value = withSpring(0.95, {}, () => {
       buttonScale.value = withSpring(1);
     });
 
-    // Simulate subscription process
-    setTimeout(() => {
-      setIsSubscribing(false);
+    try {
+      // Get available products
+      const { results } = await InAppPurchases.getProductsAsync(['vip_monthly', 'vip_yearly']);
+      
+      if (results.length === 0) {
+        throw new Error('No VIP products available');
+      }
+
+      // Purchase the monthly VIP subscription
+      const { results: purchaseResults } = await InAppPurchases.purchaseItemAsync('vip_monthly');
+      
+      if (purchaseResults && purchaseResults.length > 0) {
+        const purchase = purchaseResults[0];
+        
+        if (purchase.acknowledged) {
+          Alert.alert(
+            'Welcome to VIP! 👑',
+            'Your VIP subscription is now active. Enjoy all the premium benefits!',
+            [{ text: 'Awesome!', onPress: () => router.back() }]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Purchase failed:', error);
       Alert.alert(
-        'VIP Subscription',
-        'VIP subscription feature coming soon! You will be notified when it becomes available.',
-        [{ text: 'OK', onPress: () => router.back() }]
+        'Purchase Failed',
+        'Unable to complete the VIP subscription. Please try again later.',
+        [{ text: 'OK' }]
       );
-    }, 2000);
+    } finally {
+      setIsSubscribing(false);
+    }
   };
 
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
@@ -109,17 +181,36 @@ export default function BecomeVIPScreen() {
   }));
 
   const shimmerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: 0.3 + (shimmer.value * 0.7),
+    opacity: 0.3 + (shimmer.value * 0.4),
   }));
 
   const fadeInStyle = useAnimatedStyle(() => ({
     opacity: fadeIn.value,
     transform: [
       {
-        translateY: interpolate(fadeIn.value, [0, 1], [20, 0])
+        translateY: interpolate(fadeIn.value, [0, 1], [30, 0])
       }
     ]
   }));
+
+  const vipBadgeAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 0.8 + (vipBadgeShimmer.value * 0.2),
+    transform: [{ scale: 1 + (vipBadgeShimmer.value * 0.05) }],
+  }));
+
+  const crownPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: crownPulse.value }],
+  }));
+
+  const getBadgeAnimatedStyle = (index: number) => {
+    return useAnimatedStyle(() => ({
+      opacity: badgeAnimations[index].value,
+      transform: [
+        { scale: badgeAnimations[index].value },
+        { translateY: interpolate(badgeAnimations[index].value, [0, 1], [20, 0]) }
+      ],
+    }));
+  };
 
   return (
     <View style={styles.container}>
@@ -132,117 +223,97 @@ export default function BecomeVIPScreen() {
         <View style={styles.placeholder} />
       </LinearGradient>
 
-      {/* Background gradient */}
+      {/* VIP Badge */}
+      <Animated.View style={[styles.vipBadge, vipBadgeAnimatedStyle]}>
+        <LinearGradient
+          colors={['#FFD700', '#FFA500']}
+          style={styles.vipBadgeGradient}
+        >
+          <Crown color="#800080" size={16} />
+          <Text style={styles.vipBadgeText}>VIP</Text>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Velvet Curtain Background */}
       <LinearGradient
-        colors={['rgba(128, 0, 128, 0.05)', 'transparent']}
+        colors={['#800080', '#4b004b', '#2d0033']}
         style={styles.backgroundGradient}
-      />
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View style={fadeInStyle}>
-          {/* Hero Section */}
-          <LinearGradient
-            colors={['#800080', '#9B59B6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroSection}
-          >
-            <Animated.View style={[styles.heroIcon, shimmerAnimatedStyle]}>
-              <Animated.View style={crownAnimatedStyle}>
-                <Crown color="#FFD700" size={isVerySmallScreen ? 48 : 64} />
+      >
+        {/* Shimmer overlay */}
+        <Animated.View style={[styles.shimmerOverlay, shimmerAnimatedStyle]} />
+        
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <Animated.View style={fadeInStyle}>
+            {/* Hero Section */}
+            <View style={styles.heroSection}>
+              <Animated.View style={[styles.heroIcon, crownPulseStyle]}>
+                <Animated.View style={crownAnimatedStyle}>
+                  <Crown color="#FFD700" size={isVerySmallScreen ? 48 : 64} />
+                </Animated.View>
               </Animated.View>
-            </Animated.View>
-            <Text style={styles.heroTitle}>Upgrade to VIP</Text>
-            <Text style={styles.heroSubtitle}>
-              Unlock premium features and enjoy an enhanced VidGro experience
-            </Text>
-          </LinearGradient>
-
-          {/* Benefits Section */}
-          <View style={styles.benefitsSection}>
-            <Text style={styles.sectionTitle}>VIP Benefits</Text>
-            
-            {vipBenefits.map((benefit, index) => (
+              
               <LinearGradient
-                key={index}
-                colors={['rgba(128, 0, 128, 0.05)', 'rgba(255, 215, 0, 0.05)']}
-                style={styles.benefitItem}
+                colors={['#800080', '#FFFFFF']}
+                style={styles.titleGradient}
               >
-                <View style={styles.benefitIcon}>
-                  {benefit.icon}
-                </View>
-                <View style={styles.benefitContent}>
-                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                  <Text style={styles.benefitDescription}>{benefit.description}</Text>
-                </View>
-                <Check color="#4CAF50" size={20} />
+                <Text style={styles.heroTitle}>Become VIP</Text>
               </LinearGradient>
-            ))}
-          </View>
-
-          {/* Pricing Section */}
-          <View style={styles.pricingSection}>
-            <Text style={styles.sectionTitle}>Choose Your Plan</Text>
-            
-            <LinearGradient
-              colors={['rgba(128, 0, 128, 0.1)', 'rgba(255, 255, 255, 0.9)']}
-              style={styles.pricingCard}
-            >
-              <View style={styles.pricingHeader}>
-                <Crown color="#800080" size={isVerySmallScreen ? 24 : 32} />
-                <Text style={styles.planName}>VIP Monthly</Text>
-              </View>
-              <Text style={styles.planPrice}>₹99<Text style={styles.planPeriod}>/month</Text></Text>
-              <Text style={styles.planDescription}>
-                Full access to all VIP features with monthly billing
+              
+              <Text style={styles.heroSubtitle}>
+                Unlock the ultimate experience with VIP status!
               </Text>
-            </LinearGradient>
+            </View>
 
-            <LinearGradient
-              colors={['#800080', '#9B59B6']}
-              style={[styles.pricingCard, styles.popularPlan]}
-            >
-              <Animated.View style={[styles.popularBadge, shimmerAnimatedStyle]}>
-                <Text style={styles.popularText}>MOST POPULAR</Text>
-              </Animated.View>
-              <View style={styles.pricingHeader}>
-                <Crown color="#FFD700" size={isVerySmallScreen ? 24 : 32} />
-                <Text style={[styles.planName, styles.planNameWhite]}>VIP Yearly</Text>
-              </View>
-              <Text style={[styles.planPrice, styles.planPriceWhite]}>₹999<Text style={styles.planPeriodWhite}>/year</Text></Text>
-              <Text style={styles.planSavings}>Save 17% compared to monthly</Text>
-              <Text style={[styles.planDescription, styles.planDescriptionWhite]}>
-                Best value with full VIP access and maximum savings
-              </Text>
-            </LinearGradient>
-          </View>
+            {/* Benefits Section */}
+            <View style={styles.benefitsSection}>
+              {vipBenefits.map((benefit, index) => (
+                <Animated.View key={index} style={getBadgeAnimatedStyle(index)}>
+                  <LinearGradient
+                    colors={['rgba(255, 215, 0, 0.1)', 'rgba(255, 215, 0, 0.05)']}
+                    style={styles.benefitCard}
+                  >
+                    <View style={styles.benefitHeader}>
+                      <View style={styles.benefitIcon}>
+                        {benefit.icon}
+                      </View>
+                      <Check color="#800080" size={20} />
+                    </View>
+                    <Text style={styles.benefitTitle}>{benefit.title}</Text>
+                    <Text style={styles.benefitDescription}>{benefit.description}</Text>
+                  </LinearGradient>
+                </Animated.View>
+              ))}
+            </View>
 
-          {/* Subscribe Button */}
-          <View style={styles.subscribeSection}>
-            <Animated.View style={buttonAnimatedStyle}>
-              <LinearGradient
-                colors={['#800080', '#9B59B6']}
-                style={[styles.subscribeButton, isSubscribing && styles.subscribingButton]}
-              >
-                <TouchableOpacity
-                  style={styles.subscribeButtonInner}
-                  onPress={handleSubscribe}
-                  disabled={isSubscribing}
+            {/* Subscribe Button */}
+            <View style={styles.subscribeSection}>
+              <Animated.View style={buttonAnimatedStyle}>
+                <LinearGradient
+                  colors={['#800080', '#9B59B6']}
+                  style={[styles.subscribeButton, isSubscribing && styles.subscribingButton]}
                 >
-                  <Crown color="#FFD700" size={20} />
-                  <Text style={styles.subscribeButtonText}>
-                    {isSubscribing ? 'Processing...' : 'Subscribe Now'}
-                  </Text>
-                </TouchableOpacity>
-              </LinearGradient>
-            </Animated.View>
-            
-            <Text style={styles.subscribeNote}>
-              Cancel anytime. No hidden fees. Secure payment processing.
-            </Text>
-          </View>
-        </Animated.View>
-      </ScrollView>
+                  <TouchableOpacity
+                    style={styles.subscribeButtonInner}
+                    onPress={handleSubscribe}
+                    disabled={isSubscribing}
+                  >
+                    <Animated.View style={crownPulseStyle}>
+                      <Crown color="#FFD700" size={20} />
+                    </Animated.View>
+                    <Text style={styles.subscribeButtonText}>
+                      {isSubscribing ? 'Processing...' : 'Subscribe Now'}
+                    </Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </Animated.View>
+              
+              <Text style={styles.subscribeNote}>
+                Premium features • Cancel anytime • Secure payment
+              </Text>
+            </View>
+          </Animated.View>
+        </ScrollView>
+      </LinearGradient>
     </View>
   );
 }
@@ -250,7 +321,7 @@ export default function BecomeVIPScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#800080',
   },
   header: {
     flexDirection: 'row',
@@ -271,35 +342,58 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
+  vipBadge: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 50,
+    right: 16,
+    zIndex: 1000,
+  },
+  vipBadgeGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFD700',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.5,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 2px 8px rgba(255, 215, 0, 0.5)',
+      },
+    }),
+  },
+  vipBadgeText: {
+    color: '#800080',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   backgroundGradient: {
+    flex: 1,
+    position: 'relative',
+  },
+  shimmerOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 300,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
   },
   content: {
     flex: 1,
+    paddingHorizontal: isSmallScreen ? 12 : 20,
   },
   heroSection: {
     alignItems: 'center',
-    padding: isVerySmallScreen ? 20 : isSmallScreen ? 24 : 32,
-    margin: 16,
-    borderRadius: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#800080',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 12,
-      },
-      web: {
-        boxShadow: '0 8px 24px rgba(128, 0, 128, 0.3)',
-      },
-    }),
+    paddingVertical: isVerySmallScreen ? 20 : isSmallScreen ? 24 : 32,
   },
   heroIcon: {
     width: isVerySmallScreen ? 80 : isSmallScreen ? 100 : 120,
@@ -308,207 +402,117 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
     borderWidth: 2,
     borderColor: '#FFD700',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFD700',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 12,
+      },
+      web: {
+        boxShadow: '0 8px 24px rgba(255, 215, 0, 0.4)',
+      },
+    }),
+  },
+  titleGradient: {
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 12,
   },
   heroTitle: {
-    fontSize: isVerySmallScreen ? 20 : isSmallScreen ? 24 : 28,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  heroSubtitle: {
-    fontSize: isVerySmallScreen ? 12 : isSmallScreen ? 14 : 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  benefitsSection: {
-    backgroundColor: 'white',
-    padding: isVerySmallScreen ? 12 : isSmallScreen ? 16 : 20,
-    margin: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  sectionTitle: {
-    fontSize: isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: isVerySmallScreen ? 12 : 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 0, 128, 0.1)',
-  },
-  benefitIcon: {
-    width: isVerySmallScreen ? 40 : 48,
-    height: isVerySmallScreen ? 40 : 48,
-    borderRadius: isVerySmallScreen ? 20 : 24,
-    backgroundColor: 'rgba(128, 0, 128, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: '#FFD700',
-  },
-  benefitContent: {
-    flex: 1,
-  },
-  benefitTitle: {
-    fontSize: isVerySmallScreen ? 14 : isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  benefitDescription: {
-    fontSize: isVerySmallScreen ? 11 : isSmallScreen ? 13 : 14,
-    color: '#666',
-    lineHeight: 18,
-  },
-  pricingSection: {
-    backgroundColor: 'white',
-    padding: isVerySmallScreen ? 12 : isSmallScreen ? 16 : 20,
-    margin: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  pricingCard: {
-    borderRadius: 16,
-    padding: isVerySmallScreen ? 16 : isSmallScreen ? 20 : 24,
-    marginBottom: 16,
-    position: 'relative',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  popularPlan: {
-    borderWidth: 1,
-    borderColor: '#FFD700',
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: -8,
-    left: 16,
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  popularText: {
-    color: '#800080',
-    fontSize: isVerySmallScreen ? 8 : 10,
-    fontWeight: 'bold',
-  },
-  pricingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  planName: {
-    fontSize: isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginLeft: 12,
-  },
-  planNameWhite: {
-    color: 'white',
-  },
-  planPrice: {
     fontSize: isVerySmallScreen ? 24 : isSmallScreen ? 28 : 32,
     fontWeight: 'bold',
-    color: '#800080',
-    marginBottom: 4,
+    color: 'transparent',
+    textAlign: 'center',
+    // Gradient text effect would need a different approach in React Native
   },
-  planPriceWhite: {
-    color: '#FFD700',
-  },
-  planPeriod: {
-    fontSize: isVerySmallScreen ? 14 : isSmallScreen ? 16 : 18,
-    fontWeight: 'normal',
-    color: '#666',
-  },
-  planPeriodWhite: {
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  planSavings: {
+  heroSubtitle: {
     fontSize: isVerySmallScreen ? 12 : 14,
-    color: '#FFD700',
-    fontWeight: '600',
-    marginBottom: 8,
+    color: '#AAAAAA',
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: '90%',
   },
-  planDescription: {
-    fontSize: isVerySmallScreen ? 11 : isSmallScreen ? 13 : 14,
-    color: '#666',
-    lineHeight: 18,
+  benefitsSection: {
+    paddingVertical: 20,
+    gap: 16,
   },
-  planDescriptionWhite: {
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  subscribeSection: {
-    padding: isVerySmallScreen ? 12 : isSmallScreen ? 16 : 20,
-    paddingBottom: 32,
-  },
-  subscribeButton: {
-    borderRadius: 12,
-    marginBottom: 12,
+  benefitCard: {
+    borderRadius: 16,
+    padding: isVerySmallScreen ? 16 : 20,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     ...Platform.select({
       ios: {
-        shadowColor: '#800080',
+        shadowColor: '#FFD700',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
       },
       android: {
-        elevation: 4,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(128, 0, 128, 0.3)',
+        boxShadow: '0 4px 12px rgba(255, 215, 0, 0.3)',
+      },
+    }),
+  },
+  benefitHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  benefitIcon: {
+    width: isVerySmallScreen ? 40 : 48,
+    height: isVerySmallScreen ? 40 : 48,
+    borderRadius: isVerySmallScreen ? 20 : 24,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  benefitTitle: {
+    fontSize: isVerySmallScreen ? 16 : 18,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 8,
+  },
+  benefitDescription: {
+    fontSize: isVerySmallScreen ? 12 : 14,
+    color: '#CCCCCC',
+    lineHeight: 20,
+  },
+  subscribeSection: {
+    paddingVertical: 20,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  subscribeButton: {
+    borderRadius: 25,
+    marginBottom: 16,
+    minWidth: '80%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#800080',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 6px 16px rgba(128, 0, 128, 0.4)',
       },
     }),
   },
@@ -516,21 +520,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    gap: 12,
   },
   subscribingButton: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   subscribeButtonText: {
     color: 'white',
-    fontSize: isVerySmallScreen ? 14 : isSmallScreen ? 16 : 18,
-    fontWeight: '600',
+    fontSize: isVerySmallScreen ? 16 : 18,
+    fontWeight: 'bold',
   },
   subscribeNote: {
-    fontSize: isVerySmallScreen ? 10 : 12,
-    color: '#666',
+    fontSize: isVerySmallScreen ? 11 : 12,
+    color: '#AAAAAA',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
 });

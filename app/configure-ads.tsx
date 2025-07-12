@@ -1,261 +1,337 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Platform,
   Dimensions,
   Alert,
-  Switch,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowLeft, Settings, Eye, Volume2, Clock, Shield, Zap } from 'lucide-react-native';
+import { ArrowLeft, Shield, Play, Clock } from 'lucide-react-native';
+import { AdMobRewarded } from 'expo-ads-admob';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withRepeat,
+  withTiming,
+  interpolate,
+  Easing,
+  withSequence,
 } from 'react-native-reanimated';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
-
-interface AdSetting {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  type: 'toggle' | 'select' | 'slider';
-  value: any;
-  options?: string[];
-}
+const isVerySmallScreen = screenWidth < 375;
 
 export default function ConfigureAdsScreen() {
-  const [settings, setSettings] = useState<AdSetting[]>([
-    {
-      id: 'personalized-ads',
-      title: 'Personalized Ads',
-      description: 'Show ads based on your interests and viewing history',
-      icon: <Eye color="#800080" size={24} />,
-      type: 'toggle',
-      value: true,
-    },
-    {
-      id: 'ad-frequency',
-      title: 'Ad Frequency',
-      description: 'How often you see ads between videos',
-      icon: <Clock color="#800080" size={24} />,
-      type: 'select',
-      value: 'normal',
-      options: ['low', 'normal', 'high'],
-    },
-    {
-      id: 'audio-ads',
-      title: 'Audio in Ads',
-      description: 'Allow ads to play with sound',
-      icon: <Volume2 color="#800080" size={24} />,
-      type: 'toggle',
-      value: true,
-    },
-    {
-      id: 'data-usage',
-      title: 'Limit Data Usage',
-      description: 'Reduce ad quality to save mobile data',
-      icon: <Shield color="#800080" size={24} />,
-      type: 'toggle',
-      value: false,
-    },
-  ]);
-
+  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [adFreeTimeLeft, setAdFreeTimeLeft] = useState(0); // in seconds
+  const [isAdFreeActive, setIsAdFreeActive] = useState(false);
+  
   // Animation values
   const buttonScale = useSharedValue(1);
+  const iconRotation = useSharedValue(0);
+  const progressRing = useSharedValue(0);
+  const fadeIn = useSharedValue(0);
+  const playIconScale = useSharedValue(1);
+  const countdownPulse = useSharedValue(1);
 
-  const handleToggleSetting = (settingId: string) => {
-    setSettings(prev => prev.map(setting => 
-      setting.id === settingId 
-        ? { ...setting, value: !setting.value }
-        : setting
-    ));
+  useEffect(() => {
+    // Initialize AdMob
+    initializeAdMob();
+
+    // Icon rotation animation
+    iconRotation.value = withRepeat(
+      withTiming(360, { duration: 10000, easing: Easing.linear }),
+      -1,
+      false
+    );
+
+    // Play icon scale animation
+    playIconScale.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 800, easing: Easing.inOut(Easing.quad) }),
+        withTiming(1, { duration: 800, easing: Easing.inOut(Easing.quad) })
+      ),
+      -1,
+      false
+    );
+
+    // Fade in animation
+    fadeIn.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.quad) });
+
+    // Countdown pulse when active
+    if (isAdFreeActive) {
+      countdownPulse.value = withRepeat(
+        withSequence(
+          withTiming(1.05, { duration: 1000 }),
+          withTiming(1, { duration: 1000 })
+        ),
+        -1,
+        false
+      );
+    }
+  }, [isAdFreeActive]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isAdFreeActive && adFreeTimeLeft > 0) {
+      interval = setInterval(() => {
+        setAdFreeTimeLeft(prev => {
+          if (prev <= 1) {
+            setIsAdFreeActive(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAdFreeActive, adFreeTimeLeft]);
+
+  const initializeAdMob = async () => {
+    try {
+      // Set up rewarded ad
+      AdMobRewarded.setAdUnitID(process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID || 'ca-app-pub-2892152842024866/2049185437');
+      
+      // Set up event listeners
+      AdMobRewarded.addEventListener('rewardedVideoDidRewardUser', handleAdReward);
+      AdMobRewarded.addEventListener('rewardedVideoDidFailToLoad', handleAdError);
+      AdMobRewarded.addEventListener('rewardedVideoDidClose', handleAdClose);
+      
+      // Request ad
+      await AdMobRewarded.requestAdAsync();
+    } catch (error) {
+      console.error('Failed to initialize AdMob:', error);
+    }
   };
 
-  const handleSelectSetting = (settingId: string, newValue: string) => {
-    setSettings(prev => prev.map(setting => 
-      setting.id === settingId 
-        ? { ...setting, value: newValue }
-        : setting
-    ));
+  const handleAdReward = () => {
+    // Start 5-hour ad-free period (18000 seconds)
+    setAdFreeTimeLeft(18000);
+    setIsAdFreeActive(true);
+    
+    // Animate progress ring
+    progressRing.value = withTiming(1, { duration: 2000, easing: Easing.out(Easing.quad) });
+    
+    Alert.alert(
+      'Ad-Free Activated! 🎉',
+      'You now have 5 hours of ad-free browsing. Enjoy!',
+      [{ text: 'Awesome!' }]
+    );
   };
 
-  const handleStopAds = () => {
+  const handleAdError = (error: any) => {
+    console.error('Ad failed to load:', error);
+    Alert.alert('Ad Not Available', 'Please try again later.');
+    setIsWatchingAd(false);
+  };
+
+  const handleAdClose = () => {
+    setIsWatchingAd(false);
+    // Request next ad
+    AdMobRewarded.requestAdAsync();
+  };
+
+  const handleWatchAd = async () => {
+    if (isAdFreeActive) {
+      Alert.alert('Already Active', 'You already have an active ad-free period.');
+      return;
+    }
+
+    setIsWatchingAd(true);
     buttonScale.value = withSpring(0.95, {}, () => {
       buttonScale.value = withSpring(1);
     });
 
-    Alert.alert(
-      'Stop Ads for 6 Hours',
-      'Spend 500 coins to enjoy ad-free experience for 6 hours?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => {
-            Alert.alert('Success!', 'Ads have been disabled for 6 hours. Enjoy your ad-free experience!');
-          }
+    try {
+      const isReady = await AdMobRewarded.getIsReadyAsync();
+      
+      if (isReady) {
+        await AdMobRewarded.showAdAsync();
+      } else {
+        // Request and show ad
+        await AdMobRewarded.requestAdAsync();
+        const isReadyAfterRequest = await AdMobRewarded.getIsReadyAsync();
+        
+        if (isReadyAfterRequest) {
+          await AdMobRewarded.showAdAsync();
+        } else {
+          throw new Error('Ad not ready');
         }
-      ]
-    );
+      }
+    } catch (error) {
+      console.error('Failed to show ad:', error);
+      Alert.alert('Ad Error', 'Unable to load ad. Please try again later.');
+      setIsWatchingAd(false);
+    }
   };
 
-  const getFrequencyLabel = (value: string) => {
-    switch (value) {
-      case 'low': return 'Low (Every 10 videos)';
-      case 'normal': return 'Normal (Every 5 videos)';
-      case 'high': return 'High (Every 3 videos)';
-      default: return 'Normal';
-    }
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: buttonScale.value }],
   }));
 
+  const iconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${iconRotation.value}deg` }],
+  }));
+
+  const progressAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: progressRing.value }],
+    opacity: progressRing.value,
+  }));
+
+  const fadeInStyle = useAnimatedStyle(() => ({
+    opacity: fadeIn.value,
+    transform: [
+      {
+        translateY: interpolate(fadeIn.value, [0, 1], [20, 0])
+      }
+    ]
+  }));
+
+  const playIconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: playIconScale.value }],
+  }));
+
+  const countdownAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: countdownPulse.value }],
+  }));
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#800080', '#4b004b']} style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft color="white" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configure Ads</Text>
+        <Text style={styles.headerTitle}>Stop Ads</Text>
         <View style={styles.placeholder} />
-      </View>
+      </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroIcon}>
-            <Settings color="#800080" size={48} />
-          </View>
-          <Text style={styles.heroTitle}>Ad Preferences</Text>
-          <Text style={styles.heroSubtitle}>
-            Customize your advertising experience in VidGro
-          </Text>
-        </View>
-
-        {/* Stop Ads Section */}
-        <View style={styles.stopAdsSection}>
-          <View style={styles.stopAdsHeader}>
-            <Zap color="#FF6B35" size={32} />
-            <View style={styles.stopAdsInfo}>
-              <Text style={styles.stopAdsTitle}>Go Ad-Free!</Text>
-              <Text style={styles.stopAdsSubtitle}>
-                Enjoy uninterrupted viewing for 6 hours
-              </Text>
-            </View>
-          </View>
-          
-          <Animated.View style={buttonAnimatedStyle}>
-            <TouchableOpacity style={styles.stopAdsButton} onPress={handleStopAds}>
-              <Text style={styles.stopAdsButtonText}>Stop Ads - 500 🪙</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-
-        {/* Ad Settings */}
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Ad Settings</Text>
-          
-          {settings.map((setting, index) => (
-            <View
-              key={setting.id}
-              style={[
-                styles.settingItem,
-                index === settings.length - 1 && styles.lastSettingItem,
-              ]}
-            >
-              <View style={styles.settingHeader}>
-                <View style={styles.settingIcon}>
-                  {setting.icon}
-                </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>{setting.title}</Text>
-                  <Text style={styles.settingDescription}>{setting.description}</Text>
-                </View>
-                
-                {setting.type === 'toggle' && (
-                  <Switch
-                    value={setting.value}
-                    onValueChange={() => handleToggleSetting(setting.id)}
-                    trackColor={{ false: '#E5E7EB', true: '#800080' }}
-                    thumbColor={setting.value ? '#FFFFFF' : '#F3F4F6'}
-                  />
-                )}
-              </View>
+      {/* Dark Purple Background */}
+      <LinearGradient
+        colors={['#800080', '#4b004b', '#2d0033']}
+        style={styles.backgroundGradient}
+      >
+        <Animated.View style={[styles.content, fadeInStyle]}>
+          {/* Central Ad-Block Icon */}
+          <View style={styles.iconSection}>
+            <View style={styles.iconContainer}>
+              {/* Progress Ring */}
+              <Animated.View style={[styles.progressRing, progressAnimatedStyle]}>
+                <View style={styles.progressRingInner} />
+              </Animated.View>
               
-              {setting.type === 'select' && (
-                <View style={styles.selectContainer}>
-                  <Text style={styles.selectLabel}>Current: {getFrequencyLabel(setting.value)}</Text>
-                  <View style={styles.selectOptions}>
-                    {setting.options?.map((option) => (
-                      <TouchableOpacity
-                        key={option}
-                        style={[
-                          styles.selectOption,
-                          setting.value === option && styles.selectedOption,
-                        ]}
-                        onPress={() => handleSelectSetting(setting.id, option)}
-                      >
-                        <Text style={[
-                          styles.selectOptionText,
-                          setting.value === option && styles.selectedOptionText,
-                        ]}>
-                          {getFrequencyLabel(option)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-
-        {/* Ad Types Info */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Types of Ads</Text>
-          <View style={styles.infoList}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoItemTitle}>• Video Ads</Text>
-              <Text style={styles.infoItemDescription}>
-                Short video advertisements between content
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoItemTitle}>• Banner Ads</Text>
-              <Text style={styles.infoItemDescription}>
-                Small banner advertisements at the bottom of screens
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoItemTitle}>• Rewarded Ads</Text>
-              <Text style={styles.infoItemDescription}>
-                Optional ads that give you bonus coins when watched
-              </Text>
+              {/* Rotating Shield Icon */}
+              <Animated.View style={[styles.adBlockIcon, iconAnimatedStyle]}>
+                <Shield color="#FFFFFF" size={isVerySmallScreen ? 48 : 64} />
+              </Animated.View>
             </View>
           </View>
-        </View>
 
-        {/* Privacy Notice */}
-        <View style={styles.privacySection}>
-          <Text style={styles.privacyTitle}>Privacy & Data</Text>
-          <Text style={styles.privacyText}>
-            We respect your privacy. Ad personalization uses only anonymous data and 
-            viewing patterns. You can opt out of personalized ads at any time. 
-            No personal information is shared with advertisers.
-          </Text>
-        </View>
-      </ScrollView>
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <LinearGradient
+              colors={['#FFFFFF', '#800080']}
+              style={styles.titleGradient}
+            >
+              <Text style={styles.title}>Stop Ads</Text>
+            </LinearGradient>
+            
+            <Text style={styles.subtitle}>
+              Enjoy an ad-free experience for 5 hours!
+            </Text>
+            
+            <Text style={styles.description}>
+              Temporarily disable ads to enhance your browsing. Watch a rewarded ad to activate.
+            </Text>
+          </View>
+
+          {/* Countdown Timer (when active) */}
+          {isAdFreeActive && (
+            <Animated.View style={[styles.countdownSection, countdownAnimatedStyle]}>
+              <Clock color="#FFD700" size={24} />
+              <Text style={styles.countdownText}>
+                {formatTime(adFreeTimeLeft)} remaining
+              </Text>
+            </Animated.View>
+          )}
+
+          {/* Watch Ad Button */}
+          <View style={styles.buttonSection}>
+            <Animated.View style={buttonAnimatedStyle}>
+              <LinearGradient
+                colors={isAdFreeActive ? ['#4CAF50', '#45A049'] : ['#800080', '#9B59B6']}
+                style={[styles.watchAdButton, isWatchingAd && styles.loadingButton]}
+              >
+                <TouchableOpacity
+                  style={styles.watchAdButtonInner}
+                  onPress={handleWatchAd}
+                  disabled={isWatchingAd || isAdFreeActive}
+                >
+                  <Animated.View style={playIconAnimatedStyle}>
+                    {isAdFreeActive ? (
+                      <Shield color="white" size={20} />
+                    ) : (
+                      <Play color="white" size={20} />
+                    )}
+                  </Animated.View>
+                  <Text style={styles.watchAdButtonText}>
+                    {isWatchingAd 
+                      ? 'Loading Ad...' 
+                      : isAdFreeActive 
+                        ? 'Ad-Free Active' 
+                        : 'Watch Ad Now'
+                    }
+                  </Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </Animated.View>
+            
+            <Text style={styles.buttonNote}>
+              {isAdFreeActive 
+                ? 'Ads are currently disabled for your account'
+                : 'Watch a short ad to enjoy 5 hours without interruptions'
+              }
+            </Text>
+          </View>
+
+          {/* Features List */}
+          <View style={styles.featuresSection}>
+            <Text style={styles.featuresTitle}>What you get:</Text>
+            <View style={styles.featuresList}>
+              <View style={styles.featureItem}>
+                <Shield color="#FFD700" size={16} />
+                <Text style={styles.featureText}>No video ads for 5 hours</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Clock color="#FFD700" size={16} />
+                <Text style={styles.featureText}>Uninterrupted viewing experience</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Play color="#FFD700" size={16} />
+                <Text style={styles.featureText}>Faster video loading</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </LinearGradient>
     </View>
   );
 }
@@ -263,10 +339,9 @@ export default function ConfigureAdsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#800080',
   },
   header: {
-    backgroundColor: '#800080',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -278,218 +353,187 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
+    fontSize: isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
     fontWeight: 'bold',
     color: 'white',
   },
   placeholder: {
     width: 40,
   },
+  backgroundGradient: {
+    flex: 1,
+  },
   content: {
     flex: 1,
-  },
-  heroSection: {
-    alignItems: 'center',
-    padding: isSmallScreen ? 24 : 32,
-    backgroundColor: 'white',
-    marginBottom: 16,
-  },
-  heroIcon: {
-    width: isSmallScreen ? 80 : 96,
-    height: isSmallScreen ? 80 : 96,
-    borderRadius: isSmallScreen ? 40 : 48,
-    backgroundColor: '#F3E8FF',
+    paddingHorizontal: isSmallScreen ? 12 : 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  heroTitle: {
-    fontSize: isSmallScreen ? 22 : 26,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
+  iconSection: {
+    marginBottom: 40,
   },
-  heroSubtitle: {
-    fontSize: isSmallScreen ? 14 : 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  stopAdsSection: {
-    backgroundColor: '#FFF4E6',
-    padding: isSmallScreen ? 16 : 20,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF6B35',
-  },
-  stopAdsHeader: {
-    flexDirection: 'row',
+  iconContainer: {
+    position: 'relative',
+    width: isVerySmallScreen ? 120 : 150,
+    height: isVerySmallScreen ? 120 : 150,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  stopAdsInfo: {
+  progressRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: isVerySmallScreen ? 60 : 75,
+    borderWidth: 4,
+    borderColor: '#FFD700',
+    opacity: 0,
+  },
+  progressRingInner: {
     flex: 1,
-    marginLeft: 12,
+    borderRadius: isVerySmallScreen ? 56 : 71,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
   },
-  stopAdsTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    color: '#FF6B35',
-    marginBottom: 4,
-  },
-  stopAdsSubtitle: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#B45309',
-  },
-  stopAdsButton: {
-    backgroundColor: '#800080',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+  adBlockIcon: {
+    width: isVerySmallScreen ? 80 : 100,
+    height: isVerySmallScreen ? 80 : 100,
+    borderRadius: isVerySmallScreen ? 40 : 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     ...Platform.select({
       ios: {
-        shadowColor: '#800080',
-        shadowOffset: { width: 0, height: 4 },
+        shadowColor: '#FFFFFF',
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 4,
+        elevation: 12,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(128, 0, 128, 0.3)',
+        boxShadow: '0 8px 24px rgba(255, 255, 255, 0.3)',
       },
     }),
   },
-  stopAdsButtonText: {
-    color: 'white',
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
+  titleSection: {
+    alignItems: 'center',
+    marginBottom: 30,
   },
-  settingsSection: {
-    backgroundColor: 'white',
-    padding: isSmallScreen ? 16 : 20,
+  titleGradient: {
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: isSmallScreen ? 18 : 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
+  title: {
+    fontSize: isVerySmallScreen ? 24 : isSmallScreen ? 28 : 32,
+    fontWeight: 'bold',
+    color: 'transparent',
+    textAlign: 'center',
   },
-  settingItem: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+  subtitle: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 12,
+    fontWeight: '500',
   },
-  lastSettingItem: {
-    borderBottomWidth: 0,
+  description: {
+    fontSize: 12,
+    color: '#CCCCCC',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    lineHeight: 18,
+    maxWidth: '90%',
   },
-  settingHeader: {
+  countdownSection: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  settingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3E8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  settingInfo: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: isSmallScreen ? 15 : 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
-  },
-  settingDescription: {
-    fontSize: isSmallScreen ? 12 : 13,
-    color: '#666',
-    lineHeight: 18,
-  },
-  selectContainer: {
-    marginTop: 12,
-    paddingLeft: 52,
-  },
-  selectLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  selectOptions: {
-    gap: 8,
-  },
-  selectOption: {
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginBottom: 30,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#FFD700',
   },
-  selectedOption: {
-    backgroundColor: '#F3E8FF',
-    borderColor: '#800080',
+  countdownText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    marginLeft: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  selectOptionText: {
-    fontSize: 14,
-    color: '#666',
+  buttonSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+    width: '100%',
   },
-  selectedOptionText: {
-    color: '#800080',
-    fontWeight: '500',
-  },
-  infoSection: {
-    backgroundColor: 'white',
-    padding: isSmallScreen ? 16 : 20,
+  watchAdButton: {
+    borderRadius: 25,
     marginBottom: 16,
+    minWidth: '80%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#800080',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 6px 16px rgba(128, 0, 128, 0.4)',
+      },
+    }),
   },
-  infoTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  infoList: {
+  watchAdButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     gap: 12,
   },
-  infoItem: {
-    paddingLeft: 8,
+  loadingButton: {
+    opacity: 0.7,
   },
-  infoItemTitle: {
-    fontSize: isSmallScreen ? 14 : 15,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 2,
+  watchAdButtonText: {
+    color: 'white',
+    fontSize: isVerySmallScreen ? 16 : 18,
+    fontWeight: 'bold',
   },
-  infoItemDescription: {
-    fontSize: isSmallScreen ? 12 : 13,
-    color: '#666',
+  buttonNote: {
+    fontSize: isVerySmallScreen ? 11 : 12,
+    color: '#CCCCCC',
+    textAlign: 'center',
     lineHeight: 18,
+    maxWidth: '90%',
   },
-  privacySection: {
-    backgroundColor: '#F0F8FF',
-    padding: isSmallScreen ? 16 : 20,
-    marginBottom: 32,
-    borderRadius: 12,
-    marginHorizontal: 16,
+  featuresSection: {
+    alignItems: 'center',
+    width: '100%',
   },
-  privacyTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
+  featuresTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1E40AF',
-    marginBottom: 8,
+    color: '#FFFFFF',
+    marginBottom: 16,
   },
-  privacyText: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#1E3A8A',
-    lineHeight: 20,
+  featuresList: {
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  featureText: {
+    fontSize: 14,
+    color: '#CCCCCC',
   },
 });
