@@ -217,15 +217,14 @@ export default function ConfigureAdsScreen() {
   }, [isAdFreeActive, adFreeTimeLeft, isMounted, selectedOption]);
 
   const initializeGoogleMobileAds = async () => {
-    if (!RewardedAd || !isMounted) {
+    if (!RewardedAd || !isMounted || Platform.OS === 'web') {
+      console.log('Google Mobile Ads not available on this platform');
       return;
     }
     
     try {
       // Use test ad unit ID for development
-      const adUnitId = __DEV__ 
-        ? TestIds.REWARDED 
-        : (process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID || TestIds.REWARDED);
+      const adUnitId = TestIds.REWARDED; // Always use test ads for now
       
       const rewarded = RewardedAd.createForAdRequest(adUnitId);
       
@@ -329,7 +328,7 @@ export default function ConfigureAdsScreen() {
   };
 
   const showNextAd = async () => {
-    if (!rewardedAd || !isMounted) {
+    if (!rewardedAd || !isMounted || Platform.OS === 'web') {
       Alert.alert('Error', 'Ad service not available. Please try again later.');
       return;
     }

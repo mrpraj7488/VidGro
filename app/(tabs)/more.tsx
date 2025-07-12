@@ -80,6 +80,16 @@ export default function MoreTab() {
   };
 
   const handleFreeCoins = () => {
+    // Handle web platform
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Feature Not Available',
+        'Ad rewards are only available on mobile devices. Please use the mobile app to watch ads.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     // Animate gift box
     giftBoxScale.value = withSequence(
       withSpring(1.2, { damping: 15, stiffness: 150 }),
