@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowLeft, Shield, Clock, Play, CheckCircle, Star } from 'lucide-react-native';
+import { ArrowLeft, Shield, Clock, Play, CircleCheck as CheckCircle, Star } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
