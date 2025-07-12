@@ -47,7 +47,7 @@ export default function ConfigureAdsScreen() {
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [rewardedAd, setRewardedAd] = useState<any>(null);
-  const [RewardedAd, setRewardedAd] = useState<any>(null);
+  const [RewardedAd, setRewardedAdModule] = useState<any>(null);
   const [RewardedAdEventType, setRewardedAdEventType] = useState<any>(null);
   const [TestIds, setTestIds] = useState<any>(null);
   
@@ -172,7 +172,7 @@ export default function ConfigureAdsScreen() {
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
       try {
         const GoogleMobileAds = require('react-native-google-mobile-ads');
-        setRewardedAd(GoogleMobileAds.RewardedAd);
+        setRewardedAdModule(GoogleMobileAds.RewardedAd);
         setRewardedAdEventType(GoogleMobileAds.RewardedAdEventType);
         setTestIds(GoogleMobileAds.TestIds);
       } catch (error) {
