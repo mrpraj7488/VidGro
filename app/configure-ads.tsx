@@ -23,14 +23,19 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 
-// Conditionally import AdMob only on native platforms
-let AdMobRewarded: any = null;
+// Conditionally import Google Mobile Ads only on native platforms
+let RewardedAd: any = null;
+let RewardedAdEventType: any = null;
+let TestIds: any = null;
+
 if (Platform.OS === 'ios' || Platform.OS === 'android') {
   try {
-    const AdMob = require('expo-ads-admob');
-    AdMobRewarded = AdMob.AdMobRewarded;
+    const GoogleMobileAds = require('react-native-google-mobile-ads');
+    RewardedAd = GoogleMobileAds.RewardedAd;
+    RewardedAdEventType = GoogleMobileAds.RewardedAdEventType;
+    TestIds = GoogleMobileAds.TestIds;
   } catch (error) {
-    console.warn('AdMob not available:', error);
+    console.warn('Google Mobile Ads not available:', error);
   }
 }
 
@@ -57,24 +62,84 @@ export default function ConfigureAdsScreen() {
   const [adFreeTimeLeft, setAdFreeTimeLeft] = useState(0); // in seconds
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [rewardedAd, setRewardedAd] = useState<any>(null);
   
   // All useSharedValue hooks next - maintain consistent order
   const fadeIn = useSharedValue(0);
   const buttonScale = useSharedValue(1);
   const progressWidth = useSharedValue(0);
   const timerProgress = useSharedValue(0);
-  const cardScales = [
-    useSharedValue(1),
-    useSharedValue(1),
-    useSharedValue(1),
-    useSharedValue(1)
-  ];
-  const expandAnimations = [
-    useSharedValue(0),
-    useSharedValue(0),
-    useSharedValue(0),
-    useSharedValue(0)
-  ];
+  
+  // Fixed arrays for animations - always 4 elements
+  const cardScale0 = useSharedValue(1);
+  const cardScale1 = useSharedValue(1);
+  const cardScale2 = useSharedValue(1);
+  const cardScale3 = useSharedValue(1);
+  
+  const expandAnimation0 = useSharedValue(0);
+  const expandAnimation1 = useSharedValue(0);
+  const expandAnimation2 = useSharedValue(0);
+  const expandAnimation3 = useSharedValue(0);
+
+  // All useAnimatedStyle hooks - maintain consistent order
+  const fadeInStyle = useAnimatedStyle(() => ({
+    opacity: fadeIn.value,
+    transform: [
+      {
+        translateY: interpolate(fadeIn.value, [0, 1], [20, 0])
+      }
+    ]
+  }));
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
+
+  const progressAnimatedStyle = useAnimatedStyle(() => ({
+    width: `${progressWidth.value * 100}%`,
+  }));
+
+  const timerProgressAnimatedStyle = useAnimatedStyle(() => ({
+    width: `${timerProgress.value * 100}%`,
+  }));
+
+  // Fixed animated styles for cards
+  const cardAnimatedStyle0 = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale0.value }],
+  }));
+
+  const cardAnimatedStyle1 = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale1.value }],
+  }));
+
+  const cardAnimatedStyle2 = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale2.value }],
+  }));
+
+  const cardAnimatedStyle3 = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale3.value }],
+  }));
+
+  // Fixed animated styles for expansion
+  const expandAnimatedStyle0 = useAnimatedStyle(() => ({
+    height: interpolate(expandAnimation0.value, [0, 1], [0, 80]),
+    opacity: expandAnimation0.value,
+  }));
+
+  const expandAnimatedStyle1 = useAnimatedStyle(() => ({
+    height: interpolate(expandAnimation1.value, [0, 1], [0, 80]),
+    opacity: expandAnimation1.value,
+  }));
+
+  const expandAnimatedStyle2 = useAnimatedStyle(() => ({
+    height: interpolate(expandAnimation2.value, [0, 1], [0, 80]),
+    opacity: expandAnimation2.value,
+  }));
+
+  const expandAnimatedStyle3 = useAnimatedStyle(() => ({
+    height: interpolate(expandAnimation3.value, [0, 1], [0, 80]),
+    opacity: expandAnimation3.value,
+  }));
 
   const adOptions: AdOption[] = [
     {
@@ -116,9 +181,9 @@ export default function ConfigureAdsScreen() {
   useEffect(() => {
     setIsMounted(true);
     
-    // Initialize AdMob only on native platforms
+    // Initialize Google Mobile Ads only on native platforms
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
-      initializeAdMob();
+      initializeGoogleMobileAds();
     }
 
     // Fade in animation
@@ -166,28 +231,57 @@ export default function ConfigureAdsScreen() {
     };
   }, [isAdFreeActive, adFreeTimeLeft, isMounted, selectedOption]);
 
-  const initializeAdMob = async () => {
-    if (!AdMobRewarded || !isMounted) {
+  const initializeGoogleMobileAds = async () => {
+    if (!RewardedAd || !isMounted) {
       return;
     }
     
     try {
-      AdMobRewarded.setAdUnitID(process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID || 'ca-app-pub-2892152842024866/2049185437');
+      // Use test ad unit ID for development
+      const adUnitId = __DEV__ 
+        ? TestIds.REWARDED 
+        : (process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID || TestIds.REWARDED);
+      
+      const rewarded = RewardedAd.createForAdRequest(adUnitId);
       
       // Set up event listeners
-      AdMobRewarded.addEventListener('rewardedVideoDidRewardUser', handleAdReward);
-      AdMobRewarded.addEventListener('rewardedVideoDidLoad', () => {
+      const unsubscribeLoaded = rewarded.addAdEventListener(RewardedAdEventType.LOADED, () => {
         if (isMounted) {
           console.log('Rewarded ad loaded');
         }
       });
-      AdMobRewarded.addEventListener('rewardedVideoDidFailToLoad', handleAdError);
-      AdMobRewarded.addEventListener('rewardedVideoDidClose', handleAdClose);
-      
-      // Request ad
-      await AdMobRewarded.requestAdAsync();
+
+      const unsubscribeEarned = rewarded.addAdEventListener(RewardedAdEventType.EARNED_REWARD, (reward: any) => {
+        if (isMounted) {
+          handleAdReward();
+        }
+      });
+
+      const unsubscribeClosed = rewarded.addAdEventListener(RewardedAdEventType.CLOSED, () => {
+        if (isMounted) {
+          handleAdClose();
+        }
+      });
+
+      const unsubscribeError = rewarded.addAdEventListener(RewardedAdEventType.ERROR, (error: any) => {
+        if (isMounted) {
+          handleAdError(error);
+        }
+      });
+
+      // Load the ad
+      rewarded.load();
+      setRewardedAd(rewarded);
+
+      // Cleanup function
+      return () => {
+        unsubscribeLoaded();
+        unsubscribeEarned();
+        unsubscribeClosed();
+        unsubscribeError();
+      };
     } catch (error) {
-      console.error('Failed to initialize AdMob:', error);
+      console.error('Failed to initialize Google Mobile Ads:', error);
     }
   };
 
@@ -243,33 +337,35 @@ export default function ConfigureAdsScreen() {
   };
 
   const handleAdClose = () => {
-    if (isMounted && AdMobRewarded) {
-      // Request next ad
-      AdMobRewarded.requestAdAsync();
+    if (isMounted && rewardedAd) {
+      // Load next ad
+      rewardedAd.load();
     }
   };
 
   const showNextAd = async () => {
-    if (!AdMobRewarded || !isMounted) {
+    if (!rewardedAd || !isMounted) {
       Alert.alert('Error', 'Ad service not available. Please try again later.');
       return;
     }
 
     try {
-      const isReady = await AdMobRewarded.getIsReadyAsync();
+      const isLoaded = rewardedAd.loaded;
       
-      if (isReady) {
-        await AdMobRewarded.showAdAsync();
+      if (isLoaded) {
+        rewardedAd.show();
       } else {
-        // Request and show ad
-        await AdMobRewarded.requestAdAsync();
-        const isReadyAfterRequest = await AdMobRewarded.getIsReadyAsync();
+        // Load and show ad
+        rewardedAd.load();
         
-        if (isReadyAfterRequest) {
-          await AdMobRewarded.showAdAsync();
-        } else {
-          throw new Error('Ad not ready');
-        }
+        // Wait for ad to load
+        setTimeout(() => {
+          if (rewardedAd.loaded) {
+            rewardedAd.show();
+          } else {
+            throw new Error('Ad not ready');
+          }
+        }, 2000);
       }
     } catch (error) {
       console.error('Failed to show ad:', error);
@@ -288,6 +384,46 @@ export default function ConfigureAdsScreen() {
     }
   };
 
+  const getCardAnimatedStyle = (index: number) => {
+    switch (index) {
+      case 0: return cardAnimatedStyle0;
+      case 1: return cardAnimatedStyle1;
+      case 2: return cardAnimatedStyle2;
+      case 3: return cardAnimatedStyle3;
+      default: return cardAnimatedStyle0;
+    }
+  };
+
+  const getExpandAnimatedStyle = (index: number) => {
+    switch (index) {
+      case 0: return expandAnimatedStyle0;
+      case 1: return expandAnimatedStyle1;
+      case 2: return expandAnimatedStyle2;
+      case 3: return expandAnimatedStyle3;
+      default: return expandAnimatedStyle0;
+    }
+  };
+
+  const getCardScale = (index: number) => {
+    switch (index) {
+      case 0: return cardScale0;
+      case 1: return cardScale1;
+      case 2: return cardScale2;
+      case 3: return cardScale3;
+      default: return cardScale0;
+    }
+  };
+
+  const getExpandAnimation = (index: number) => {
+    switch (index) {
+      case 0: return expandAnimation0;
+      case 1: return expandAnimation1;
+      case 2: return expandAnimation2;
+      case 3: return expandAnimation3;
+      default: return expandAnimation0;
+    }
+  };
+
   const handleOptionSelect = (optionId: string) => {
     if (isWatchingAds || isAdFreeActive) return;
     
@@ -299,14 +435,17 @@ export default function ConfigureAdsScreen() {
     
     // Animate card selection
     const index = adOptions.findIndex(opt => opt.id === optionId);
-    if (index !== -1 && index < cardScales.length) {
-      cardScales[index].value = withSequence(
+    if (index !== -1 && index < 4) {
+      const cardScale = getCardScale(index);
+      const expandAnimation = getExpandAnimation(index);
+      
+      cardScale.value = withSequence(
         withSpring(0.98, { damping: 15, stiffness: 150 }),
         withSpring(1, { damping: 15, stiffness: 150 })
       );
       
       // Animate expansion
-      expandAnimations[index].value = withTiming(
+      expandAnimation.value = withTiming(
         isCurrentlyExpanded ? 0 : 1,
         { duration: 300, easing: Easing.out(Easing.quad) }
       );
@@ -348,41 +487,6 @@ export default function ConfigureAdsScreen() {
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Animation styles
-  const fadeInStyle = useAnimatedStyle(() => ({
-    opacity: fadeIn.value,
-    transform: [
-      {
-        translateY: interpolate(fadeIn.value, [0, 1], [20, 0])
-      }
-    ]
-  }));
-
-  const buttonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
-
-  const progressAnimatedStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value * 100}%`,
-  }));
-
-  const timerProgressAnimatedStyle = useAnimatedStyle(() => ({
-    width: `${timerProgress.value * 100}%`,
-  }));
-
-  const getCardAnimatedStyle = (index: number) => {
-    return useAnimatedStyle(() => ({
-      transform: [{ scale: cardScales[index]?.value || 1 }],
-    }));
-  };
-
-  const getExpandAnimatedStyle = (index: number) => {
-    return useAnimatedStyle(() => ({
-      height: interpolate(expandAnimations[index]?.value || 0, [0, 1], [0, 80]),
-      opacity: expandAnimations[index]?.value || 0,
-    }));
   };
 
   const renderOption = (option: AdOption, index: number) => {
