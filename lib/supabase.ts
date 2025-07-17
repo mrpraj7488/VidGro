@@ -1,25 +1,59 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Provide fallback values to prevent undefined errors during development
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Enhanced environment variable handling with proper fallbacks
+const getEnvVar = (key: string, fallback: string = ''): string => {
+  // Try multiple sources for environment variables
+  const sources = [
+    process.env?.[key],
+    (global as any)?.importMetaEnv?.[key],
+    (typeof window !== 'undefined' && (window as any).importMeta?.env?.[key]),
+  ];
+  
+  const value = sources.find(v => v && typeof v === 'string') || fallback;
+  
+  if (!value && !fallback) {
+    console.warn(`⚠️ Environment variable ${key} is not set`);
+  }
+  
+  return value;
+};
 
-// Warn if environment variables are not set
-if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
-  console.warn('⚠️ Supabase environment variables are not set. Please configure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.');
-}
+// Get environment variables with enhanced error handling
+const supabaseUrl = getEnvVar('EXPO_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-// Ensure we have valid URLs
+// Enhanced validation with better error messages
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase configuration. Please check your environment variables.');
+  const missingVars = [];
+  if (!supabaseUrl) missingVars.push('EXPO_PUBLIC_SUPABASE_URL');
+  if (!supabaseAnonKey) missingVars.push('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  
+  console.error('❌ Missing Supabase environment variables:', missingVars.join(', '));
+  console.error('📝 Please check your .env file and ensure these variables are set');
+  
+  // Provide more helpful error message
+  throw new Error(
+    `Missing Supabase configuration: ${missingVars.join(', ')}. ` +
+    'Please check your .env file and restart the development server.'
+  );
 }
 
+// Validate URL format
+try {
+  new URL(supabaseUrl);
+} catch (error) {
+  throw new Error(`Invalid EXPO_PUBLIC_SUPABASE_URL format: ${supabaseUrl}`);
+}
+
+// Enhanced Supabase client configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
     flowType: 'implicit',
+    // Enhanced storage configuration
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   },
   realtime: {
     params: {
@@ -28,11 +62,28 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      'X-Client-Info': 'vidgro-app'
+      'X-Client-Info': 'vidgro-app',
+      'X-Client-Version': '1.0.0',
+      'X-Platform': typeof window !== 'undefined' ? 'web' : 'mobile',
     }
-  }
+  },
+  // Enhanced database configuration
+  db: {
+    schema: 'public',
+  },
+  // Add custom fetch implementation for better compatibility
+  fetch: (url, options = {}) => {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Content-Type': 'application/json',
+      },
+    });
+  },
 });
 
+// Enhanced type definitions
 export type Database = {
   public: {
     Tables: {
@@ -298,3 +349,18 @@ export type Database = {
     };
   };
 };
+
+// Test connection on initialization (development only)
+if (process.env?.NODE_ENV === 'development') {
+  supabase.from('profiles').select('count').limit(1).then(
+    ({ error }) => {
+      if (error) {
+        console.warn('⚠️ Supabase connection test failed:', error.message);
+      } else {
+        console.log('✅ Supabase connection established successfully');
+      }
+    }
+  ).catch((error) => {
+    console.warn('⚠️ Supabase connection test error:', error.message);
+  });
+}

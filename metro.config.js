@@ -2,23 +2,48 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-// Fix import.meta issues
+// Enhanced resolver configuration for import.meta handling
 config.resolver.alias = {
   'crypto': 'react-native-crypto',
   'stream': 'readable-stream',
   'buffer': '@craftzdog/react-native-buffer',
+  // Add polyfills for Node.js modules
+  'util': 'util',
+  'url': 'react-native-url-polyfill',
+  'querystring': 'querystring-es3',
 };
 
-// Enable support for import.meta
+// Enhanced transformer configuration
 config.transformer.getTransformOptions = async () => ({
   transform: {
-    experimentalImportSupport: false,
+    // Enable experimental import support for import.meta handling
+    experimentalImportSupport: true,
+    // Inline requires to prevent module loading issues
     inlineRequires: true,
+    // Enable hermetic modules for better isolation
+    hermetic: false,
   },
 });
 
-// Resolver configuration for better module resolution
+// Enhanced resolver configuration
 config.resolver.platforms = ['ios', 'android', 'web'];
-config.resolver.sourceExts = [...config.resolver.sourceExts, 'mjs', 'cjs'];
+config.resolver.sourceExts = [...config.resolver.sourceExts, 'mjs', 'cjs', 'ts', 'tsx'];
+config.resolver.assetExts = [...config.resolver.assetExts, 'bin'];
+
+// Add support for ES modules and CommonJS interop
+config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
+config.resolver.enableGlobalPackages = true;
+
+// Enhanced transformer for better module handling
+config.transformer.minifierConfig = {
+  // Preserve import.meta transformations
+  keep_fnames: true,
+  mangle: {
+    keep_fnames: true,
+  },
+};
+
+// Add custom transformer options for import.meta
+config.transformer.babelTransformerPath = require.resolve('metro-react-native-babel-transformer');
 
 module.exports = config;

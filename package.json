@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start --clear --dev-client",
     "build:web": "expo export --platform web",
-    "start": "expo start",
-    "start:clear": "expo start --clear",
+    "start": "EXPO_NO_TELEMETRY=1 expo start",
+    "start:clear": "EXPO_NO_TELEMETRY=1 expo start --clear",
     "lint": "expo lint",
     "clean": "rm -rf node_modules .expo dist build .cache *.log *.tmp .DS_Store Thumbs.db && npm install",
-    "deep-clean": "rm -rf node_modules .expo dist build .cache *.log *.tmp .DS_Store Thumbs.db package-lock.json && npm install"
+    "deep-clean": "rm -rf node_modules .expo dist build .cache *.log *.tmp .DS_Store Thumbs.db package-lock.json && npm cache clean --force && npm install",
+    "reset-metro": "npx expo start --clear",
+    "reset-all": "npm run deep-clean && npm run reset-metro"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
