@@ -200,10 +200,11 @@ export const useVideoStore = create<VideoStore>()((set, get) => ({
         if (filteredVideos.length === 0) {
           console.log(`📋 No suitable videos after filtering, resetting queue...`);
           // Instead of resetting immediately, wait a bit
-          setTimeout(() => {
+          setTimeout(async () => {
           set({ isLoading: false });
           await get().resetQueue(userId);
           return;
+          }, 5000); // Wait 5 seconds before resetting
         }
 
         console.log(`📋 Loaded ${filteredVideos.length} videos from fallback`);
@@ -216,7 +217,6 @@ export const useVideoStore = create<VideoStore>()((set, get) => ({
           errorCount: 0
         });
         return;
-          }, 5000); // Wait 5 seconds before resetting
       }
 
       // Process enhanced function results
