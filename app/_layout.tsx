@@ -1,16 +1,16 @@
-// Polyfill for structuredClone if not available
-if (typeof global.structuredClone === 'undefined') {
-  global.structuredClone = (obj: any) => {
-    return JSON.parse(JSON.stringify(obj));
-  };
-}
-
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import 'react-native-url-polyfill/auto';
+
+// Polyfill for structuredClone if not available
+if (typeof global !== 'undefined' && typeof global.structuredClone === 'undefined') {
+  global.structuredClone = (obj: any) => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+}
 
 export default function RootLayout() {
   useFrameworkReady();

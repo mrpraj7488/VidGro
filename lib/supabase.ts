@@ -1,12 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Provide fallback values to prevent undefined errors during development
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Warn if environment variables are not set
 if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
   console.warn('⚠️ Supabase environment variables are not set. Please configure EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file.');
+}
+
+// Ensure we have valid URLs
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase configuration. Please check your environment variables.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -14,17 +19,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    // Completely disable email confirmation and validation
     flowType: 'implicit',
-    // Disable email confirmation
-    confirmEmail: false,
-    // Skip email validation
-    skipEmailValidation: true
   },
-  // Disable realtime to avoid WebCrypto issues
   realtime: {
     params: {
       eventsPerSecond: 2
+    }
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'vidgro-app'
     }
   }
 });
