@@ -43,7 +43,7 @@ config.transformer.minifierConfig = {
   },
 };
 
-// Add custom transformer options for import.meta
-config.transformer.babelTransformerPath = require.resolve('metro-react-native-babel-transformer');
+// Use the default Expo babel transformer (no need to specify custom path)
+// config.transformer.babelTransformerPath is handled by Expo automatically
 
 module.exports = config;

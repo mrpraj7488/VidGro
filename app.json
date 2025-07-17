@@ -27,6 +27,7 @@
     "plugins": [
       "expo-font",
       "expo-web-browser",
+      "expo-dev-client",
       [
         "expo-router",
         {
