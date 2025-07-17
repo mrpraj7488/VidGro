@@ -31,9 +31,9 @@ interface VideoStore {
   checkVideoCompletion: (videoId: string) => Promise<boolean>; // New method for completion check
 }
 
-const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache (reduced for more frequent updates)
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 const QUEUE_SIZE = 5; // Reduced queue size for better performance
-const MAX_ERROR_COUNT = 2; // Further reduced for faster queue management
+const MAX_ERROR_COUNT = 3; // Reduced for faster queue management
 
 export const useVideoStore = create<VideoStore>((set, get) => ({
   videoQueue: [],
@@ -91,7 +91,6 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       return false;
     }
   },
-
   fetchVideos: async (userId: string) => {
     const now = Date.now();
     const { lastFetchTime, isLoading, videoQueue, isResetting, blacklistedVideoIds } = get();
@@ -102,8 +101,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       return;
     }
 
-    // Check if we need to fetch (cache expired or no videos) - be more aggressive about fetching
-    if (now - lastFetchTime < CACHE_DURATION && videoQueue.length > 1) {
+    // Check if we need to fetch (cache expired or no videos)
+    if (now - lastFetchTime < CACHE_DURATION && videoQueue.length > 0) {
       console.log(`📋 Using cached videos (${videoQueue.length} available)`);
       return;
     }
@@ -112,134 +111,119 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     set({ isLoading: true, errorCount: 0 });
 
     try {
-      // Simplified approach: Get all active videos and filter client-side
-      console.log(`📋 Fetching all active videos...`);
-      const { data: allVideos, error } = await supabase
-        .from('videos')
-        .select(`
-          id, 
-          youtube_url, 
-          title, 
-          duration_seconds, 
-          views_count, 
-          target_views, 
-          user_id, 
-          status,
-          updated_at
-        `)
-        .eq('status', 'active') // Only active videos
-        .neq('user_id', userId)
-        .lt('views_count', supabase.sql`target_views`) // Only videos with remaining views
-        .order('updated_at', { ascending: false })
-        .limit(20); // Get more videos to filter from
+      // First, get videos that the user has already watched
+      const { data: watchedVideos, error: watchedError } = await supabase
+        .from('video_views')
+        .select('video_id')
+        .eq('viewer_id', userId);
+
+      if (watchedError) {
+        throw watchedError;
+      }
+
+      const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
+      
+      // Use enhanced function to get next videos for user
+      const { data: availableVideos, error } = await supabase
+        .rpc('get_next_video_for_user_enhanced', {
+          user_uuid: userId
+        });
 
       if (error) {
         throw error;
       }
 
-      if (!allVideos || allVideos.length === 0) {
-        console.log(`📋 No active videos available`);
-        set({ 
-          videoQueue: [], 
-          currentVideoIndex: 0,
-          isLoading: false,
-          lastFetchTime: now,
-          errorCount: 0
-        });
-        return;
-      }
+      // If no videos from enhanced function, fall back to regular query
+      if (!availableVideos || availableVideos.length === 0) {
+        console.log(`📋 No videos from enhanced function, using fallback...`);
+        const { data: fallbackVideos, error: fallbackError } = await supabase
+        .from('videos')
+        .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id, status, updated_at')
+        .eq('status', 'active') // Only active videos
+        .neq('user_id', userId)
+        .order('updated_at', { ascending: false }) // Order by updated_at to get freshest data
+        .limit(QUEUE_SIZE * 3); // Get more to filter from
 
-      // Get videos that the user has already watched
-      const { data: watchedVideos } = await supabase
-        .from('video_views')
-        .select('video_id')
-        .eq('viewer_id', userId);
-
-      const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
-      
-      // Filter videos
-      const filteredVideos = allVideos
-        .filter(video => {
-          const hasRemainingViews = video.views_count < video.target_views;
-          const notWatched = !watchedVideoIds.includes(video.id);
-          const notBlacklisted = !blacklistedVideoIds.has(video.youtube_url);
-          const isActive = video.status === 'active';
-          
-          return hasRemainingViews && notWatched && notBlacklisted && isActive;
-        })
-        .slice(0, QUEUE_SIZE)
-        .map(video => ({
-          id: video.id,
-          youtube_url: video.youtube_url,
-          title: video.title,
-          duration_seconds: video.duration_seconds,
-          coin_reward: calculateCoinsByDuration(video.duration_seconds)
-        }));
-
-      if (filteredVideos.length === 0) {
-        console.log(`📋 No suitable videos after filtering. Total videos: ${allVideos.length}, Watched: ${watchedVideoIds.length}, Blacklisted: ${blacklistedVideoIds.size}`);
-        
-        // Clear blacklist and try again if no videos available
-        if (blacklistedVideoIds.size > 0) {
-          console.log(`📋 Clearing blacklist and retrying...`);
-          set({ blacklistedVideoIds: new Set<string>() });
-          
-          // Retry without blacklist
-          const retryVideos = allVideos
-            .filter(video => {
-              const hasRemainingViews = video.views_count < video.target_views;
-              const notWatched = !watchedVideoIds.includes(video.id);
-              const isActive = video.status === 'active';
-              
-              return hasRemainingViews && notWatched && isActive;
-            })
-            .slice(0, QUEUE_SIZE)
-            .map(video => ({
-              id: video.id,
-              youtube_url: video.youtube_url,
-              title: video.title,
-              duration_seconds: video.duration_seconds,
-              coin_reward: calculateCoinsByDuration(video.duration_seconds)
-            }));
-          
-          if (retryVideos.length > 0) {
-            console.log(`📋 Found ${retryVideos.length} videos after clearing blacklist`);
-            set({ 
-              videoQueue: retryVideos,
-              currentVideoIndex: 0,
-              isLoading: false,
-              lastFetchTime: now,
-              cachedVideoIds: retryVideos.map(v => v.id),
-              errorCount: 0
-            });
-            return;
-          }
+        if (fallbackError) {
+          throw fallbackError;
         }
-        
-        // Still no videos, set empty queue
+
+        if (!fallbackVideos || fallbackVideos.length === 0) {
+          console.log(`📋 No videos available at all`);
+          set({ 
+            videoQueue: [], 
+            currentVideoIndex: 0,
+            isLoading: false,
+            lastFetchTime: now,
+            errorCount: 0
+          });
+          return;
+        }
+
+        // Filter fallback videos
+        const filteredVideos = fallbackVideos
+          .filter(video => {
+            const hasRemainingViews = video.views_count < video.target_views;
+            const notWatched = !watchedVideoIds.includes(video.id);
+            const notBlacklisted = !blacklistedVideoIds.has(video.youtube_url);
+            const isActive = video.status === 'active';
+            
+            return hasRemainingViews && notWatched && notBlacklisted && isActive;
+          })
+          .slice(0, QUEUE_SIZE)
+          .map(video => ({
+            id: video.id,
+            youtube_url: video.youtube_url,
+            title: video.title,
+            duration_seconds: video.duration_seconds,
+            coin_reward: video.coin_reward
+          }));
+
+        if (filteredVideos.length === 0) {
+          console.log(`📋 No suitable videos after filtering, resetting queue...`);
+          set({ isLoading: false });
+          await get().resetQueue(userId);
+          return;
+        }
+
+        console.log(`📋 Loaded ${filteredVideos.length} videos from fallback`);
         set({ 
-          videoQueue: [], 
+          videoQueue: filteredVideos,
           currentVideoIndex: 0,
           isLoading: false,
           lastFetchTime: now,
+          cachedVideoIds: filteredVideos.map(v => v.id),
           errorCount: 0
         });
         return;
       }
 
-      console.log(`📋 Loaded ${filteredVideos.length} videos successfully`);
+      // Process enhanced function results
+      const processedVideos = availableVideos.map(video => ({
+        id: video.video_id,
+        youtube_url: video.youtube_url,
+        title: video.title,
+        duration_seconds: video.duration_seconds,
+        coin_reward: video.coin_reward
+      }));
+      
+      // Cache video IDs for performance
+      const videoIds = processedVideos.map(v => v.id);
+      
+      console.log(`📋 Loaded ${processedVideos.length} videos from enhanced function`);
       set({ 
-        videoQueue: filteredVideos,
+        videoQueue: processedVideos,
         currentVideoIndex: 0,
         isLoading: false,
         lastFetchTime: now,
-        cachedVideoIds: filteredVideos.map(v => v.id),
+        cachedVideoIds: videoIds,
         errorCount: 0
       });
 
     } catch (error) {
       console.error('Error fetching videos:', error);
       set({ isLoading: false, errorCount: 0 });
+      throw error;
     }
   },
 
