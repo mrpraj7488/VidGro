@@ -237,7 +237,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     const currentVideo = videoQueue[currentVideoIndex];
     
     // Check if current video should be skipped due to completion
-        coin_reward: calculateCoinsByDuration(video.duration_seconds) // Calculate coins based on duration
+    if (currentVideo) {
       const shouldSkip = await get().checkVideoCompletion(currentVideo.id);
       if (shouldSkip) {
         console.log(`🔄 Skipping completed video: ${currentVideo.youtube_url}`);
