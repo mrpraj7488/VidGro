@@ -44,8 +44,6 @@ interface MoreItem {
   subtitle: string;
   icon: React.ReactNode;
   onPress: () => void;
-  showArrow:інің
-
   showArrow: boolean;
   isSpecial?: boolean;
   gradientColors: string[];
