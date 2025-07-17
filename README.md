@@ -525,8 +525,7 @@ calculate_coins_by_duration_v2(duration_seconds integer) RETURNS integer
 - 90s+ = 35 coins
 - 60s+ = 25 coins
 - 45s+ = 15 coins
-- 30s+ = 10 coins
-- <30s = 5 coins
+- 35s+ = 10 coins
 
 ### 6.5 System Functions
 
