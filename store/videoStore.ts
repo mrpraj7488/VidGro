@@ -35,7 +35,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 const QUEUE_SIZE = 5; // Reduced queue size for better performance
 const MAX_ERROR_COUNT = 3; // Reduced for faster queue management
 
-export const useVideoStore = create<VideoStore>((set, get) => ({
+export const useVideoStore = create<VideoStore>()((set, get) => ({
   videoQueue: [],
   currentVideoIndex: 0,
   isLoading: false,
@@ -95,6 +95,11 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     const now = Date.now();
     const { lastFetchTime, isLoading, videoQueue, isResetting, blacklistedVideoIds } = get();
     
+    // Add debug logging
+    console.log(`📋 Fetch videos called - loading: ${isLoading}, resetting: ${isResetting}, queue length: ${videoQueue.length}`);
+    
+    // Don't fetch if already loading or resetting
+    
     // Don't fetch if already loading or resetting
     if (isLoading || isResetting) {
       console.log(`⏳ Fetch already in progress, skipping...`);
@@ -103,7 +108,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
     // Check if we need to fetch (cache expired or no videos)
     if (now - lastFetchTime < CACHE_DURATION && videoQueue.length > 0) {
-      console.log(`📋 Using cached videos (${videoQueue.length} available)`);
+      console.log(`📋 Using cached videos (${videoQueue.length} available) - cache valid for ${Math.round((CACHE_DURATION - (now - lastFetchTime)) / 1000)}s more`);
       return;
     }
 
@@ -112,6 +117,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
     try {
       // First, get videos that the user has already watched
+      console.log(`📋 Getting watched videos for user ${userId}...`);
       const { data: watchedVideos, error: watchedError } = await supabase
         .from('video_views')
         .select('video_id')
@@ -122,6 +128,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       const watchedVideoIds = watchedVideos?.map(v => v.video_id) || [];
+      console.log(`📋 User has watched ${watchedVideoIds.length} videos`);
       
       // Use enhanced function to get next videos for user
       const { data: availableVideos, error } = await supabase
@@ -136,6 +143,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       // If no videos from enhanced function, fall back to regular query
       if (!availableVideos || availableVideos.length === 0) {
         console.log(`📋 No videos from enhanced function, using fallback...`);
+        
         const { data: fallbackVideos, error: fallbackError } = await supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, coin_reward, views_count, target_views, user_id, status, updated_at')
@@ -149,6 +157,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         }
 
         if (!fallbackVideos || fallbackVideos.length === 0) {
+          console.log(`📋 No fallback videos available either`);
           console.log(`📋 No videos available at all`);
           set({ 
             videoQueue: [], 
@@ -160,6 +169,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           return;
         }
 
+        console.log(`📋 Found ${fallbackVideos.length} fallback videos, filtering...`);
+        
         // Filter fallback videos
         const filteredVideos = fallbackVideos
           .filter(video => {
@@ -167,6 +178,11 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
             const notWatched = !watchedVideoIds.includes(video.id);
             const notBlacklisted = !blacklistedVideoIds.has(video.youtube_url);
             const isActive = video.status === 'active';
+            
+            if (!hasRemainingViews) console.log(`📋 Video ${video.youtube_url} filtered: no remaining views (${video.views_count}/${video.target_views})`);
+            if (!notWatched) console.log(`📋 Video ${video.youtube_url} filtered: already watched`);
+            if (!notBlacklisted) console.log(`📋 Video ${video.youtube_url} filtered: blacklisted`);
+            if (!isActive) console.log(`📋 Video ${video.youtube_url} filtered: not active (${video.status})`);
             
             return hasRemainingViews && notWatched && notBlacklisted && isActive;
           })
@@ -179,8 +195,12 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
             coin_reward: video.coin_reward
           }));
 
+        console.log(`📋 After filtering: ${filteredVideos.length} suitable videos found`);
+        
         if (filteredVideos.length === 0) {
           console.log(`📋 No suitable videos after filtering, resetting queue...`);
+          // Instead of resetting immediately, wait a bit
+          setTimeout(() => {
           set({ isLoading: false });
           await get().resetQueue(userId);
           return;
@@ -196,6 +216,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           errorCount: 0
         });
         return;
+          }, 5000); // Wait 5 seconds before resetting
       }
 
       // Process enhanced function results
@@ -207,6 +228,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         coin_reward: video.coin_reward
       }));
       
+      console.log(`📋 Enhanced function returned ${processedVideos.length} videos`);
       // Cache video IDs for performance
       const videoIds = processedVideos.map(v => v.id);
       
@@ -222,6 +244,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
     } catch (error) {
       console.error('Error fetching videos:', error);
+      console.log(`📋 Fetch error, will retry in 10 seconds...`);
       set({ isLoading: false, errorCount: 0 });
       throw error;
     }
@@ -235,6 +258,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
   moveToNextVideo: async () => {
     const { videoQueue, currentVideoIndex } = get();
     const currentVideo = videoQueue[currentVideoIndex];
+    
+    console.log(`🎬 Moving to next video - current index: ${currentVideoIndex}, queue length: ${videoQueue.length}`);
     
     // Check if current video should be skipped due to completion
     if (currentVideo) {
@@ -250,6 +275,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     const nextIndex = currentVideoIndex + 1;
     
     if (nextIndex < videoQueue.length) {
+      console.log(`🎬 Moving to video ${nextIndex + 1}/${videoQueue.length}: ${videoQueue[nextIndex]?.youtube_url}`);
       console.log(`🎬 Moving to next video in queue (${nextIndex + 1}/${videoQueue.length})`);
       set({ currentVideoIndex: nextIndex, errorCount: 0 });
     } else {
@@ -268,6 +294,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     const { videoQueue, currentVideoIndex } = get();
     const currentVideo = videoQueue[currentVideoIndex];
     
+    console.log(`🗑️ Remove current video called for: ${currentVideo?.youtube_url}`);
+    
     if (!currentVideo) return;
     
     console.log(`🗑️ Removing current video from queue: ${currentVideo.youtube_url}`);
@@ -279,6 +307,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     const newQueue = videoQueue.filter((_, index) => index !== currentVideoIndex);
     
     if (newQueue.length === 0) {
+      console.log(`📋 Queue empty after removal, will fetch new videos in 3 seconds...`);
+      setTimeout(() => {
       console.log(`📋 No more videos in queue, clearing for fresh fetch`);
       // No more videos, clear queue to trigger instant reload
       set({ 
@@ -287,6 +317,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         lastFetchTime: 0, // Force fresh fetch
         errorCount: 0
       });
+      }, 3000); // Wait 3 seconds before clearing
     } else {
       console.log(`📋 ${newQueue.length} videos remaining in queue`);
       // Adjust index if needed
@@ -301,6 +332,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
   markVideoAsUnplayable: async (youtubeVideoId: string, reason: string) => {
     try {
+      console.log(`🚫 Marking video as unplayable: ${youtubeVideoId} (${reason})`);
+      
       // Add to local blacklist immediately
       get().addToBlacklist(youtubeVideoId);
       
@@ -328,6 +361,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
   handleVideoError: async (youtubeVideoId: string, errorType: string) => {
     const { errorCount } = get();
+    
+    console.log(`❌ Video error: ${youtubeVideoId} - ${errorType} (error count: ${errorCount + 1})`);
     const newErrorCount = errorCount + 1;
     
     // Critical errors that indicate unplayable videos
@@ -364,6 +399,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
   resetQueue: async (userId: string) => {
     const { isResetting, blacklistedVideoIds } = get();
     
+    console.log(`🔄 Reset queue called for user ${userId}`);
+    
     // Prevent multiple resets
     if (isResetting) {
       return;
@@ -373,6 +410,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
     try {
       // Get ONLY ACTIVE videos with fresh data (top 10)
+      console.log(`🔄 Fetching active videos for reset...`);
       const { data: allVideos, error } = await supabase
         .from('videos')
         .select('id, youtube_url, title, duration_seconds, views_count, target_views, status, updated_at')
@@ -385,6 +423,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         throw error;
       }
 
+      console.log(`🔄 Found ${allVideos?.length || 0} active videos for reset`);
+      
       if (allVideos && allVideos.length > 0) {
         // Filter videos with remaining views and not blacklisted
         const availableVideos = allVideos.filter(video => {
@@ -395,6 +435,8 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
           return hasRemainingViews && notBlacklisted && isActive;
         });
 
+        console.log(`🔄 After filtering: ${availableVideos.length} available videos`);
+        
         if (availableVideos.length > 0) {
           const videoQueue = availableVideos
             .slice(0, QUEUE_SIZE) // Limit to top 10
@@ -405,6 +447,9 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
               duration_seconds: video.duration_seconds,
               coin_reward: calculateCoinsByDuration(video.duration_seconds) // Calculate coins based on duration
             }));
+          
+        console.log(`🔄 Reset with cleared blacklist: ${videoQueue.length} videos`);
+          console.log(`🔄 Reset complete: ${videoQueue.length} videos in new queue`);
 
 
           set({
@@ -420,6 +465,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
         }
 
         // If no videos with remaining views, clear blacklist and try again
+        console.log(`🔄 No available videos, clearing blacklist and retrying...`);
         set({ blacklistedVideoIds: new Set<string>() });
         
         const videoQueue = allVideos
@@ -446,6 +492,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       // No active videos available at all
+      console.log(`🔄 No active videos available, queue will remain empty`);
       set({
         videoQueue: [],
         currentVideoIndex: 0,
@@ -457,6 +504,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
     } catch (error) {
       set({ isResetting: false, errorCount: 0 });
+      console.error('Error in resetQueue:', error);
     }
   },
 

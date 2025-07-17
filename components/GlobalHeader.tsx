@@ -49,7 +49,7 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
   // Auto-refresh profile data when header is focused for real-time coin updates
   useFocusEffect(
     React.useCallback(() => {
-      if (user && showCoinDisplay) {
+      if (user && showCoinDisplay && !menuVisible) {
         // Refresh profile data when header becomes visible
         refreshProfile();
         
@@ -57,10 +57,11 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
         const interval = setInterval(() => {
           refreshProfile();
         }, 2000); // Refresh every 2 seconds for more responsive coin updates
+        }, 5000); // Reduced frequency to every 5 seconds
         
         return () => clearInterval(interval);
       }
-    }, [user, showCoinDisplay, refreshProfile])
+    }, [user, showCoinDisplay, refreshProfile, menuVisible])
   );
 
   const handleMenuPress = () => {

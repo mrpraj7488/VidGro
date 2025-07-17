@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Dimensions } from 'react-native';
 import {
   View,
   Text,
@@ -35,7 +35,8 @@ interface Video {
   coin_reward: number;
 }
 
-const isSmallScreen = false; // Simplified for web platform
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 480;
 const videoHeight = 220;
 
 export default function ViewTab() {
@@ -87,6 +88,23 @@ export default function ViewTab() {
 
   // Calculate remaining time for UI display
   const remainingTime = Math.max(0, targetDuration - currentTime);
+
+  // Auto-refresh profile data when header is focused for real-time coin updates
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user && !isLoading) {
+        // Refresh profile data when header becomes visible
+        refreshProfile();
+        
+        // Set up interval for periodic updates
+        const interval = setInterval(() => {
+          refreshProfile();
+        }, 2000); // Refresh every 2 seconds for more responsive coin updates
+        
+        return () => clearInterval(interval);
+      }
+    }, [user, refreshProfile, isLoading])
+  );
 
   // Extract YouTube video ID
   const extractVideoId = (url: string): string | null => {
@@ -216,6 +234,23 @@ export default function ViewTab() {
         var hasError = false;
         var debugMode = false; // Debug mode disabled
         var popupSuppressed = false;
+        var playerReadyTimeout;
+        var hasPlayerReady = false;
+        
+        // Set a maximum timeout for player ready
+        playerReadyTimeout = setTimeout(function() {
+          if (!hasPlayerReady && !hasTimedOut && !hasError) {
+            hasTimedOut = true;
+            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'PLAYER_READY_TIMEOUT',
+              error: 'PLAYER_READY_TIMEOUT',
+              message: 'Player ready timeout after 5 seconds',
+              errorType: 'TIMEOUT',
+              isEmbeddingError: true,
+              instantSkip: true
+            }));
+          }
+        }, 5000); // 5 second timeout for player ready
         
         // Set loading timeout
         loadingTimeoutId = setTimeout(function() {
@@ -305,6 +340,11 @@ export default function ViewTab() {
             return;
           }
           
+          hasPlayerReady = true;
+          if (playerReadyTimeout) {
+            clearTimeout(playerReadyTimeout);
+          }
+          
           isPlayerReady = true;
           if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
           document.getElementById('loading').style.display = 'none';
@@ -342,6 +382,11 @@ export default function ViewTab() {
         }
 
         function onPlayerStateChange(event) {
+          // Early exit if we have errors or timeouts
+          if (hasError || hasTimedOut) {
+            return;
+          }
+          
           if (hasError || hasTimedOut) {
             return;
           }
@@ -398,6 +443,10 @@ export default function ViewTab() {
         }
 
         function onPlayerError(event) {
+          // Clear timeouts
+          if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
+          if (playerReadyTimeout) clearTimeout(playerReadyTimeout);
+          
           hasError = true;
           if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
           
@@ -521,6 +570,13 @@ export default function ViewTab() {
         window.updateAutoSkip = function(enabled) {
           autoSkipEnabled = enabled;
         };
+        
+        // Cleanup function
+        window.cleanup = function() {
+          if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
+          if (playerReadyTimeout) clearTimeout(playerReadyTimeout);
+          if (progressInterval) clearInterval(progressInterval);
+        };
 
         // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
@@ -624,13 +680,20 @@ export default function ViewTab() {
   // Fetch videos on component mount
   useEffect(() => {
     if (user && videoQueue.length === 0) {
-      fetchVideos(user.id);
+      setTimeout(() => fetchVideos(user.id), 1000); // Add delay to prevent immediate fetching
     }
   }, [user, videoQueue.length, fetchVideos]);
 
   // Instant skip function for seamless experience
   const handleInstantSkip = useCallback((reason: string = 'Video unavailable') => {
     if (isSkipping) return;
+    
+    console.log(`🔄 Instant skip triggered: ${reason}`);
+    
+    // Cleanup WebView
+    if (webviewRef.current) {
+      webviewRef.current.injectJavaScript('window.cleanup && window.cleanup(); true;');
+    }
     
     setIsSkipping(true);
     
@@ -664,7 +727,7 @@ export default function ViewTab() {
       
       setIsSkipping(false);
     }, 200); // Minimal delay for smooth transition
-  }, [isSkipping, moveToNextVideo, user, videoQueue.length, fetchVideos]);
+  }, [isSkipping, moveToNextVideo, user, videoQueue.length, fetchVideos, webviewRef]);
 
   // Enhanced award coins function with retry mechanism
   const awardCoins = useCallback(async () => {
@@ -942,6 +1005,11 @@ export default function ViewTab() {
           break;
           
         case 'LOADING_TIMEOUT':
+        case 'PLAYER_READY_TIMEOUT':
+          console.log(`⏰ Video loading timeout: ${data.message}`);
+          handleInstantSkip(data.message || 'Loading timeout');
+          break;
+          
         case 'API_LOAD_ERROR':
         case 'PLAYER_INIT_ERROR':
         case 'PLAYER_ERROR':
@@ -949,6 +1017,7 @@ export default function ViewTab() {
             handleInstantSkip(data.message);
           } else {
             handleInstantSkip('Video error occurred');
+            console.log(`❌ Video error: ${data.message}`);
           }
           break;
           
@@ -969,6 +1038,7 @@ export default function ViewTab() {
           break;
       }
     } catch (error) {
+      console.error('Error parsing WebView message:', error);
       handleInstantSkip('Message parse error');
     }
   }, [coinsEarned, coinsAwarded, targetDuration, videoCompleted, retryCount, maxRetries, handleInstantSkip, awardCoins]);
@@ -1020,6 +1090,15 @@ export default function ViewTab() {
       window.open(youtubeUrl, '_blank');
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (webviewRef.current) {
+        webviewRef.current.injectJavaScript('window.cleanup && window.cleanup(); true;');
+      }
+    };
+  }, []);
 
   // Animation styles
   const progressAnimatedStyle = useAnimatedStyle(() => ({

@@ -217,7 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = async () => {
     if (user) {
       const oldCoins = profile?.coins || 0;
-      
+      console.log(`🔄 Profile refresh requested for user ${user.id}`);
       try {
         console.log(`🔄 Refreshing profile for user ${user.id}...`);
         
@@ -270,6 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const newCoins = freshProfile.coins || 0;
         if (newCoins !== oldCoins) {
           console.log(`💰 COIN BALANCE UPDATED: ${oldCoins} → ${newCoins} (${newCoins > oldCoins ? '+' : ''}${newCoins - oldCoins})`);
+          // Only log if there's an actual change
         } else {
           console.log(`💰 Coin balance unchanged: ${newCoins}`);
         }
