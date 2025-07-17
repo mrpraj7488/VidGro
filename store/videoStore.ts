@@ -199,7 +199,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
       }
 
       // Process enhanced function results
-    .select('id, youtube_url, title, duration_seconds, views_count, target_views, user_id, status, updated_at')
+      const processedVideos = availableVideos.map(video => ({
         id: video.video_id,
         youtube_url: video.youtube_url,
         title: video.title,
