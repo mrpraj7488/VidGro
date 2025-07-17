@@ -14,7 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
 import { supabase } from '@/lib/supabase';
-import { Play, SkipForward, RefreshCw, AlertCircle } from 'lucide-react-native';
+import { Play, SkipForward, RefreshCw, CircleAlert as AlertCircle } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
 import Animated, {
   useSharedValue,
