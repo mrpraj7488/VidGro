@@ -30,18 +30,12 @@
       [
         "expo-router",
         {
-          "origin": "https://vidgro.app/",
           "root": "./app"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "your-project-id"
-      }
     }
   }
 }
