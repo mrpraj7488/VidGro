@@ -56,7 +56,6 @@ export default function GlobalHeader({ title, showCoinDisplay = true, menuVisibl
         // Set up periodic refresh for coin balance updates
         const interval = setInterval(() => {
           refreshProfile();
-        }, 2000); // Refresh every 2 seconds for more responsive coin updates
         }, 5000); // Reduced frequency to every 5 seconds
         
         return () => clearInterval(interval);
