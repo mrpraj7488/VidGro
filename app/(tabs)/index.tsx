@@ -666,7 +666,21 @@ export default function ViewTab() {
 
   // Enhanced award coins function with retry mechanism
   const awardCoins = useCallback(async () => {
-    if (!user || !currentVideo || coinsEarned || coinUpdateInProgress || coinsAwarded) {
+    if (!user || !currentVideo) {
+      console.log('🪙 Cannot award coins - missing user or video');
+      return;
+    }
+    
+    if (coinsEarned || coinUpdateInProgress || coinsAwarded) {
+      console.log(`🪙 Coins already processed - coinsEarned:${coinsEarned}, coinUpdateInProgress:${coinUpdateInProgress}, coinsAwarded:${coinsAwarded}`);
+      return;
+    }
+    
+    console.log(`🪙 Starting coin award process - currentTime:${currentTime}, targetDuration:${targetDuration}`);
+    
+    // Check if user watched enough of the video
+    if (currentTime < targetDuration) {
+      console.log(`🪙 Insufficient watch time - watched:${currentTime}s, required:${targetDuration}s`);
       return;
     }
     
@@ -677,17 +691,55 @@ export default function ViewTab() {
     try {
       console.log(`💰 Starting coin award process for video ${currentVideo.id}, duration: ${Math.floor(currentTime)}s`);
       
-      // First try the enhanced function
+      // Use the guaranteed coin update function
       const { data: result, error } = await supabase
-        .rpc('enhanced_complete_video_view_v2', {
+        .rpc('complete_video_view_with_guaranteed_coins', {
           user_uuid: user.id,
           video_uuid: currentVideo.id,
           watch_duration: Math.floor(currentTime)
         });
 
       if (error) {
-        console.error('❌ Enhanced function error:', error);
-        throw error;
+        console.error('❌ Guaranteed coin function error:', error);
+        // Fallback to enhanced function
+        const { data: fallbackResult, error: fallbackError } = await supabase
+          .rpc('enhanced_complete_video_view_v2', {
+            user_uuid: user.id,
+            video_uuid: currentVideo.id,
+            watch_duration: Math.floor(currentTime)
+          });
+        
+        if (fallbackError) {
+          console.error('❌ Fallback function error:', fallbackError);
+          throw fallbackError;
+        }
+        
+        // Use fallback result
+        if (fallbackResult) {
+          const coinsEarned = fallbackResult.coins_earned || 0;
+          const coinUpdateSuccess = fallbackResult.success || false;
+          
+          console.log(`💰 Fallback coin award result: ${coinsEarned} coins, success: ${coinUpdateSuccess}`);
+          
+          if (coinsEarned > 0 && coinUpdateSuccess) {
+            await refreshProfile();
+            setTimeout(async () => await refreshProfile(), 500);
+            setTimeout(async () => await refreshProfile(), 1500);
+            
+            coinBounce.value = withSpring(1.2, {
+              damping: 15,
+              stiffness: 150,
+            }, () => {
+              coinBounce.value = withSpring(1, {
+                damping: 15,
+                stiffness: 150,
+              });
+            });
+            
+            showToast(`+${coinsEarned} coins earned!`);
+          }
+        }
+        return;
       }
 
       if (result) {
@@ -695,8 +747,8 @@ export default function ViewTab() {
         const coinUpdateSuccess = result.success || false;
         const videoCompleted = result.video_completed || false;
         const shouldSkip = result.should_skip || false;
-        const newCoinBalance = result.new_coin_balance || 0;
-        const oldCoinBalance = result.old_coin_balance || 0;
+        const newCoinBalance = result.new_coin_balance;
+        const oldCoinBalance = result.old_coin_balance;
         
         console.log(`💰 Coin award result:`, {
           success: coinUpdateSuccess,
@@ -707,24 +759,21 @@ export default function ViewTab() {
           shouldSkip
         });
         
-        // CRITICAL: Force immediate profile refresh for coin balance if coins were earned
+        // Force immediate profile refresh for coin balance if coins were earned
         if (coinsEarned > 0 && coinUpdateSuccess) {
           console.log(`💰 Coins successfully awarded: ${coinsEarned}, Balance: ${oldCoinBalance} -> ${newCoinBalance}`);
           
-          // Force multiple profile refreshes to ensure UI updates
+          // Multiple profile refreshes to ensure UI updates
           await refreshProfile();
           
-          // Additional refresh after delay
           setTimeout(async () => {
             await refreshProfile();
           }, 500);
           
-          // Another refresh after longer delay
           setTimeout(async () => {
             await refreshProfile();
           }, 1500);
           
-          // Animate coin update
           coinBounce.value = withSpring(1.2, {
             damping: 15,
             stiffness: 150,
@@ -735,35 +784,26 @@ export default function ViewTab() {
             });
           });
           
-          // Show toast with earned coins
           showToast(`+${coinsEarned} coins earned!`);
         } else {
           console.log(`ℹ️ No coins earned: coinsEarned=${coinsEarned}, success=${coinUpdateSuccess}`);
         }
         
-        // If video completed or should skip, clear queue and move to next
         if (videoCompleted || shouldSkip) {
           console.log('🔄 Video completed or should skip, clearing queue');
           clearQueue();
-          // Force immediate skip to next video
           setTimeout(() => {
             handleInstantSkip('Video completed - moving to next');
-          }, 2000); // Give more time for coin processing
+          }, 2000);
         }
       } else {
         console.warn('⚠️ No result from coin update function');
       }
     } catch (error: any) {
+      console.error('❌ Error awarding coins:', error);
       setCoinsEarned(false);
       setCoinsAwarded(false);
-      console.error('❌ Error awarding coins:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      });
       
-      // Try to refresh profile anyway in case coins were updated
       try {
         await refreshProfile();
       } catch (refreshError) {
@@ -772,7 +812,7 @@ export default function ViewTab() {
     } finally {
       setCoinUpdateInProgress(false);
     }
-  }, [user, currentVideo, coinsEarned, coinUpdateInProgress, coinsAwarded, refreshProfile, currentTime, showToast, clearQueue, handleInstantSkip]);
+  }, [user, currentVideo, coinsEarned, coinUpdateInProgress, coinsAwarded, refreshProfile, currentTime, showToast, clearQueue, handleInstantSkip, targetDuration]);
 
   // WebView message handler with enhanced coin logic
   const handleWebViewMessage = useCallback(async (event: any) => {
@@ -818,22 +858,22 @@ export default function ViewTab() {
           
         case 'COINS_EARNED':
           console.log(`🪙 COINS_EARNED event: currentTime=${data.currentTime}, targetDuration=${targetDuration}, coinsEarned=${coinsEarned}, coinUpdateInProgress=${coinUpdateInProgress}`);
-          if (!coinsEarned && !coinUpdateInProgress && !coinsAwarded && data.currentTime >= targetDuration) {
+          if (!coinsEarned && !coinUpdateInProgress && !coinsAwarded) {
             console.log('🪙 Triggering coin award from COINS_EARNED event');
             awardCoins();
           } else {
-            console.log('🪙 Skipping coin award - already processed or conditions not met');
+            console.log(`🪙 Skipping coin award - coinsEarned:${coinsEarned}, coinUpdateInProgress:${coinUpdateInProgress}, coinsAwarded:${coinsAwarded}`);
           }
           break;
           
         case 'VIDEO_COMPLETED':
           console.log(`🎬 VIDEO_COMPLETED event: currentTime=${data.currentTime}, targetDuration=${targetDuration}, coinsEarned=${coinsEarned}, coinUpdateInProgress=${coinUpdateInProgress}`);
           // Award coins if video was watched for sufficient time and not already earned
-          if (!coinsEarned && !coinUpdateInProgress && !coinsAwarded && data.currentTime >= targetDuration) {
+          if (!coinsEarned && !coinUpdateInProgress && !coinsAwarded) {
             console.log('🎬 Triggering coin award from VIDEO_COMPLETED event');
             await awardCoins();
           } else {
-            console.log('🎬 Skipping coin award from VIDEO_COMPLETED - already processed or conditions not met');
+            console.log(`🎬 Skipping coin award from VIDEO_COMPLETED - coinsEarned:${coinsEarned}, coinUpdateInProgress:${coinUpdateInProgress}, coinsAwarded:${coinsAwarded}`);
           }
           
           if (!videoCompleted) {
