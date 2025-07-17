@@ -221,100 +221,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         console.log(`🔄 Refreshing profile for user ${user.id}...`);
         
-        // Enhanced profile refresh with multiple retry attempts
-        const { data: freshProfile, error } = await supabase
+        // SIMPLIFIED AND RELIABLE PROFILE REFRESH
+        let freshProfile = null;
+        let error = null;
+        
+        // Try direct query first
+        const directResult = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single(); // Use single() for better error handling
+          .single();
+        
+        freshProfile = directResult.data;
+        error = directResult.error;
         
         if (error) {
-          console.error('Error refreshing profile:', error);
+          console.error('❌ Direct profile refresh failed:', error);
           
-          // Try alternative refresh methods
+          // Fallback: try with maybeSingle
           try {
-            // Method 1: Force refresh function
-            const { data: forceRefreshResult } = await supabase
-              .rpc('force_refresh_user_profile', { user_uuid: user.id });
-            
-            if (forceRefreshResult && !forceRefreshResult.error) {
-              console.log('🔄 Force refresh successful:', forceRefreshResult);
-              setProfile(prev => prev ? {
-                ...prev,
-                coins: forceRefreshResult.coins,
-                is_vip: forceRefreshResult.is_vip,
-                vip_expires_at: forceRefreshResult.vip_expires_at,
-                updated_at: forceRefreshResult.updated_at
-              } : null);
-              
-              const newCoins = forceRefreshResult.coins || 0;
-              if (newCoins !== oldCoins) {
-                console.log(`💰 COIN BALANCE UPDATED (force): ${oldCoins} → ${newCoins} (${newCoins > oldCoins ? '+' : ''}${newCoins - oldCoins})`);
-              }
-              return;
-            }
-          } catch (forceError) {
-            console.error('Force refresh failed:', forceError);
-          }
-          
-          // Method 2: Direct query with maybeSingle
-          try {
-            const { data: directProfile, error: directError } = await supabase
+            const fallbackResult = await supabase
               .from('profiles')
               .select('*')
               .eq('id', user.id)
               .maybeSingle();
             
-            if (!directError && directProfile) {
-              console.log('🔄 Direct refresh successful');
-              setProfile(directProfile);
-              
-              const newCoins = directProfile.coins || 0;
-              if (newCoins !== oldCoins) {
-                console.log(`💰 COIN BALANCE UPDATED (direct): ${oldCoins} → ${newCoins} (${newCoins > oldCoins ? '+' : ''}${newCoins - oldCoins})`);
-              }
+            freshProfile = fallbackResult.data;
+            error = fallbackResult.error;
+            
+            if (error) {
+              console.error('❌ Fallback profile refresh also failed:', error);
               return;
             }
-          } catch (directError) {
-            console.error('Direct refresh failed:', directError);
+          } catch (fallbackError) {
+            console.error('❌ Fallback refresh error:', fallbackError);
+            return;
           }
-          
-          console.warn('All profile refresh methods failed');
+        }
+        
+        if (!freshProfile) {
+          console.warn('⚠️ No profile data received');
           return;
         }
         
-        if (freshProfile) {
-          setProfile(freshProfile);
-          const newCoins = freshProfile.coins || 0;
-          if (newCoins !== oldCoins) {
-            console.log(`💰 COIN BALANCE UPDATED: ${oldCoins} → ${newCoins} (${newCoins > oldCoins ? '+' : ''}${newCoins - oldCoins})`);
-          } else {
-            console.log(`💰 Coin balance unchanged: ${newCoins}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error in refreshProfile:', error);
+        // Update profile state
+        setProfile(freshProfile);
         
-        // Final fallback: try to get any profile data
-        try {
-          const { data: fallbackProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .limit(1);
-          
-          if (fallbackProfile && fallbackProfile.length > 0) {
-            console.log('🔄 Fallback refresh successful');
-            setProfile(fallbackProfile[0]);
-            
-            const newCoins = fallbackProfile[0].coins || 0;
-            if (newCoins !== oldCoins) {
-              console.log(`💰 COIN BALANCE UPDATED (fallback): ${oldCoins} → ${newCoins} (${newCoins > oldCoins ? '+' : ''}${newCoins - oldCoins})`);
-            }
-          }
-        } catch (fallbackError) {
-          console.error('Fallback refresh failed:', fallbackError);
+        const newCoins = freshProfile.coins || 0;
+        if (newCoins !== oldCoins) {
+          console.log(`💰 COIN BALANCE UPDATED: ${oldCoins} → ${newCoins} (${newCoins > oldCoins ? '+' : ''}${newCoins - oldCoins})`);
+        } else {
+          console.log(`💰 Coin balance unchanged: ${newCoins}`);
         }
+        
+      } catch (error) {
+        console.error('❌ Unexpected error in refreshProfile:', error);
       }
     }
   };

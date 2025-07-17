@@ -691,114 +691,139 @@ export default function ViewTab() {
     try {
       console.log(`💰 Starting coin award process for video ${currentVideo.id}, duration: ${Math.floor(currentTime)}s`);
       
-      // Use the guaranteed coin update function
-      const { data: result, error } = await supabase
-        .rpc('complete_video_view_with_guaranteed_coins', {
-          user_uuid: user.id,
-          video_uuid: currentVideo.id,
-          watch_duration: Math.floor(currentTime)
-        });
-
-      if (error) {
-        console.error('❌ Guaranteed coin function error:', error);
-        // Fallback to enhanced function
-        const { data: fallbackResult, error: fallbackError } = await supabase
-          .rpc('enhanced_complete_video_view_v2', {
-            user_uuid: user.id,
-            video_uuid: currentVideo.id,
-            watch_duration: Math.floor(currentTime)
-          });
-        
-        if (fallbackError) {
-          console.error('❌ Fallback function error:', fallbackError);
-          throw fallbackError;
-        }
-        
-        // Use fallback result
-        if (fallbackResult) {
-          const coinsEarned = fallbackResult.coins_earned || 0;
-          const coinUpdateSuccess = fallbackResult.success || false;
-          
-          console.log(`💰 Fallback coin award result: ${coinsEarned} coins, success: ${coinUpdateSuccess}`);
-          
-          if (coinsEarned > 0 && coinUpdateSuccess) {
-            await refreshProfile();
-            setTimeout(async () => await refreshProfile(), 500);
-            setTimeout(async () => await refreshProfile(), 1500);
-            
-            coinBounce.value = withSpring(1.2, {
-              damping: 15,
-              stiffness: 150,
-            }, () => {
-              coinBounce.value = withSpring(1, {
-                damping: 15,
-                stiffness: 150,
-              });
-            });
-            
-            showToast(`+${coinsEarned} coins earned!`);
-          }
-        }
+      // SIMPLIFIED AND RELIABLE COIN AWARDING PROCESS
+      
+      // Step 1: Calculate coins based on duration
+      const calculatedCoins = calculateCoinsByDuration(currentVideo.duration_seconds);
+      console.log(`💰 Calculated coins for ${currentVideo.duration_seconds}s video: ${calculatedCoins}`);
+      
+      // Step 2: Check if user already watched this video
+      const { data: existingView, error: checkError } = await supabase
+        .from('video_views')
+        .select('id')
+        .eq('video_id', currentVideo.id)
+        .eq('viewer_id', user.id)
+        .maybeSingle();
+      
+      if (checkError) {
+        console.error('❌ Error checking existing view:', checkError);
+        throw checkError;
+      }
+      
+      if (existingView) {
+        console.log('⚠️ User already watched this video, skipping coin award');
         return;
       }
-
-      if (result) {
-        const coinsEarned = result.coins_earned || 0;
-        const coinUpdateSuccess = result.success || false;
-        const videoCompleted = result.video_completed || false;
-        const shouldSkip = result.should_skip || false;
-        const newCoinBalance = result.new_coin_balance;
-        const oldCoinBalance = result.old_coin_balance;
-        
-        console.log(`💰 Coin award result:`, {
-          success: coinUpdateSuccess,
-          coinsEarned,
-          oldBalance: oldCoinBalance,
-          newBalance: newCoinBalance,
-          videoCompleted,
-          shouldSkip
-        });
-        
-        // Force immediate profile refresh for coin balance if coins were earned
-        if (coinsEarned > 0 && coinUpdateSuccess) {
-          console.log(`💰 Coins successfully awarded: ${coinsEarned}, Balance: ${oldCoinBalance} -> ${newCoinBalance}`);
-          
-          // Multiple profile refreshes to ensure UI updates
-          await refreshProfile();
-          
-          setTimeout(async () => {
-            await refreshProfile();
-          }, 500);
-          
-          setTimeout(async () => {
-            await refreshProfile();
-          }, 1500);
-          
-          coinBounce.value = withSpring(1.2, {
-            damping: 15,
-            stiffness: 150,
-          }, () => {
-            coinBounce.value = withSpring(1, {
-              damping: 15,
-              stiffness: 150,
-            });
-          });
-          
-          showToast(`+${coinsEarned} coins earned!`);
-        } else {
-          console.log(`ℹ️ No coins earned: coinsEarned=${coinsEarned}, success=${coinUpdateSuccess}`);
-        }
-        
-        if (videoCompleted || shouldSkip) {
-          console.log('🔄 Video completed or should skip, clearing queue');
-          clearQueue();
-          setTimeout(() => {
-            handleInstantSkip('Video completed - moving to next');
-          }, 2000);
-        }
-      } else {
-        console.warn('⚠️ No result from coin update function');
+      
+      // Step 3: Get current coin balance
+      const { data: currentProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('coins')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError) {
+        console.error('❌ Error getting current profile:', profileError);
+        throw profileError;
       }
+      
+      const oldBalance = currentProfile.coins;
+      const newBalance = oldBalance + calculatedCoins;
+      
+      console.log(`💰 Coin update: ${oldBalance} + ${calculatedCoins} = ${newBalance}`);
+      
+      // Step 4: Create video view record
+      const { error: viewError } = await supabase
+        .from('video_views')
+        .insert({
+          video_id: currentVideo.id,
+          viewer_id: user.id,
+          watched_duration: Math.floor(currentTime),
+          completed: true,
+          coins_earned: calculatedCoins
+        });
+      
+      if (viewError) {
+        console.error('❌ Error creating video view:', viewError);
+        throw viewError;
+      }
+      
+      console.log('✅ Video view record created successfully');
+      
+      // Step 5: Update user coins directly
+      const { error: coinError } = await supabase
+        .from('profiles')
+        .update({ 
+          coins: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+      
+      if (coinError) {
+        console.error('❌ Error updating coins:', coinError);
+        throw coinError;
+      }
+      
+      console.log('✅ Coins updated successfully in database');
+      
+      // Step 6: Create transaction record
+      const { error: transactionError } = await supabase
+        .from('coin_transactions')
+        .insert({
+          user_id: user.id,
+          amount: calculatedCoins,
+          transaction_type: 'video_watch',
+          description: `Watched ${currentVideo.duration_seconds}s video: ${currentVideo.title} (${calculatedCoins} coins)`,
+          reference_id: currentVideo.id
+        });
+      
+      if (transactionError) {
+        console.error('❌ Error creating transaction:', transactionError);
+        // Don't throw here as coins were already awarded
+      } else {
+        console.log('✅ Transaction record created successfully');
+      }
+      
+      // Step 7: Update video view count
+      const { error: videoUpdateError } = await supabase
+        .from('videos')
+        .update({ 
+          views_count: supabase.sql`views_count + 1`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentVideo.id);
+      
+      if (videoUpdateError) {
+        console.error('❌ Error updating video view count:', videoUpdateError);
+        // Don't throw here as coins were already awarded
+      } else {
+        console.log('✅ Video view count updated successfully');
+      }
+      
+      // Step 8: Force immediate profile refresh
+      await refreshProfile();
+      
+      // Step 9: Show success feedback
+      coinBounce.value = withSpring(1.2, {
+        damping: 15,
+        stiffness: 150,
+      }, () => {
+        coinBounce.value = withSpring(1, {
+          damping: 15,
+          stiffness: 150,
+        });
+      });
+      
+      showToast(`+${calculatedCoins} coins earned!`);
+      
+      console.log(`💰 COIN AWARD COMPLETED: User ${user.id} earned ${calculatedCoins} coins for video ${currentVideo.id}`);
+      
+      // Step 10: Clear queue and move to next video after delay
+      clearQueue();
+      setTimeout(() => {
+        handleInstantSkip('Video completed - moving to next');
+      }, 2000);
+      
     } catch (error: any) {
       console.error('❌ Error awarding coins:', error);
       setCoinsEarned(false);
@@ -813,6 +838,24 @@ export default function ViewTab() {
       setCoinUpdateInProgress(false);
     }
   }, [user, currentVideo, coinsEarned, coinUpdateInProgress, coinsAwarded, refreshProfile, currentTime, showToast, clearQueue, handleInstantSkip, targetDuration]);
+
+  // Helper function to calculate coins based on duration (matching database function)
+  const calculateCoinsByDuration = (durationSeconds: number): number => {
+    if (durationSeconds >= 540) return 200;  // 540s = 200 coins
+    if (durationSeconds >= 480) return 150;  // 480s = 150 coins
+    if (durationSeconds >= 420) return 130;  // 420s = 130 coins
+    if (durationSeconds >= 360) return 100;  // 360s = 100 coins
+    if (durationSeconds >= 300) return 90;   // 300s = 90 coins
+    if (durationSeconds >= 240) return 70;   // 240s = 70 coins
+    if (durationSeconds >= 180) return 55;   // 180s = 55 coins
+    if (durationSeconds >= 150) return 50;   // 150s = 50 coins
+    if (durationSeconds >= 120) return 45;   // 120s = 45 coins
+    if (durationSeconds >= 90) return 35;    // 90s = 35 coins
+    if (durationSeconds >= 60) return 25;    // 60s = 25 coins
+    if (durationSeconds >= 45) return 15;    // 45s = 15 coins
+    if (durationSeconds >= 30) return 10;    // 30s = 10 coins
+    return 5;  // Default for very short durations
+  };
 
   // WebView message handler with enhanced coin logic
   const handleWebViewMessage = useCallback(async (event: any) => {
