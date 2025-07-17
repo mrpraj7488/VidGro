@@ -150,7 +150,6 @@ export default function MoreTab() {
       subtitle: 'Unlock Rewards',
       icon: <DollarSign color="#FFD700" size={isVerySmallScreen ? 20 : 24} />,
       onPress: handleBuyCoins,
-gue,
       showArrow: true,
       gradientColors: ['#800080', '#4b004b'],
     },
