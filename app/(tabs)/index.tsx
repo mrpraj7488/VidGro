@@ -623,7 +623,7 @@ export default function ViewTab() {
 
   // Fetch videos on component mount
   useEffect(() => {
-    if (user && videoQueue.length === 0) {
+    if (user && videoQueue.length === 0 && !isLoading) {
       fetchVideos(user.id);
     }
   }, [user, videoQueue.length, fetchVideos]);
@@ -632,6 +632,7 @@ export default function ViewTab() {
   const handleInstantSkip = useCallback((reason: string = 'Video unavailable') => {
     if (isSkipping) return;
     
+    console.log(`⏭️ Instant skip triggered: ${reason}`);
     setIsSkipping(true);
     
     // Clear all timeouts
@@ -658,12 +659,12 @@ export default function ViewTab() {
       moveToNextVideo();
       
       // Fetch more videos if queue is running low
-      if (user && videoQueue.length <= 2) {
+      if (user && videoQueue.length <= 1) {
         fetchVideos(user.id);
       }
-      
+        // Set up less frequent refresh to reduce performance issues
       setIsSkipping(false);
-    }, 200); // Minimal delay for smooth transition
+    }, 500); // Slightly longer delay to prevent rapid skipping
   }, [isSkipping, moveToNextVideo, user, videoQueue.length, fetchVideos]);
 
   // Enhanced award coins function with retry mechanism
@@ -1203,9 +1204,7 @@ export default function ViewTab() {
           {(!isTabFocused || appState !== 'active') && (
             <View style={styles.securityWarning}>
               <Text style={styles.securityWarningText}>
-                🔒 Stay on this tab to watch videos
-              </Text>
-            </View>
+        }, 10000); // Check every 10 seconds instead of 2 seconds
           )}
         </View>
       </ScrollView>

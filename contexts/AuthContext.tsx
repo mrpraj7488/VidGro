@@ -392,10 +392,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signIn,
         signUp,
-        signOut,
+        // Set up less frequent refresh to reduce performance issues
         signOutAndRedirect,
         updateCoins,
-        refreshProfile,
+        }, 5000); // Refresh every 5 seconds instead of 2 seconds
       }}
     >
       {children}
