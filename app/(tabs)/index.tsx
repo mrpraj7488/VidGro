@@ -385,12 +385,14 @@ export default function ViewTab() {
               }
             }
             
-            window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({
+          const completionThreshold = targetDuration * 0.95; // 95% completion threshold
+          if (currentTime >= completionThreshold && !hasEarnedCoins) {
               type: 'VIDEO_COMPLETED',
               reason: 'natural_end',
               shouldAwardCoins: currentTime >= targetDuration,
               currentTime: currentTime,
-              autoSkip: autoSkipEnabled
+              coinsEarned: ${currentVideo?.coin_reward || 3},
+              completionThreshold: completionThreshold
             }));
           }
         }
@@ -678,11 +680,14 @@ export default function ViewTab() {
     
     console.log(`🪙 Starting coin award process - currentTime:${currentTime}, targetDuration:${targetDuration}`);
     
-    // Check if user watched enough of the video
-    if (currentTime < targetDuration) {
-      console.log(`🪙 Insufficient watch time - watched:${currentTime}s, required:${targetDuration}s`);
+    // Check if user watched enough of the video (with 2-second tolerance for timing precision)
+    const watchTimeThreshold = Math.max(targetDuration - 2, targetDuration * 0.95); // 95% or 2 seconds tolerance
+    if (currentTime < watchTimeThreshold) {
+      console.log(`🪙 Insufficient watch time - watched:${currentTime}s, required:${watchTimeThreshold}s (target:${targetDuration}s)`);
       return;
     }
+    
+    console.log(`🪙 Watch time sufficient - watched:${currentTime}s, threshold:${watchTimeThreshold}s, target:${targetDuration}s`);
     
     setCoinUpdateInProgress(true);
     setCoinsEarned(true);
@@ -738,7 +743,7 @@ export default function ViewTab() {
         .insert({
           video_id: currentVideo.id,
           viewer_id: user.id,
-          watched_duration: Math.floor(currentTime),
+          watched_duration: Math.floor(Math.max(currentTime, targetDuration)), // Ensure we record at least target duration
           completed: true,
           coins_earned: calculatedCoins
         });
@@ -897,6 +902,13 @@ export default function ViewTab() {
             duration: 300,
             easing: Easing.out(Easing.quad),
           });
+          
+          // Check for completion with tolerance (95% of target duration)
+          const completionThreshold = targetDuration * 0.95;
+          if (data.currentTime >= completionThreshold && !coinsEarned && !coinUpdateInProgress && !coinsAwarded) {
+            console.log(`🪙 Triggering coin award from PROGRESS_UPDATE - currentTime:${data.currentTime}, threshold:${completionThreshold}`);
+            awardCoins();
+          }
           break;
           
         case 'COINS_EARNED':
