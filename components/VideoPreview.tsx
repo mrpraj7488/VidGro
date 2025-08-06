@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, Image, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Play, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, RefreshCw } from 'lucide-react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface VideoData {
   id: string;
@@ -535,6 +536,7 @@ const handleWebViewMessage = (
 };
 
 export default function VideoPreview({ youtubeUrl, onValidation, onTitleDetected, collapsed = false }: VideoPreviewProps) {
+  const { colors, isDark } = useTheme();
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showIframe, setShowIframe] = useState(false);
@@ -605,10 +607,10 @@ export default function VideoPreview({ youtubeUrl, onValidation, onTitleDetected
 
   if (collapsed && videoData) {
     return (
-      <View style={styles.collapsedContainer}>
+      <View style={[styles.collapsedContainer, { backgroundColor: colors.surface }]}>
         <Image source={{ uri: videoData.thumbnail }} style={styles.collapsedThumbnail} />
         <View style={styles.collapsedInfo}>
-          <Text style={styles.collapsedTitle} numberOfLines={2}>
+          <Text style={[styles.collapsedTitle, { color: colors.text }]} numberOfLines={2}>
             {videoData.autoDetectedTitle || title || 'Video Preview'}
           </Text>
           <View style={styles.statusContainer}>
@@ -637,16 +639,16 @@ export default function VideoPreview({ youtubeUrl, onValidation, onTitleDetected
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {error && (
-        <View style={styles.errorContainer}>
-          <AlertCircle size={20} color="#E74C3C" />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={[styles.errorContainer, { backgroundColor: colors.error + '20' }]}>
+          <AlertCircle size={20} color={colors.error} />
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
         </View>
       )}
 
       {videoData && (
-        <View style={styles.previewContainer}>
+        <View style={[styles.previewContainer, { backgroundColor: colors.surface }]}>
           <View style={styles.thumbnailContainer}>
             <Image source={{ uri: videoData.thumbnail }} style={styles.thumbnail} />
             {showIframe && (
@@ -674,7 +676,7 @@ export default function VideoPreview({ youtubeUrl, onValidation, onTitleDetected
           </View>
 
           <View style={styles.infoContainer}>
-            <Text style={styles.videoTitle} numberOfLines={2}>
+            <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
               {videoData.autoDetectedTitle || title || 'Loading title...'}
             </Text>
             
@@ -712,7 +714,6 @@ const styles = StyleSheet.create({
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFEBEE',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
@@ -720,12 +721,10 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    color: '#E74C3C',
     fontSize: 14,
     lineHeight: 20,
   },
   previewContainer: {
-    backgroundColor: 'white',
     borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -777,7 +776,6 @@ const styles = StyleSheet.create({
   videoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -799,7 +797,6 @@ const styles = StyleSheet.create({
   },
   collapsedContainer: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     borderRadius: 8,
     padding: 12,
     marginVertical: 8,
@@ -823,7 +820,6 @@ const styles = StyleSheet.create({
   collapsedTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
     lineHeight: 18,
   },
   statusContainer: {
