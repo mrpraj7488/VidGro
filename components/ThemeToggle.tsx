@@ -18,7 +18,7 @@ export default function ThemeToggle() {
   // Animation values
   const scale = useSharedValue(1);
   const rotation = useSharedValue(0);
-  const slideX = useSharedValue(isDark ? 24 : 0);
+  const slideX = useSharedValue(isDark ? 20 : 0);
   const colorProgress = useSharedValue(isDark ? 1 : 0);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function ThemeToggle() {
     });
     
     // Animate slide transition
-    slideX.value = withTiming(isDark ? 24 : 0, {
+    slideX.value = withTiming(isDark ? 20 : 0, {
       duration: 300,
     });
     
@@ -103,9 +103,9 @@ export default function ThemeToggle() {
 
 const styles = StyleSheet.create({
   container: {
-    width: 56,
-    height: 32,
-    borderRadius: 16,
+    width: 52,
+    height: 28,
+    borderRadius: 14,
     padding: 4,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -116,9 +116,9 @@ const styles = StyleSheet.create({
   },
   slider: {
     position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
