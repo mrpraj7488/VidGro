@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, MessageCircle, Send, Phone, Mail, CircleHelp as HelpCircle } from 'lucide-react-native';
 
 export default function ContactSupportScreen() {
   const { profile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [subject, setSubject] = useState('');
@@ -42,9 +44,9 @@ export default function ContactSupportScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -57,25 +59,27 @@ export default function ContactSupportScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Need help? We're here to assist you with any questions or issues.
         </Text>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Category</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Select Category</Text>
           <View style={styles.categoriesContainer}>
             {supportCategories.map((category) => (
               <TouchableOpacity
                 key={category.id}
                 style={[
                   styles.categoryCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
                   selectedCategory === category.id && styles.selectedCategory
                 ]}
                 onPress={() => setSelectedCategory(category.id)}
               >
-                <category.icon size={20} color={selectedCategory === category.id ? '#800080' : '#666'} />
+                <category.icon size={20} color={selectedCategory === category.id ? colors.primary : colors.textSecondary} />
                 <Text style={[
                   styles.categoryText,
+                  { color: colors.textSecondary },
                   selectedCategory === category.id && styles.selectedCategoryText
                 ]}>
                   {category.title}
@@ -86,22 +90,22 @@ export default function ContactSupportScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Subject</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Subject</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="Brief description of your issue"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             value={subject}
             onChangeText={setSubject}
           />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Message</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Message</Text>
           <TextInput
-            style={[styles.input, styles.messageInput]}
+            style={[styles.input, styles.messageInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="Please describe your issue in detail..."
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             value={message}
             onChangeText={setMessage}
             multiline
@@ -111,7 +115,7 @@ export default function ContactSupportScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.submitButton, loading && styles.buttonDisabled]}
+          style={[styles.submitButton, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
           onPress={handleSubmitTicket}
           disabled={loading}
         >
@@ -143,7 +147,6 @@ export default function ContactSupportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -166,7 +169,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
@@ -177,7 +179,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 12,
   },
   categoriesContainer: {
@@ -188,36 +189,28 @@ const styles = StyleSheet.create({
   categoryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1,
     minWidth: '45%',
     gap: 8,
   },
   selectedCategory: {
-    borderColor: '#800080',
-    backgroundColor: '#F3E5F5',
+    borderWidth: 2,
   },
   categoryText: {
     fontSize: 14,
-    color: '#666',
   },
   selectedCategoryText: {
-    color: '#800080',
     fontWeight: '600',
   },
   input: {
-    backgroundColor: 'white',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
   messageInput: {
     height: 120,
@@ -227,7 +220,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#800080',
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -242,7 +234,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   contactInfo: {
-    backgroundColor: 'white',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
@@ -250,7 +242,7 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
     marginBottom: 16,
   },
   contactItem: {
@@ -261,11 +253,11 @@ const styles = StyleSheet.create({
   },
   contactText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
   responseTime: {
     fontSize: 14,
-    color: '#999',
+    color: colors.textSecondary,
     marginTop: 16,
     textAlign: 'center',
   },

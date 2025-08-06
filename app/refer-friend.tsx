@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Share2, Copy, Gift, Users, Coins } from 'lucide-react-native';
 
 export default function ReferFriendScreen() {
   const { profile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -63,9 +65,9 @@ export default function ReferFriendScreen() {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -78,83 +80,83 @@ export default function ReferFriendScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroSection}>
-          <Users size={64} color="#800080" />
-          <Text style={styles.heroTitle}>Invite Friends & Earn Together</Text>
-          <Text style={styles.heroSubtitle}>
+        <View style={[styles.heroSection, { backgroundColor: colors.surface }]}>
+          <Users size={64} color={colors.primary} />
+          <Text style={[styles.heroTitle, { color: colors.text }]}>Invite Friends & Earn Together</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
             Share VidGro with your friends and both of you earn bonus coins!
           </Text>
         </View>
 
         <View style={styles.benefitsSection}>
-          <Text style={styles.sectionTitle}>Referral Benefits</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Referral Benefits</Text>
           {benefits.map((benefit, index) => (
-            <View key={index} style={styles.benefitCard}>
+            <View key={index} style={[styles.benefitCard, { backgroundColor: colors.surface }]}>
               <View style={[styles.benefitIcon, { backgroundColor: `${benefit.color}20` }]}>
                 <benefit.icon size={24} color={benefit.color} />
               </View>
               <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                <Text style={styles.benefitDescription}>{benefit.description}</Text>
+                <Text style={[styles.benefitTitle, { color: colors.text }]}>{benefit.title}</Text>
+                <Text style={[styles.benefitDescription, { color: colors.textSecondary }]}>{benefit.description}</Text>
               </View>
             </View>
           ))}
         </View>
 
         <View style={styles.codeSection}>
-          <Text style={styles.sectionTitle}>Your Referral Code</Text>
-          <View style={styles.codeContainer}>
-            <Text style={styles.codeText}>{referralCode}</Text>
-            <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
-              <Copy size={20} color="#800080" />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Referral Code</Text>
+          <View style={[styles.codeContainer, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.codeText, { color: colors.primary }]}>{referralCode}</Text>
+            <TouchableOpacity style={[styles.copyButton, { backgroundColor: colors.primary + '20' }]} onPress={handleCopyCode}>
+              <Copy size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.linkSection}>
-          <Text style={styles.sectionTitle}>Your Referral Link</Text>
-          <View style={styles.linkContainer}>
-            <Text style={styles.linkText} numberOfLines={1}>{referralLink}</Text>
-            <TouchableOpacity style={styles.copyButton} onPress={handleCopyLink}>
-              <Copy size={20} color="#800080" />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Referral Link</Text>
+          <View style={[styles.linkContainer, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.linkText, { color: colors.textSecondary }]} numberOfLines={1}>{referralLink}</Text>
+            <TouchableOpacity style={[styles.copyButton, { backgroundColor: colors.primary + '20' }]} onPress={handleCopyLink}>
+              <Copy size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
 
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
           <Share2 size={20} color="white" />
-          <Text style={styles.shareButtonText}>Share with Friends</Text>
+          <Text style={[styles.shareButtonText, { color: 'white' }]}>Share with Friends</Text>
         </TouchableOpacity>
 
-        <View style={styles.stepsSection}>
-          <Text style={styles.sectionTitle}>How It Works</Text>
+        <View style={[styles.stepsSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>How It Works</Text>
           {steps.map((step, index) => (
             <View key={index} style={styles.stepItem}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>{index + 1}</Text>
+              <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.stepNumberText, { color: 'white' }]}>{index + 1}</Text>
               </View>
-              <Text style={styles.stepText}>{step}</Text>
+              <Text style={[styles.stepText, { color: colors.textSecondary }]}>{step}</Text>
             </View>
           ))}
         </View>
 
         <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Your Referral Stats</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Referral Stats</Text>
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Friends Referred</Text>
+            <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.statNumber, { color: colors.primary }]}>0</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Friends Referred</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>0</Text>
-              <Text style={styles.statLabel}>Coins Earned</Text>
+            <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.statNumber, { color: colors.primary }]}>0</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Coins Earned</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.termsSection}>
-          <Text style={styles.termsTitle}>Terms & Conditions</Text>
-          <Text style={styles.termsText}>
+        <View style={[styles.termsSection, { backgroundColor: colors.warning + '20', borderLeftColor: colors.warning }]}>
+          <Text style={[styles.termsTitle, { color: colors.warning }]}>Terms & Conditions</Text>
+          <Text style={[styles.termsText, { color: colors.warning }]}>
             • Referral bonus is awarded when referred friend completes first video watch{'\n'}
             • Each user can only be referred once{'\n'}
             • Referral rewards may take up to 24 hours to process{'\n'}
@@ -170,7 +172,6 @@ export default function ReferFriendScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -192,7 +193,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   heroSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
@@ -206,14 +206,12 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
   heroSubtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -223,12 +221,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   benefitCard: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -252,12 +248,10 @@ const styles = StyleSheet.create({
   benefitTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 4,
   },
   benefitDescription: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   codeSection: {
@@ -266,7 +260,6 @@ const styles = StyleSheet.create({
   codeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -279,12 +272,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#800080',
     letterSpacing: 2,
   },
   copyButton: {
     padding: 8,
-    backgroundColor: '#F3E5F5',
     borderRadius: 8,
   },
   linkSection: {
@@ -293,7 +284,6 @@ const styles = StyleSheet.create({
   linkContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -305,14 +295,13 @@ const styles = StyleSheet.create({
   linkText: {
     flex: 1,
     fontSize: 14,
-    color: '#666',
     marginRight: 12,
   },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#800080',
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -324,12 +313,10 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   shareButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
   stepsSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -348,20 +335,17 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#800080',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
   stepNumberText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
   stepText: {
     flex: 1,
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   statsSection: {
@@ -373,7 +357,6 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
@@ -386,31 +369,25 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#800080',
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
     marginTop: 4,
   },
   termsSection: {
-    backgroundColor: '#FFF3E0',
     borderRadius: 12,
     padding: 16,
     marginBottom: 32,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
   },
   termsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#E65100',
     marginBottom: 8,
   },
   termsText: {
     fontSize: 12,
-    color: '#BF360C',
     lineHeight: 18,
   },
 });

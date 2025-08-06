@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, FileText, Scale, Shield, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 
 export default function TermsScreen() {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
 
   const sections = [
@@ -60,9 +62,9 @@ Violation of these terms may result in account suspension or termination.`
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -75,30 +77,30 @@ Violation of these terms may result in account suspension or termination.`
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.introSection}>
-          <Text style={styles.introTitle}>Terms of Service</Text>
-          <Text style={styles.introText}>
+        <View style={[styles.introSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.introTitle, { color: colors.text }]}>Terms of Service</Text>
+          <Text style={[styles.introText, { color: colors.textSecondary }]}>
             Please read these Terms of Service carefully before using VidGro. These terms govern your use of our platform and services.
           </Text>
-          <Text style={styles.lastUpdated}>Last updated: January 15, 2025</Text>
+          <Text style={[styles.lastUpdated, { color: colors.textSecondary }]}>Last updated: January 15, 2025</Text>
         </View>
 
         {sections.map((section, index) => (
-          <View key={index} style={styles.section}>
+          <View key={index} style={[styles.section, { backgroundColor: colors.surface }]}>
             <View style={styles.sectionHeader}>
-              <section.icon size={24} color="#800080" />
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <section.icon size={24} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.title}</Text>
             </View>
-            <Text style={styles.sectionContent}>{section.content}</Text>
+            <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>{section.content}</Text>
           </View>
         ))}
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Scale size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Virtual Currency</Text>
+            <Scale size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Virtual Currency</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             Coins are virtual currency with no real-world value. They can be:
             {'\n\n'}• Earned by watching videos
             {'\n'}• Purchased through in-app purchases
@@ -108,24 +110,24 @@ Violation of these terms may result in account suspension or termination.`
           </Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Shield size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Content and Intellectual Property</Text>
+            <Shield size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Content and Intellectual Property</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             You retain ownership of content you submit but grant us a license to use, display, and distribute it on our platform.
             {'\n\n'}You represent that you have the right to share any content you promote and that it doesn't violate any third-party rights.
             {'\n\n'}We respect intellectual property rights and will respond to valid DMCA takedown notices.
           </Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <AlertTriangle size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Disclaimers and Limitations</Text>
+            <AlertTriangle size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Disclaimers and Limitations</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND.
             {'\n\n'}We are not liable for:
             {'\n'}• Service interruptions or downtime
@@ -136,12 +138,12 @@ Violation of these terms may result in account suspension or termination.`
           </Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Scale size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Termination</Text>
+            <Scale size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Termination</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             Either party may terminate this agreement at any time:
             {'\n\n'}• You can delete your account through the app settings
             {'\n'}• We may suspend or terminate accounts for violations
@@ -150,12 +152,12 @@ Violation of these terms may result in account suspension or termination.`
           </Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <FileText size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Governing Law and Disputes</Text>
+            <FileText size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Governing Law and Disputes</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             These terms are governed by the laws of [Your Jurisdiction].
             {'\n\n'}Any disputes will be resolved through binding arbitration, except for:
             {'\n'}• Small claims court matters
@@ -165,9 +167,9 @@ Violation of these terms may result in account suspension or termination.`
           </Text>
         </View>
 
-        <View style={styles.contactSection}>
-          <Text style={styles.contactTitle}>Questions About These Terms?</Text>
-          <Text style={styles.contactText}>
+        <View style={[styles.contactSection, { backgroundColor: colors.primary + '20', borderLeftColor: colors.primary }]}>
+          <Text style={[styles.contactTitle, { color: colors.primary }]}>Questions About These Terms?</Text>
+          <Text style={[styles.contactText, { color: colors.primary }]}>
             If you have any questions about these Terms of Service, please contact us:
             {'\n\n'}Email: legal@vidgro.com
             {'\n'}Address: 123 Legal Street, Terms City, TC 12345
@@ -175,9 +177,9 @@ Violation of these terms may result in account suspension or termination.`
           </Text>
         </View>
 
-        <View style={styles.changesSection}>
-          <Text style={styles.changesTitle}>Changes to Terms</Text>
-          <Text style={styles.changesText}>
+        <View style={[styles.changesSection, { backgroundColor: colors.warning + '20', borderLeftColor: colors.warning }]}>
+          <Text style={[styles.changesTitle, { color: colors.warning }]}>Changes to Terms</Text>
+          <Text style={[styles.changesText, { color: colors.warning }]}>
             We may update these Terms of Service from time to time. We will notify you of any changes by posting the new terms on this page and updating the "Last updated" date.
             {'\n\n'}Your continued use of the service after changes constitutes acceptance of the new terms.
           </Text>
@@ -190,7 +192,6 @@ Violation of these terms may result in account suspension or termination.`
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -212,7 +213,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   introSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 24,
     marginBottom: 20,
@@ -225,25 +225,21 @@ const styles = StyleSheet.create({
   introTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
     textAlign: 'center',
   },
   introText: {
     fontSize: 16,
-    color: '#666',
     lineHeight: 24,
     textAlign: 'center',
     marginBottom: 16,
   },
   lastUpdated: {
     fontSize: 14,
-    color: '#999',
     textAlign: 'center',
     fontStyle: 'italic',
   },
   section: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -262,49 +258,39 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   sectionContent: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 22,
   },
   contactSection: {
-    backgroundColor: '#E3F2FD',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
   },
   contactTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1976D2',
     marginBottom: 12,
   },
   contactText: {
     fontSize: 14,
-    color: '#1565C0',
     lineHeight: 22,
   },
   changesSection: {
-    backgroundColor: '#FFF3E0',
     borderRadius: 16,
     padding: 20,
     marginBottom: 32,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
   },
   changesTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#F57C00',
     marginBottom: 12,
   },
   changesText: {
     fontSize: 14,
-    color: '#E65100',
     lineHeight: 22,
   },
 });

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Star, Send, Heart, ThumbsUp } from 'lucide-react-native';
 
 export default function RateUsScreen() {
   const { profile, refreshProfile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
@@ -63,9 +65,9 @@ export default function RateUsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -78,10 +80,10 @@ export default function RateUsScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.ratingSection}>
+        <View style={[styles.ratingSection, { backgroundColor: colors.surface }]}>
           <Heart size={48} color="#FF4757" />
-          <Text style={styles.ratingTitle}>How do you like VidGro?</Text>
-          <Text style={styles.ratingSubtitle}>
+          <Text style={[styles.ratingTitle, { color: colors.text }]}>How do you like VidGro?</Text>
+          <Text style={[styles.ratingSubtitle, { color: colors.textSecondary }]}>
             Your feedback helps us improve the app for everyone
           </Text>
 
@@ -90,18 +92,18 @@ export default function RateUsScreen() {
           </View>
 
           {rating > 0 && (
-            <Text style={styles.ratingLabel}>
+            <Text style={[styles.ratingLabel, { color: colors.accent }]}>
               {ratingLabels[rating]}
             </Text>
           )}
         </View>
 
-        <View style={styles.feedbackSection}>
-          <Text style={styles.feedbackTitle}>Tell us more (optional)</Text>
+        <View style={[styles.feedbackSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.feedbackTitle, { color: colors.text }]}>Tell us more (optional)</Text>
           <TextInput
-            style={styles.feedbackInput}
+            style={[styles.feedbackInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="What do you like most about VidGro? Any suggestions for improvement?"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             value={feedback}
             onChangeText={setFeedback}
             multiline
@@ -111,7 +113,7 @@ export default function RateUsScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.submitButton, loading && styles.buttonDisabled]}
+          style={[styles.submitButton, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
           onPress={handleRatingSubmit}
           disabled={loading}
         >
@@ -121,34 +123,34 @@ export default function RateUsScreen() {
           </Text>
         </TouchableOpacity>
 
-        <View style={styles.benefitsSection}>
-          <Text style={styles.benefitsTitle}>Why rate us?</Text>
+        <View style={[styles.benefitsSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.benefitsTitle, { color: colors.text }]}>Why rate us?</Text>
           <View style={styles.benefitItem}>
             <ThumbsUp size={20} color="#2ECC71" />
-            <Text style={styles.benefitText}>Earn 100 coins instantly</Text>
+            <Text style={[styles.benefitText, { color: colors.textSecondary }]}>Earn 100 coins instantly</Text>
           </View>
           <View style={styles.benefitItem}>
             <Heart size={20} color="#E74C3C" />
-            <Text style={styles.benefitText}>Help us improve the app</Text>
+            <Text style={[styles.benefitText, { color: colors.textSecondary }]}>Help us improve the app</Text>
           </View>
           <View style={styles.benefitItem}>
             <Star size={20} color="#FFD700" />
-            <Text style={styles.benefitText}>Support the VidGro community</Text>
+            <Text style={[styles.benefitText, { color: colors.textSecondary }]}>Support the VidGro community</Text>
           </View>
         </View>
 
-        <View style={styles.storeLinksSection}>
-          <Text style={styles.storeLinksTitle}>Love VidGro? Rate us on:</Text>
-          <TouchableOpacity style={styles.storeButton}>
-            <Text style={styles.storeButtonText}>📱 App Store</Text>
+        <View style={[styles.storeLinksSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.storeLinksTitle, { color: colors.text }]}>Love VidGro? Rate us on:</Text>
+          <TouchableOpacity style={[styles.storeButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.storeButtonText, { color: colors.text }]}>📱 App Store</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.storeButton}>
-            <Text style={styles.storeButtonText}>🤖 Google Play</Text>
+          <TouchableOpacity style={[styles.storeButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.storeButtonText, { color: colors.text }]}>🤖 Google Play</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.thankYouSection}>
-          <Text style={styles.thankYouText}>
+        <View style={[styles.thankYouSection, { backgroundColor: colors.primary + '20', borderLeftColor: colors.primary }]}>
+          <Text style={[styles.thankYouText, { color: colors.primary }]}>
             Thank you for being part of the VidGro community! Your support means everything to us. 💜
           </Text>
         </View>
@@ -160,7 +162,6 @@ export default function RateUsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -182,7 +183,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   ratingSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
@@ -196,13 +196,11 @@ const styles = StyleSheet.create({
   ratingTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 16,
     marginBottom: 8,
   },
   ratingSubtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 22,
@@ -218,10 +216,8 @@ const styles = StyleSheet.create({
   ratingLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFD700',
   },
   feedbackSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -234,25 +230,20 @@ const styles = StyleSheet.create({
   feedbackTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
   },
   feedbackInput: {
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
     height: 100,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#800080',
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -272,7 +263,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   benefitsSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -285,7 +275,6 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   benefitItem: {
@@ -296,10 +285,8 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     fontSize: 16,
-    color: '#666',
   },
   storeLinksSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -312,12 +299,10 @@ const styles = StyleSheet.create({
   storeLinksTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
     textAlign: 'center',
   },
   storeButton: {
-    backgroundColor: '#F8F9FA',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -328,20 +313,16 @@ const styles = StyleSheet.create({
   },
   storeButtonText: {
     fontSize: 16,
-    color: '#333',
     fontWeight: '600',
   },
   thankYouSection: {
-    backgroundColor: '#F3E5F5',
     borderRadius: 16,
     padding: 20,
     marginBottom: 32,
     borderLeftWidth: 4,
-    borderLeftColor: '#800080',
   },
   thankYouText: {
     fontSize: 16,
-    color: '#800080',
     textAlign: 'center',
     lineHeight: 24,
   },

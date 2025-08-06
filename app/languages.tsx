@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Globe, Check } from 'lucide-react-native';
 
 export default function LanguagesScreen() {
   const { profile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [loading, setLoading] = useState(false);
@@ -42,9 +44,9 @@ export default function LanguagesScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -57,7 +59,7 @@ export default function LanguagesScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Choose your preferred language for the app interface
         </Text>
 
@@ -67,6 +69,7 @@ export default function LanguagesScreen() {
               key={language.code}
               style={[
                 styles.languageCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
                 selectedLanguage === language.code && styles.selectedLanguage
               ]}
               onPress={() => handleLanguageChange(language.code)}
@@ -77,12 +80,14 @@ export default function LanguagesScreen() {
                 <View style={styles.languageText}>
                   <Text style={[
                     styles.languageName,
+                    { color: colors.text },
                     selectedLanguage === language.code && styles.selectedText
                   ]}>
                     {language.name}
                   </Text>
                   <Text style={[
                     styles.nativeName,
+                    { color: colors.textSecondary },
                     selectedLanguage === language.code && styles.selectedNativeText
                   ]}>
                     {language.nativeName}
@@ -90,15 +95,15 @@ export default function LanguagesScreen() {
                 </View>
               </View>
               {selectedLanguage === language.code && (
-                <Check size={20} color="#800080" />
+                <Check size={20} color={colors.primary} />
               )}
             </TouchableOpacity>
           ))}
         </View>
 
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Language Support</Text>
-          <Text style={styles.infoText}>
+        <View style={[styles.infoContainer, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.infoTitle, { color: colors.text }]}>Language Support</Text>
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
             • All interface elements will be translated{'\n'}
             • Video titles and descriptions remain in original language{'\n'}
             • Support messages will be in your selected language{'\n'}
@@ -106,9 +111,9 @@ export default function LanguagesScreen() {
           </Text>
         </View>
 
-        <View style={styles.noteContainer}>
-          <Text style={styles.noteTitle}>📝 Note</Text>
-          <Text style={styles.noteText}>
+        <View style={[styles.noteContainer, { backgroundColor: colors.warning + '20', borderLeftColor: colors.warning }]}>
+          <Text style={[styles.noteTitle, { color: colors.warning }]}>📝 Note</Text>
+          <Text style={[styles.noteText, { color: colors.warning }]}>
             Some languages are still being translated. If you notice any missing translations, please contact our support team.
           </Text>
         </View>
@@ -120,7 +125,6 @@ export default function LanguagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -143,7 +147,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
@@ -156,11 +159,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -168,8 +169,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   selectedLanguage: {
-    borderColor: '#800080',
-    backgroundColor: '#F3E5F5',
+    borderWidth: 2,
   },
   languageInfo: {
     flexDirection: 'row',
@@ -186,21 +186,18 @@ const styles = StyleSheet.create({
   languageName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   selectedText: {
-    color: '#800080',
+    fontWeight: 'bold',
   },
   nativeName: {
     fontSize: 14,
-    color: '#666',
     marginTop: 2,
   },
   selectedNativeText: {
-    color: '#800080',
+    fontWeight: '600',
   },
   infoContainer: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -213,30 +210,24 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   noteContainer: {
-    backgroundColor: '#FFF3E0',
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
   },
   noteTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#E65100',
     marginBottom: 8,
   },
   noteText: {
     fontSize: 14,
-    color: '#BF360C',
     lineHeight: 20,
   },
 });

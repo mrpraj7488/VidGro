@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Shield, Eye, Lock, Database } from 'lucide-react-native';
 
 export default function PrivacyPolicyScreen() {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
 
   const sections = [
@@ -60,9 +62,9 @@ However, no method of transmission over the internet is 100% secure.`
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -75,30 +77,30 @@ However, no method of transmission over the internet is 100% secure.`
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.introSection}>
-          <Text style={styles.introTitle}>Your Privacy Matters</Text>
-          <Text style={styles.introText}>
+        <View style={[styles.introSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.introTitle, { color: colors.text }]}>Your Privacy Matters</Text>
+          <Text style={[styles.introText, { color: colors.textSecondary }]}>
             At VidGro, we are committed to protecting your privacy and ensuring the security of your personal information. This policy explains how we collect, use, and safeguard your data.
           </Text>
-          <Text style={styles.lastUpdated}>Last updated: January 15, 2025</Text>
+          <Text style={[styles.lastUpdated, { color: colors.textSecondary }]}>Last updated: January 15, 2025</Text>
         </View>
 
         {sections.map((section, index) => (
-          <View key={index} style={styles.section}>
+          <View key={index} style={[styles.section, { backgroundColor: colors.surface }]}>
             <View style={styles.sectionHeader}>
-              <section.icon size={24} color="#800080" />
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <section.icon size={24} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.title}</Text>
             </View>
-            <Text style={styles.sectionContent}>{section.content}</Text>
+            <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>{section.content}</Text>
           </View>
         ))}
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Shield size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Your Rights</Text>
+            <Shield size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Rights</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             You have the right to:
             {'\n\n'}• Access your personal information
             {'\n'}• Correct inaccurate data
@@ -109,22 +111,22 @@ However, no method of transmission over the internet is 100% secure.`
           </Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Database size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Data Retention</Text>
+            <Database size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Data Retention</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             We retain your information for as long as your account is active or as needed to provide services. When you delete your account, we will delete your personal information within 30 days, except where we are required to retain it for legal purposes.
           </Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Eye size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Cookies and Tracking</Text>
+            <Eye size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Cookies and Tracking</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             We use cookies and similar technologies to:
             {'\n\n'}• Remember your preferences
             {'\n'}• Analyze platform usage
@@ -134,19 +136,19 @@ However, no method of transmission over the internet is 100% secure.`
           </Text>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Lock size={24} color="#800080" />
-            <Text style={styles.sectionTitle}>Children's Privacy</Text>
+            <Lock size={24} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Children's Privacy</Text>
           </View>
-          <Text style={styles.sectionContent}>
+          <Text style={[styles.sectionContent, { color: colors.textSecondary }]}>
             Our service is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.
           </Text>
         </View>
 
-        <View style={styles.contactSection}>
-          <Text style={styles.contactTitle}>Contact Us</Text>
-          <Text style={styles.contactText}>
+        <View style={[styles.contactSection, { backgroundColor: colors.primary + '20', borderLeftColor: colors.primary }]}>
+          <Text style={[styles.contactTitle, { color: colors.primary }]}>Contact Us</Text>
+          <Text style={[styles.contactText, { color: colors.primary }]}>
             If you have any questions about this Privacy Policy, please contact us:
             {'\n\n'}Email: privacy@vidgro.com
             {'\n'}Address: 123 Privacy Street, Data City, DC 12345
@@ -154,9 +156,9 @@ However, no method of transmission over the internet is 100% secure.`
           </Text>
         </View>
 
-        <View style={styles.changesSection}>
-          <Text style={styles.changesTitle}>Changes to This Policy</Text>
-          <Text style={styles.changesText}>
+        <View style={[styles.changesSection, { backgroundColor: colors.warning + '20', borderLeftColor: colors.warning }]}>
+          <Text style={[styles.changesTitle, { color: colors.warning }]}>Changes to This Policy</Text>
+          <Text style={[styles.changesText, { color: colors.warning }]}>
             We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically for any changes.
           </Text>
         </View>
@@ -168,7 +170,6 @@ However, no method of transmission over the internet is 100% secure.`
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -190,7 +191,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   introSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 24,
     marginBottom: 20,
@@ -203,25 +203,20 @@ const styles = StyleSheet.create({
   introTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
     textAlign: 'center',
   },
   introText: {
-    fontSize: 16,
-    color: '#666',
     lineHeight: 24,
     textAlign: 'center',
     marginBottom: 16,
   },
   lastUpdated: {
     fontSize: 14,
-    color: '#999',
     textAlign: 'center',
     fontStyle: 'italic',
   },
   section: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -240,49 +235,39 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   sectionContent: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 22,
   },
   contactSection: {
-    backgroundColor: '#E3F2FD',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
   },
   contactTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1976D2',
     marginBottom: 12,
   },
   contactText: {
     fontSize: 14,
-    color: '#1565C0',
     lineHeight: 22,
   },
   changesSection: {
-    backgroundColor: '#FFF3E0',
     borderRadius: 16,
     padding: 20,
     marginBottom: 32,
     borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
   },
   changesTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#F57C00',
     marginBottom: 12,
   },
   changesText: {
     fontSize: 14,
-    color: '#E65100',
     lineHeight: 22,
   },
 });

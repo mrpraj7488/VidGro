@@ -1,10 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Menu, X, User, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ThemeToggle from './ThemeToggle';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 interface GlobalHeaderProps {
   title: string;
@@ -57,18 +60,20 @@ export default function GlobalHeader({
 
   const renderSideMenu = () => (
     <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
-      <View style={[styles.sideMenuHeader, { backgroundColor: colors.primary }]}>
-        <View style={styles.profileSection}>
-          <View style={[styles.profileAvatar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-            <User size={32} color="white" />
+      <LinearGradient
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
+        style={styles.sideMenuHeader}
+      >
+        <View style={styles.sideMenuHeaderContent}>
+          <View style={styles.profileSection}>
+            <View style={[styles.profileAvatar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+              <User size={32} color="white" />
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={[styles.profileName, { color: 'white' }]}>{profile?.username || 'User'}</Text>
+              <Text style={[styles.profileEmail, { color: 'rgba(255, 255, 255, 0.8)' }]}>{profile?.email || 'user@example.com'}</Text>
+            </View>
           </View>
-          <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: 'white' }]}>{profile?.username || 'User'}</Text>
-            <Text style={[styles.profileEmail, { color: 'rgba(255, 255, 255, 0.8)' }]}>{profile?.email || 'user@example.com'}</Text>
-          </View>
-        </View>
-        <View style={styles.headerActions}>
-          <ThemeToggle />
           <TouchableOpacity 
             style={styles.closeButton}
             onPress={() => setMenuVisible(false)}
@@ -76,7 +81,11 @@ export default function GlobalHeader({
             <X size={24} color="white" />
           </TouchableOpacity>
         </View>
-      </View>
+        <View style={styles.themeToggleRow}>
+          <Text style={styles.themeLabel}>Theme</Text>
+          <ThemeToggle />
+        </View>
+      </LinearGradient>
       
       <View style={[styles.sideMenuContent, { backgroundColor: colors.surface }]}>
         {sideMenuItems.map((item, index) => (
@@ -85,7 +94,7 @@ export default function GlobalHeader({
             style={[styles.sideMenuItem, { borderBottomColor: colors.border }]}
             onPress={() => handleItemPress(item)}
           >
-            <item.icon size={20} color={item.color || '#800080'} />
+            <item.icon size={20} color={item.color || colors.primary} />
             <Text style={[styles.sideMenuText, { color: item.color || colors.text }]}>
               {item.title}
             </Text>
@@ -94,33 +103,61 @@ export default function GlobalHeader({
       </View>
     </View>
   );
+          </View>
+  sideMenuHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  themeToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  themeLabel: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 
   return (
     <>
-      <View style={[styles.header, { backgroundColor: colors.headerBackground }]}>
-        <View style={styles.leftSection}>
-          <TouchableOpacity 
-            style={styles.menuButton}
-            onPress={() => setMenuVisible(!menuVisible)}
-          >
-            {menuVisible ? (
-              <X size={24} color="white" />
-            ) : (
-              <Menu size={24} color="white" />
+      <LinearGradient
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.leftSection}>
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={() => setMenuVisible(!menuVisible)}
+            >
+              {menuVisible ? (
+                <X size={24} color="white" />
+              ) : (
+                <Menu size={24} color="white" />
+              )}
+            </TouchableOpacity>
+            <Text style={styles.title}>{title}</Text>
+          </View>
+          
+          <View style={styles.rightSection}>
+            {showCoinDisplay && profile && (
+              <View style={styles.coinDisplay}>
+                <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                  <Text style={styles.coinIcon}>🪙</Text>
+                  <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
+                </View>
+              </View>
             )}
-          </TouchableOpacity>
-          <Text style={styles.title}>{title}</Text>
-        </View>
-        
-        {showCoinDisplay && profile && (
-          <View style={styles.coinDisplay}>
-            <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <Text style={styles.coinIcon}>🪙</Text>
-              <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
+            <View style={styles.themeToggleContainer}>
+              <ThemeToggle />
             </View>
           </View>
-        )}
-      </View>
+        </View>
+      </LinearGradient>
       
       {renderSideMenu()}
       
@@ -136,28 +173,37 @@ export default function GlobalHeader({
 
 const styles = StyleSheet.create({
   header: {
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingTop: 50,
+    minHeight: 44,
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   menuButton: {
     marginRight: 16,
+    padding: 4,
   },
   title: {
-    fontSize: 24,
+    fontSize: Math.min(24, screenWidth * 0.06),
     fontWeight: 'bold',
     color: 'white',
+    flex: 1,
   },
   coinDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   coinBadge: {
     flexDirection: 'row',
@@ -165,15 +211,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    minWidth: 60,
   },
   coinIcon: {
-    fontSize: 16,
+    fontSize: 14,
     marginRight: 4,
   },
   coinText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
+  },
+  themeToggleContainer: {
+    marginLeft: 8,
   },
   sideMenu: {
     position: 'absolute',
@@ -189,16 +239,13 @@ const styles = StyleSheet.create({
   },
   sideMenuHeader: {
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 16,
     paddingHorizontal: 20,
+  },
+  sideMenuHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   profileSection: {
     flexDirection: 'row',
