@@ -52,8 +52,11 @@ export default function MoreTab() {
 
   const renderSideMenu = () => (
     null // Remove duplicate side menu - handled by GlobalHeader
-      
-      {renderSideMenu()}
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <GlobalHeader />
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.menuGrid}>
