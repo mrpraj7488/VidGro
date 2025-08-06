@@ -103,9 +103,9 @@ export default function ThemeToggle() {
 
 const styles = StyleSheet.create({
   container: {
-    width: 52,
-    height: 28,
-    borderRadius: 14,
+    width: 48,
+    height: 26,
+    borderRadius: 13,
     padding: 4,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -116,9 +116,9 @@ const styles = StyleSheet.create({
   },
   slider: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',

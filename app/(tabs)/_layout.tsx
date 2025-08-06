@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Play, TrendingUp, ChartBar as BarChart3, MoveHorizontal as MoreHorizontal } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Platform } from 'react-native';
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
@@ -13,9 +14,9 @@ export default function TabLayout() {
           backgroundColor: colors.tabBarBackground,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          paddingBottom: 6,
-          paddingTop: 6,
-          height: 65,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+          paddingTop: 8,
+          height: Platform.OS === 'ios' ? 85 : 70,
           shadowColor: colors.shadowColor,
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: isDark ? 0.3 : 0.1,
@@ -25,12 +26,12 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: '600',
-          marginBottom: 2,
+          marginBottom: Platform.OS === 'ios' ? 0 : 4,
         },
         tabBarIconStyle: {
-          marginTop: 2,
+          marginTop: Platform.OS === 'ios' ? 4 : 2,
         },
       }}
     >

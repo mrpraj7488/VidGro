@@ -47,14 +47,14 @@ const lightColors: ThemeColors = {
   error: '#E74C3C',
   overlay: 'rgba(0, 0, 0, 0.5)',
   headerBackground: '#800080',
-  tabBarBackground: '#FFFFFF',
+  tabBarBackground: '#FAFAFA',
   inputBackground: '#FFFFFF',
   shadowColor: '#000000',
 };
 
 const darkColors: ThemeColors = {
   background: '#121212',
-  surface: '#1F1F1F',
+  surface: '#1E1E1E',
   card: '#2A2A2A',
   text: '#FFFFFF',
   textSecondary: '#CCCCCC',
@@ -67,7 +67,7 @@ const darkColors: ThemeColors = {
   error: '#FF5252',
   overlay: 'rgba(0, 0, 0, 0.7)',
   headerBackground: '#9D4EDD',
-  tabBarBackground: '#1F1F1F',
+  tabBarBackground: '#1A1A1A',
   inputBackground: '#2A2A2A',
   shadowColor: '#000000',
 };
