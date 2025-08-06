@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useVideoStore } from '../store/videoStore';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown, Check, MoveVertical as MoreVertical, CreditCard as Edit3 } from 'lucide-react-native';
@@ -61,6 +62,7 @@ interface DropdownProps {
   onSelect: (value: number) => void;
   label: string;
   suffix: string;
+  colors: any;
 }
 
 const SmoothDropdown: React.FC<DropdownProps> = ({
@@ -71,6 +73,7 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
   onSelect,
   label,
   suffix,
+  colors,
 }) => {
   const handleSelect = (value: number) => {
     onSelect(value);
@@ -85,6 +88,7 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
     <Pressable
       style={[
         styles.dropdownItem,
+        { borderBottomColor: colors.border },
         item === selectedValue && styles.selectedDropdownItem
       ]}
       onPress={() => handleSelect(item)}
@@ -92,12 +96,13 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
     >
       <Text style={[
         styles.dropdownItemText,
+        { color: colors.text },
         item === selectedValue && styles.selectedDropdownItemText
       ]}>
         {item} {suffix}
       </Text>
       {item === selectedValue && (
-        <Check color="#3498DB" size={16} />
+        <Check color={colors.primary} size={16} />
       )}
     </Pressable>
   );
@@ -115,17 +120,17 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
         onPress={handleBackdropPress}
       >
         <Pressable 
-          style={styles.fullScreenModal}
+          style={[styles.fullScreenModal, { backgroundColor: colors.surface }]}
           onPress={(e) => e.stopPropagation()}
         >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{label}</Text>
+          <View style={[styles.modalHeader, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.modalTitle, { color: 'white' }]}>{label}</Text>
             <Pressable 
               onPress={onClose} 
               style={styles.closeButton}
               android_ripple={{ color: 'rgba(255,255,255,0.3)', borderless: true }}
             >
-              <Text style={styles.closeButtonText}>✕</Text>
+              <Text style={[styles.closeButtonText, { color: 'white' }]}>✕</Text>
             </Pressable>
           </View>
           <FlatList
@@ -145,6 +150,7 @@ const SmoothDropdown: React.FC<DropdownProps> = ({
 
 export default function EditVideoScreen() {
   const { user, refreshProfile } = useAuth();
+  const { colors, isDark } = useTheme();
   const { clearQueue } = useVideoStore();
   const params = useLocalSearchParams();
   const [videoData, setVideoData] = useState<VideoData | null>(null);
@@ -597,66 +603,66 @@ export default function EditVideoScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <LinearGradient colors={['#800080', '#FF4757']} style={styles.header}>
+      <LinearGradient colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']} style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={handleNavigateBack}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Video</Text>
+          <Text style={[styles.headerTitle, { color: 'white' }]}>Edit Video</Text>
           <Edit3 size={24} color="white" />
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Video Status */}
-        <View style={styles.statusCard}>
+        <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
           <View style={styles.statusHeader}>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(videoData.status) }]}>
-              <Text style={styles.statusText}>{getStatusText(videoData.status)}</Text>
+              <Text style={[styles.statusText, { color: 'white' }]}>{getStatusText(videoData.status)}</Text>
             </View>
-            <Text style={styles.videoId} numberOfLines={1}>ID: {videoData.title}</Text>
+            <Text style={[styles.videoId, { color: colors.textSecondary }]} numberOfLines={1}>ID: {videoData.title}</Text>
           </View>
         </View>
 
         {/* Pending Status Timeline */}
         {videoData.status === 'on_hold' && holdTimer > 0 && (
-          <View style={styles.pendingCard}>
+          <View style={[styles.pendingCard, { backgroundColor: colors.warning + '20' }]}>
             <View style={styles.pendingHeader}>
               <Timer color="#F39C12" size={24} />
-              <Text style={styles.pendingTitle}>Pending Status</Text>
+              <Text style={[styles.pendingTitle, { color: colors.warning }]}>Pending Status</Text>
             </View>
             <View style={styles.timerContainer}>
-              <Text style={styles.timerText}>{formatHoldTimer(holdTimer)} remaining</Text>
-              <Text style={styles.timerSubtext}>Video will enter queue after hold period</Text>
+              <Text style={[styles.timerText, { color: colors.warning }]}>{formatHoldTimer(holdTimer)} remaining</Text>
+              <Text style={[styles.timerSubtext, { color: colors.warning }]}>Video will enter queue after hold period</Text>
             </View>
           </View>
         )}
 
         {/* Main Metrics */}
         <View style={styles.metricsSection}>
-          <Text style={styles.sectionTitle}>Video Metrics</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Video Metrics</Text>
           
           <View style={styles.metricsGrid}>
             {/* Total Views */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.surface }]}>
               <View style={styles.metricHeaderCentered}>
                 <Eye color="#3498DB" size={isSmallScreen ? 22 : 28} />
-                <Text style={styles.metricLabelResponsive}>Total Views</Text>
+                <Text style={[styles.metricLabelResponsive, { color: colors.text }]}>Total Views</Text>
               </View>
-              <Text style={styles.metricValueResponsive}>
+              <Text style={[styles.metricValueResponsive, { color: colors.text }]}>
                 {videoData.views_count}/{videoData.target_views}
               </Text>
             </View>
 
             {/* Received Watch Time */}
-            <View style={styles.metricCard}>
+            <View style={[styles.metricCard, { backgroundColor: colors.surface }]}>
               <View style={styles.metricHeaderCentered}>
                 <Clock color="#F39C12" size={isSmallScreen ? 22 : 28} />
-                <Text style={styles.metricLabelResponsive}>Received Watch Time</Text>
+                <Text style={[styles.metricLabelResponsive, { color: colors.text }]}>Received Watch Time</Text>
               </View>
-              <Text style={styles.metricValueResponsive}>
+              <Text style={[styles.metricValueResponsive, { color: colors.text }]}>
                 {formatEngagementTime(videoData.total_watch_time || 0)}
               </Text>
             </View>
@@ -665,32 +671,32 @@ export default function EditVideoScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionSection}>
-          <Text style={styles.sectionTitle}>Actions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Actions</Text>
 
           {/* Delete Button */}
           <TouchableOpacity 
-            style={[styles.actionButton, styles.deleteButton]} 
+            style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error }]} 
             onPress={handleDeleteVideo}
           >
             <Trash2 color="white" size={20} />
             <View style={styles.actionContent}>
-              <Text style={styles.actionButtonText}>Delete Video</Text>
-              <Text style={styles.actionSubtext}>
+              <Text style={[styles.actionButtonText, { color: 'white' }]}>Delete Video</Text>
+              <Text style={[styles.actionSubtext, { color: 'rgba(255, 255, 255, 0.8)' }]}>
                 Refund: 🪙{getRefundInfo().refundAmount} ({getRefundInfo().refundPercentage}%)
               </Text>
             </View>
           </TouchableOpacity>
 
           {/* Repromote Section */}
-          <View style={styles.repromoteSection}>
+          <View style={[styles.repromoteSection, { backgroundColor: colors.surface }]}>
             <Pressable 
               style={styles.repromoteToggle}
               onPress={() => setShowRepromoteOptions(!showRepromoteOptions)}
               android_ripple={{ color: '#F5F5F5' }}
             >
-              <Text style={styles.repromoteLabel}>Repromote Video</Text>
+              <Text style={[styles.repromoteLabel, { color: colors.text }]}>Repromote Video</Text>
               <ChevronDown 
-                color="#333" 
+                color={colors.text} 
                 size={20} 
                 style={[
                   styles.chevron,
@@ -702,8 +708,8 @@ export default function EditVideoScreen() {
             {showRepromoteOptions && (
               <View style={styles.repromoteOptions}>
                 {!canRepromote() && (
-                  <View style={styles.repromoteDisabledNotice}>
-                    <Text style={styles.disabledNoticeText}>
+                  <View style={[styles.repromoteDisabledNotice, { backgroundColor: colors.warning + '20' }]}>
+                    <Text style={[styles.disabledNoticeText, { color: colors.warning }]}>
                       Repromote is only available for completed, paused, or previously repromoted videos.
                     </Text>
                   </View>
@@ -711,10 +717,11 @@ export default function EditVideoScreen() {
                 
                 {/* Views Selection */}
                 <View style={styles.optionGroup}>
-                  <Text style={styles.optionLabel}>Target Views</Text>
+                  <Text style={[styles.optionLabel, { color: colors.text }]}>Target Views</Text>
                   <Pressable 
                     style={[
                       styles.dropdown,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.border },
                       !canRepromote() && styles.dropdownDisabled
                     ]}
                     onPress={() => setShowViewsDropdown(true)}
@@ -723,12 +730,13 @@ export default function EditVideoScreen() {
                   >
                     <Text style={[
                       styles.dropdownText,
+                      { color: colors.text },
                       !canRepromote() && styles.dropdownTextDisabled
                     ]}>
                       {selectedViews} views
                     </Text>
                     <ChevronDown 
-                      color={canRepromote() ? "#666" : "#CCC"} 
+                      color={canRepromote() ? colors.textSecondary : colors.border} 
                       size={16} 
                     />
                   </Pressable>
@@ -736,10 +744,11 @@ export default function EditVideoScreen() {
 
                 {/* Duration Selection */}
                 <View style={styles.optionGroup}>
-                  <Text style={styles.optionLabel}>Watch Duration</Text>
+                  <Text style={[styles.optionLabel, { color: colors.text }]}>Watch Duration</Text>
                   <Pressable 
                     style={[
                       styles.dropdown,
+                      { backgroundColor: colors.inputBackground, borderColor: colors.border },
                       !canRepromote() && styles.dropdownDisabled
                     ]}
                     onPress={() => setShowDurationDropdown(true)}
@@ -748,20 +757,21 @@ export default function EditVideoScreen() {
                   >
                     <Text style={[
                       styles.dropdownText,
+                      { color: colors.text },
                       !canRepromote() && styles.dropdownTextDisabled
                     ]}>
                       {selectedDuration} seconds
                     </Text>
                     <ChevronDown 
-                      color={canRepromote() ? "#666" : "#CCC"} 
+                      color={canRepromote() ? colors.textSecondary : colors.border} 
                       size={16} 
                     />
                   </Pressable>
                 </View>
 
                 {/* Cost Display */}
-                <View style={styles.costDisplay}>
-                  <Text style={styles.costText}>
+                <View style={[styles.costDisplay, { backgroundColor: colors.primary + '20' }]}>
+                  <Text style={[styles.costText, { color: colors.primary }]}>
                     Cost: 🪙{calculateCoinCost(selectedViews, selectedDuration)} | Reward: 🪙{calculateCoinReward(selectedDuration)} per view
                   </Text>
                 </View>
@@ -771,6 +781,7 @@ export default function EditVideoScreen() {
                   style={[
                     styles.actionButton, 
                     styles.repromoteButton,
+                    { backgroundColor: colors.primary },
                     (repromoting || !canRepromote()) && styles.buttonDisabled
                   ]} 
                   onPress={handleRepromoteVideo}
@@ -779,10 +790,10 @@ export default function EditVideoScreen() {
                 >
                   <Play color="white" size={20} />
                   <View style={styles.actionContent}>
-                    <Text style={styles.actionButtonText}>
+                    <Text style={[styles.actionButtonText, { color: 'white' }]}>
                       {repromoting ? 'Repromoting...' : 'Repromote Now'}
                     </Text>
-                    <Text style={styles.actionSubtext}>
+                    <Text style={[styles.actionSubtext, { color: 'rgba(255, 255, 255, 0.8)' }]}>
                       {canRepromote() ? 'Instantly active in queue' : 'Not available for this video'}
                     </Text>
                   </View>
@@ -802,6 +813,7 @@ export default function EditVideoScreen() {
         onSelect={setSelectedViews}
         label="Select Target Views"
         suffix="views"
+        colors={colors}
       />
 
       <SmoothDropdown
@@ -812,6 +824,7 @@ export default function EditVideoScreen() {
         onSelect={setSelectedDuration}
         label="Select Duration (seconds)"
         suffix="seconds"
+        colors={colors}
       />
     </View>
   );
@@ -820,13 +833,11 @@ export default function EditVideoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -841,13 +852,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
   },
   scrollView: {
     flex: 1,
   },
   statusCard: {
-    backgroundColor: 'white',
     margin: 16,
     borderRadius: 16,
     padding: 16,
@@ -879,17 +888,14 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'white',
   },
   videoId: {
     fontSize: 12,
-    color: '#666',
     flex: 1,
     textAlign: 'right',
     marginLeft: 8,
   },
   pendingCard: {
-    backgroundColor: '#FFF8E1',
     margin: 16,
     marginTop: 0,
     borderRadius: 16,
@@ -905,7 +911,6 @@ const styles = StyleSheet.create({
   pendingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#F57C00',
     marginLeft: 8,
   },
   timerContainer: {
@@ -914,12 +919,10 @@ const styles = StyleSheet.create({
   timerText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#F39C12',
     fontFamily: 'monospace',
   },
   timerSubtext: {
     fontSize: 12,
-    color: '#F57C00',
     marginTop: 4,
   },
   metricsSection: {
@@ -928,7 +931,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 12,
   },
   metricsGrid: {
@@ -937,7 +939,6 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     ...Platform.select({
@@ -963,23 +964,19 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
     marginLeft: 8,
   },
   metricValue: {
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   metricValueCentered: {
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
-    color: '#333',
     textAlign: 'center',
   },
   engagementLabel: {
     fontSize: 12,
-    color: '#666',
     marginTop: 4,
   },
   actionSection: {
@@ -993,10 +990,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   deleteButton: {
-    backgroundColor: '#E74C3C',
   },
   repromoteButton: {
-    backgroundColor: '#800080',
     marginTop: 16,
   },
   buttonDisabled: {
@@ -1007,17 +1002,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 2,
   },
   actionSubtext: {
-    color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 12,
   },
   repromoteSection: {
-    backgroundColor: 'white',
     borderRadius: 12,
     overflow: 'hidden',
     ...Platform.select({
@@ -1044,7 +1036,6 @@ const styles = StyleSheet.create({
   repromoteLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   chevron: {
     transform: [{ rotate: '0deg' }],
@@ -1055,8 +1046,6 @@ const styles = StyleSheet.create({
   repromoteOptions: {
     padding: 16,
     paddingTop: 0,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
   },
   optionGroup: {
     marginBottom: 16,
@@ -1064,25 +1053,20 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 8,
   },
   dropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   dropdownText: {
     fontSize: 14,
-    color: '#333',
   },
   costDisplay: {
-    backgroundColor: '#F0F8FF',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -1091,7 +1075,6 @@ const styles = StyleSheet.create({
   costText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#3498DB',
   },
   // Modal styles for smooth dropdown
   modalOverlay: {
@@ -1102,7 +1085,6 @@ const styles = StyleSheet.create({
     padding: isVerySmallScreen ? 10 : 20,
   },
   fullScreenModal: {
-    backgroundColor: 'white',
     borderRadius: 20,
     maxHeight: isSmallScreen ? '80%' : '70%',
     minHeight: isSmallScreen ? '50%' : '40%',
@@ -1127,7 +1109,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FF4757',
     paddingHorizontal: isVerySmallScreen ? 15 : 20,
     paddingVertical: isVerySmallScreen ? 12 : 16,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 16,
@@ -1137,7 +1118,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: isVerySmallScreen ? 16 : 18,
     fontWeight: '600',
-    color: 'white',
     flex: 1,
     marginRight: 10,
   },
@@ -1151,12 +1131,10 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     fontSize: isVerySmallScreen ? 18 : 20,
-    color: 'white',
     fontWeight: 'bold',
   },
   modalList: {
     flex: 1,
-    backgroundColor: 'white',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
@@ -1170,44 +1148,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: isVerySmallScreen ? 15 : 20,
     paddingVertical: isVerySmallScreen ? 12 : 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
     minHeight: isVerySmallScreen ? 48 : 56,
   },
   selectedDropdownItem: {
-    backgroundColor: '#F0F8FF',
+    backgroundColor: 'rgba(157, 78, 221, 0.1)',
   },
   dropdownItemText: {
     fontSize: isVerySmallScreen ? 14 : 16,
-    color: '#333',
     flex: 1,
   },
   selectedDropdownItemText: {
-    color: '#3498DB',
+    color: '#9D4EDD',
     fontWeight: '600',
   },
   repromoteDisabledNotice: {
-    backgroundColor: '#FFF3CD',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
   },
   disabledNoticeText: {
     fontSize: isVerySmallScreen ? 12 : 13,
-    color: '#856404',
     lineHeight: 18,
   },
   dropdownDisabled: {
-    backgroundColor: '#F8F9FA',
     opacity: 0.6,
   },
   dropdownTextDisabled: {
-    color: '#999',
   },
   disabledText: {
     fontSize: 12,
-    color: '#999',
     fontStyle: 'italic',
   },
   chevronDisabled: {
@@ -1222,14 +1191,12 @@ const styles = StyleSheet.create({
   metricLabelResponsive: {
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '600',
-    color: '#333',
     marginLeft: 8,
     textAlign: 'center',
   },
   metricValueResponsive: {
     fontSize: isSmallScreen ? 22 : 28,
     fontWeight: 'bold',
-    color: '#222',
     textAlign: 'center',
     marginTop: 2,
     marginBottom: 2,

@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Menu, X, User, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import ThemeToggle from './ThemeToggle';
 import { useRouter } from 'expo-router';
 
 interface GlobalHeaderProps {
@@ -18,6 +20,7 @@ export default function GlobalHeader({
   setMenuVisible 
 }: GlobalHeaderProps) {
   const { profile, signOut } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
 
   const sideMenuItems = [
@@ -53,34 +56,37 @@ export default function GlobalHeader({
   };
 
   const renderSideMenu = () => (
-    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300 }]}>
-      <View style={styles.sideMenuHeader}>
+    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
+      <View style={[styles.sideMenuHeader, { backgroundColor: colors.primary }]}>
         <View style={styles.profileSection}>
-          <View style={styles.profileAvatar}>
+          <View style={[styles.profileAvatar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
             <User size={32} color="white" />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile?.username || 'User'}</Text>
-            <Text style={styles.profileEmail}>{profile?.email || 'user@example.com'}</Text>
+            <Text style={[styles.profileName, { color: 'white' }]}>{profile?.username || 'User'}</Text>
+            <Text style={[styles.profileEmail, { color: 'rgba(255, 255, 255, 0.8)' }]}>{profile?.email || 'user@example.com'}</Text>
           </View>
         </View>
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={() => setMenuVisible(false)}
-        >
-          <X size={24} color="white" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <ThemeToggle />
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => setMenuVisible(false)}
+          >
+            <X size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
       
-      <View style={styles.sideMenuContent}>
+      <View style={[styles.sideMenuContent, { backgroundColor: colors.surface }]}>
         {sideMenuItems.map((item, index) => (
           <TouchableOpacity
             key={index}
-            style={styles.sideMenuItem}
+            style={[styles.sideMenuItem, { borderBottomColor: colors.border }]}
             onPress={() => handleItemPress(item)}
           >
             <item.icon size={20} color={item.color || '#800080'} />
-            <Text style={[styles.sideMenuText, item.color && { color: item.color }]}>
+            <Text style={[styles.sideMenuText, { color: item.color || colors.text }]}>
               {item.title}
             </Text>
           </TouchableOpacity>
@@ -91,7 +97,7 @@ export default function GlobalHeader({
 
   return (
     <>
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.headerBackground }]}>
         <View style={styles.leftSection}>
           <TouchableOpacity 
             style={styles.menuButton}
@@ -108,7 +114,7 @@ export default function GlobalHeader({
         
         {showCoinDisplay && profile && (
           <View style={styles.coinDisplay}>
-            <View style={styles.coinBadge}>
+            <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
               <Text style={styles.coinIcon}>🪙</Text>
               <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
             </View>
@@ -120,7 +126,7 @@ export default function GlobalHeader({
       
       {menuVisible && (
         <TouchableOpacity 
-          style={styles.overlay}
+          style={[styles.overlay, { backgroundColor: colors.overlay }]}
           onPress={() => setMenuVisible(false)}
         />
       )}
@@ -135,7 +141,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#800080',
     paddingTop: 50,
   },
   leftSection: {
@@ -157,7 +162,6 @@ const styles = StyleSheet.create({
   coinBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -176,7 +180,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 300,
-    backgroundColor: 'white',
     zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
@@ -185,13 +188,17 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   sideMenuHeader: {
-    backgroundColor: '#800080',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   profileSection: {
     flexDirection: 'row',
@@ -202,7 +209,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -213,11 +219,9 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: 'white',
   },
   profileEmail: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   closeButton: {
     padding: 8,
@@ -231,11 +235,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   sideMenuText: {
     fontSize: 16,
-    color: '#333',
     marginLeft: 16,
   },
   overlay: {
@@ -244,7 +246,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 999,
   },
 });

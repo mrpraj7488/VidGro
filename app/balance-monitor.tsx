@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TouchableOpacity } from 'react-native';
 import { ArrowLeft, Database } from 'lucide-react-native';
@@ -9,18 +10,19 @@ import BalanceSystemMonitor from '../components/BalanceSystemMonitor';
 
 export default function BalanceMonitorScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>System Monitor</Text>
+          <Text style={[styles.headerTitle, { color: 'white' }]}>System Monitor</Text>
           <Database size={24} color="white" />
         </View>
       </LinearGradient>
@@ -33,7 +35,6 @@ export default function BalanceMonitorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -48,6 +49,5 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
   },
 });

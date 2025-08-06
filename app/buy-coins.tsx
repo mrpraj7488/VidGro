@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Coins, Crown } from 'lucide-react-native';
 
 export default function BuyCoinsScreen() {
   const { profile, refreshProfile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -53,25 +55,25 @@ export default function BuyCoinsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Buy Coins</Text>
+          <Text style={[styles.headerTitle, { color: 'white' }]}>Buy Coins</Text>
           <View style={styles.currentBalance}>
             <Coins size={16} color="white" />
-            <Text style={styles.balanceText}>{profile?.coins || 0}</Text>
+            <Text style={[styles.balanceText, { color: 'white' }]}>{profile?.coins || 0}</Text>
           </View>
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Choose a coin package to unlock more video promotions
         </Text>
 
@@ -81,6 +83,7 @@ export default function BuyCoinsScreen() {
               key={index}
               style={[
                 styles.packageCard,
+                { backgroundColor: colors.surface },
                 packageItem.popular && styles.popularPackage
               ]}
               onPress={() => handlePurchase(packageItem)}
@@ -94,25 +97,25 @@ export default function BuyCoinsScreen() {
               )}
               
               <View style={styles.packageHeader}>
-                <Text style={styles.coinAmount}>
+                <Text style={[styles.coinAmount, { color: colors.text }]}>
                   {packageItem.coins.toLocaleString()} Coins
                 </Text>
                 {packageItem.bonus > 0 && (
-                  <Text style={styles.bonusText}>
+                  <Text style={[styles.bonusText, { color: colors.success }]}>
                     +{packageItem.bonus.toLocaleString()} Bonus
                   </Text>
                 )}
               </View>
 
               <View style={styles.packageDetails}>
-                <Text style={styles.totalCoins}>
+                <Text style={[styles.totalCoins, { color: colors.textSecondary }]}>
                   Total: {(packageItem.coins + packageItem.bonus).toLocaleString()} Coins
                 </Text>
-                <Text style={styles.price}>₹{packageItem.price}</Text>
+                <Text style={[styles.price, { color: colors.primary }]}>₹{packageItem.price}</Text>
               </View>
 
-              <View style={styles.purchaseButton}>
-                <Text style={styles.purchaseButtonText}>
+              <View style={[styles.purchaseButton, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.purchaseButtonText, { color: 'white' }]}>
                   {loading ? 'Processing...' : 'Purchase'}
                 </Text>
               </View>
@@ -120,9 +123,9 @@ export default function BuyCoinsScreen() {
           ))}
         </View>
 
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Why Buy Coins?</Text>
-          <Text style={styles.infoText}>
+        <View style={[styles.infoContainer, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.infoTitle, { color: colors.text }]}>Why Buy Coins?</Text>
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
             • Promote your YouTube videos to thousands of viewers{'\n'}
             • Increase your video views and engagement{'\n'}
             • Grow your channel faster with targeted promotion{'\n'}
@@ -130,9 +133,9 @@ export default function BuyCoinsScreen() {
           </Text>
         </View>
 
-        <View style={styles.securityContainer}>
-          <Text style={styles.securityTitle}>🔒 Secure Payment</Text>
-          <Text style={styles.securityText}>
+        <View style={[styles.securityContainer, { backgroundColor: colors.success + '20' }]}>
+          <Text style={[styles.securityTitle, { color: colors.success }]}>🔒 Secure Payment</Text>
+          <Text style={[styles.securityText, { color: colors.success }]}>
             Your payment information is protected with bank-level security
           </Text>
         </View>
@@ -144,7 +147,6 @@ export default function BuyCoinsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -159,7 +161,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
   },
   currentBalance: {
     flexDirection: 'row',
@@ -171,7 +172,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   balanceText: {
-    color: 'white',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -181,7 +181,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
@@ -191,7 +190,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   packageCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -230,11 +228,9 @@ const styles = StyleSheet.create({
   coinAmount: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
   },
   bonusText: {
     fontSize: 14,
-    color: '#2ECC71',
     fontWeight: '600',
   },
   packageDetails: {
@@ -245,27 +241,22 @@ const styles = StyleSheet.create({
   },
   totalCoins: {
     fontSize: 16,
-    color: '#666',
     fontWeight: '500',
   },
   price: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#800080',
   },
   purchaseButton: {
-    backgroundColor: '#800080',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   purchaseButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
   infoContainer: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -278,16 +269,13 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   securityContainer: {
-    backgroundColor: '#E8F5E8',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -295,12 +283,10 @@ const styles = StyleSheet.create({
   securityTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2ECC71',
     marginBottom: 4,
   },
   securityText: {
     fontSize: 12,
-    color: '#2ECC71',
     textAlign: 'center',
   },
 });

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ShieldOff, Clock, Play } from 'lucide-react-native';
 
 export default function ConfigureAdsScreen() {
   const { profile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [isAdFreeActive, setIsAdFreeActive] = useState(false);
   const [selectedOption, setSelectedOption] = useState(5);
@@ -52,34 +54,34 @@ export default function ConfigureAdsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#800080', '#FF4757']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Configure Ads</Text>
+          <Text style={[styles.headerTitle, { color: 'white' }]}>Configure Ads</Text>
           <ShieldOff size={24} color="white" />
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {isAdFreeActive ? (
-          <View style={styles.activeContainer}>
-            <View style={styles.activeIcon}>
+          <View style={[styles.activeContainer, { backgroundColor: colors.surface }]}>
+            <View style={[styles.activeIcon, { backgroundColor: colors.success + '20' }]}>
               <ShieldOff size={48} color="#2ECC71" />
             </View>
-            <Text style={styles.activeTitle}>Ad-Free Active</Text>
-            <Text style={styles.activeSubtitle}>
+            <Text style={[styles.activeTitle, { color: colors.text }]}>Ad-Free Active</Text>
+            <Text style={[styles.activeSubtitle, { color: colors.textSecondary }]}>
               You're currently enjoying an ad-free experience
             </Text>
           </View>
         ) : (
           <>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Choose how many ads you want to watch to earn ad-free time
             </Text>
 
@@ -89,38 +91,39 @@ export default function ConfigureAdsScreen() {
                   key={index}
                   style={[
                     styles.optionCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
                     selectedOption === option.hours && styles.selectedOption
                   ]}
                   onPress={() => setSelectedOption(option.hours)}
                 >
                   <View style={styles.optionHeader}>
-                    <Text style={styles.optionHours}>{option.hours} Hours</Text>
-                    <View style={styles.adCount}>
-                      <Play size={16} color="#800080" />
-                      <Text style={styles.adCountText}>{option.watchAds} ads</Text>
+                    <Text style={[styles.optionHours, { color: colors.text }]}>{option.hours} Hours</Text>
+                    <View style={[styles.adCount, { backgroundColor: colors.primary + '20' }]}>
+                      <Play size={16} color={colors.primary} />
+                      <Text style={[styles.adCountText, { color: colors.primary }]}>{option.watchAds} ads</Text>
                     </View>
                   </View>
-                  <Text style={styles.optionDescription}>{option.description}</Text>
+                  <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{option.description}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <TouchableOpacity
-              style={[styles.startButton, loading && styles.buttonDisabled]}
+              style={[styles.startButton, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
               onPress={handleStartAdFreeSession}
               disabled={loading}
             >
               <ShieldOff size={20} color="white" />
-              <Text style={styles.startButtonText}>
+              <Text style={[styles.startButtonText, { color: 'white' }]}>
                 {loading ? 'Starting...' : 'Start Ad-Free Session'}
               </Text>
             </TouchableOpacity>
           </>
         )}
 
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>How it works</Text>
-          <Text style={styles.infoText}>
+        <View style={[styles.infoContainer, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.infoTitle, { color: colors.text }]}>How it works</Text>
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
             1. Select how many hours of ad-free time you want{'\n'}
             2. Watch the required number of ads{'\n'}
             3. Enjoy uninterrupted video watching and earning{'\n'}
@@ -130,10 +133,10 @@ export default function ConfigureAdsScreen() {
 
         {!profile?.is_vip && (
           <TouchableOpacity
-            style={styles.vipButton}
+            style={[styles.vipButton, { backgroundColor: colors.accent }]}
             onPress={() => router.push('/become-vip')}
           >
-            <Text style={styles.vipButtonText}>
+            <Text style={[styles.vipButtonText, { color: colors.primary }]}>
               Upgrade to VIP for unlimited ad-free experience
             </Text>
           </TouchableOpacity>
@@ -146,7 +149,6 @@ export default function ConfigureAdsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -161,7 +163,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
   },
   content: {
     flex: 1,
@@ -169,14 +170,12 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
   },
   activeContainer: {
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 32,
     marginBottom: 24,
@@ -190,7 +189,6 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#E8F5E8',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -198,12 +196,10 @@ const styles = StyleSheet.create({
   activeTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   activeSubtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
   },
   optionsContainer: {
@@ -211,11 +207,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   optionCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
-    borderColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -223,8 +217,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   selectedOption: {
-    borderColor: '#800080',
-    shadowColor: '#800080',
+    borderColor: '#9D4EDD',
+    shadowColor: '#9D4EDD',
     shadowOpacity: 0.2,
   },
   optionHeader: {
@@ -236,12 +230,10 @@ const styles = StyleSheet.create({
   optionHours: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   adCount: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3E5F5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -249,18 +241,15 @@ const styles = StyleSheet.create({
   },
   adCountText: {
     fontSize: 12,
-    color: '#800080',
     fontWeight: '600',
   },
   optionDescription: {
     fontSize: 14,
-    color: '#666',
   },
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#800080',
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -275,12 +264,10 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   startButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
   infoContainer: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -293,16 +280,13 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   vipButton: {
-    backgroundColor: '#FFD700',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -313,7 +297,6 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   vipButtonText: {
-    color: '#800080',
     fontSize: 16,
     fontWeight: 'bold',
   },

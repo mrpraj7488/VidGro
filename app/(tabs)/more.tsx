@@ -51,15 +51,15 @@ export default function MoreTab() {
   };
 
   const renderSideMenu = () => (
-    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300 }]}>
-      <View style={styles.sideMenuHeader}>
+    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
+      <View style={[styles.sideMenuHeader, { backgroundColor: colors.primary }]}>
         <View style={styles.profileSection}>
-          <View style={styles.profileAvatar}>
+          <View style={[styles.profileAvatar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
             <User size={32} color="white" />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile?.username || 'User'}</Text>
-            <Text style={styles.profileEmail}>{profile?.email || 'user@example.com'}</Text>
+            <Text style={[styles.profileName, { color: 'white' }]}>{profile?.username || 'User'}</Text>
+            <Text style={[styles.profileEmail, { color: 'rgba(255, 255, 255, 0.8)' }]}>{profile?.email || 'user@example.com'}</Text>
           </View>
         </View>
         <TouchableOpacity 
@@ -70,15 +70,15 @@ export default function MoreTab() {
         </TouchableOpacity>
       </View>
       
-      <ScrollView style={styles.sideMenuContent}>
+      <ScrollView style={[styles.sideMenuContent, { backgroundColor: colors.surface }]}>
         {sideMenuItems.map((item, index) => (
           <TouchableOpacity
             key={index}
-            style={styles.sideMenuItem}
+            style={[styles.sideMenuItem, { borderBottomColor: colors.border }]}
             onPress={() => handleItemPress(item)}
           >
-            <item.icon size={20} color={item.color || '#800080'} />
-            <Text style={[styles.sideMenuText, item.color && { color: item.color }]}>
+            <item.icon size={20} color={item.color || colors.primary} />
+            <Text style={[styles.sideMenuText, { color: item.color || colors.text }]}>
               {item.title}
             </Text>
           </TouchableOpacity>
@@ -99,7 +99,7 @@ export default function MoreTab() {
       
       {menuVisible && (
         <TouchableOpacity 
-          style={styles.overlay}
+          style={[styles.overlay, { backgroundColor: colors.overlay }]}
           onPress={() => setMenuVisible(false)}
         />
       )}
@@ -111,12 +111,12 @@ export default function MoreTab() {
               key={index}
               style={[
                 styles.menuItem,
-                { backgroundColor: colors.primary },
+                { backgroundColor: colors.surface },
                 item.action === 'tap' && styles.menuItemTap
               ]}
               onPress={() => handleItemPress(item)}
             >
-              <View style={styles.menuItemIcon}>
+              <View style={[styles.menuItemIcon, { backgroundColor: colors.primary + '20' }]}>
                 <item.icon size={24} color={colors.accent} />
               </View>
               <Text style={[styles.menuItemTitle, { color: colors.text }]}>{item.title}</Text>
@@ -155,7 +155,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -174,7 +173,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 300,
-    backgroundColor: 'white',
     zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
@@ -183,7 +181,6 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   sideMenuHeader: {
-    backgroundColor: '#800080',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -200,7 +197,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -211,11 +207,9 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: 'white',
   },
   profileEmail: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   closeButton: {
     padding: 8,
@@ -229,11 +223,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   sideMenuText: {
     fontSize: 16,
-    color: '#333',
     marginLeft: 16,
   },
   overlay: {
@@ -242,7 +234,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     zIndex: 999,
   },
 });

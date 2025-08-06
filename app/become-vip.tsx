@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Crown, Check, Zap, Shield, Headphones } from 'lucide-react-native';
 
 export default function BecomeVIPScreen() {
   const { profile, refreshProfile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -78,36 +80,36 @@ export default function BecomeVIPScreen() {
 
   if (profile?.is_vip) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <LinearGradient
-          colors={['#FFD700', '#FF4757']}
+          colors={isDark ? ['#F7B731', '#FF6B7A'] : ['#FFD700', '#FF4757']}
           style={styles.header}
         >
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()}>
               <ArrowLeft size={24} color="white" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>VIP Status</Text>
+            <Text style={[styles.headerTitle, { color: 'white' }]}>VIP Status</Text>
             <Crown size={24} color="white" />
           </View>
         </LinearGradient>
 
-        <View style={styles.vipActiveContainer}>
-          <View style={styles.vipIcon}>
+        <View style={[styles.vipActiveContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.vipIcon, { backgroundColor: colors.accent + '20' }]}>
             <Crown size={48} color="#FFD700" />
           </View>
-          <Text style={styles.vipActiveTitle}>You're a VIP Member!</Text>
-          <Text style={styles.vipActiveSubtitle}>
+          <Text style={[styles.vipActiveTitle, { color: colors.text }]}>You're a VIP Member!</Text>
+          <Text style={[styles.vipActiveSubtitle, { color: colors.textSecondary }]}>
             Enjoy all premium benefits including ad-free experience and 10% discount
           </Text>
           
-          <View style={styles.benefitsList}>
+          <View style={[styles.benefitsList, { backgroundColor: colors.surface }]}>
             {vipBenefits.map((benefit, index) => (
-              <View key={index} style={styles.benefitItem}>
+              <View key={index} style={[styles.benefitItem, { borderBottomColor: colors.border }]}>
                 <benefit.icon size={20} color="#FFD700" />
                 <View style={styles.benefitContent}>
-                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                  <Text style={styles.benefitDescription}>{benefit.description}</Text>
+                  <Text style={[styles.benefitTitle, { color: colors.text }]}>{benefit.title}</Text>
+                  <Text style={[styles.benefitDescription, { color: colors.textSecondary }]}>{benefit.description}</Text>
                 </View>
                 <Check size={20} color="#2ECC71" />
               </View>
@@ -119,45 +121,46 @@ export default function BecomeVIPScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <LinearGradient
-        colors={['#FFD700', '#FF4757']}
+        colors={isDark ? ['#F7B731', '#FF6B7A'] : ['#FFD700', '#FF4757']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Become VIP</Text>
+          <Text style={[styles.headerTitle, { color: 'white' }]}>Become VIP</Text>
           <Crown size={24} color="white" />
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Unlock premium features and maximize your earnings
         </Text>
 
-        <View style={styles.benefitsContainer}>
-          <Text style={styles.benefitsTitle}>VIP Benefits</Text>
+        <View style={[styles.benefitsContainer, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.benefitsTitle, { color: colors.text }]}>VIP Benefits</Text>
           {vipBenefits.map((benefit, index) => (
-            <View key={index} style={styles.benefitItem}>
+            <View key={index} style={[styles.benefitItem, { borderBottomColor: colors.border }]}>
               <benefit.icon size={24} color="#FFD700" />
               <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                <Text style={styles.benefitDescription}>{benefit.description}</Text>
+                <Text style={[styles.benefitTitle, { color: colors.text }]}>{benefit.title}</Text>
+                <Text style={[styles.benefitDescription, { color: colors.textSecondary }]}>{benefit.description}</Text>
               </View>
             </View>
           ))}
         </View>
 
         <View style={styles.plansContainer}>
-          <Text style={styles.plansTitle}>Choose Your Plan</Text>
+          <Text style={[styles.plansTitle, { color: colors.text }]}>Choose Your Plan</Text>
           {vipPlans.map((plan, index) => (
             <TouchableOpacity
               key={index}
               style={[
                 styles.planCard,
+                { backgroundColor: colors.surface },
                 plan.popular && styles.popularPlan
               ]}
               onPress={() => handleSubscribe(plan)}
@@ -170,17 +173,17 @@ export default function BecomeVIPScreen() {
               )}
               
               <View style={styles.planHeader}>
-                <Text style={styles.planDuration}>{plan.duration}</Text>
+                <Text style={[styles.planDuration, { color: colors.text }]}>{plan.duration}</Text>
                 <View style={styles.planPricing}>
-                  <Text style={styles.planPrice}>₹{plan.price}</Text>
+                  <Text style={[styles.planPrice, { color: colors.accent }]}>₹{plan.price}</Text>
                   {plan.savings > 0 && (
-                    <Text style={styles.planSavings}>Save ₹{plan.savings}</Text>
+                    <Text style={[styles.planSavings, { color: colors.success }]}>Save ₹{plan.savings}</Text>
                   )}
                 </View>
               </View>
 
-              <View style={styles.subscribeButton}>
-                <Text style={styles.subscribeButtonText}>
+              <View style={[styles.subscribeButton, { backgroundColor: colors.accent }]}>
+                <Text style={[styles.subscribeButtonText, { color: 'white' }]}>
                   {loading ? 'Processing...' : 'Subscribe'}
                 </Text>
               </View>
@@ -188,9 +191,9 @@ export default function BecomeVIPScreen() {
           ))}
         </View>
 
-        <View style={styles.guaranteeContainer}>
-          <Text style={styles.guaranteeTitle}>💎 Premium Guarantee</Text>
-          <Text style={styles.guaranteeText}>
+        <View style={[styles.guaranteeContainer, { backgroundColor: colors.success + '20' }]}>
+          <Text style={[styles.guaranteeTitle, { color: colors.success }]}>💎 Premium Guarantee</Text>
+          <Text style={[styles.guaranteeText, { color: colors.success }]}>
             Not satisfied? Cancel anytime within 7 days for a full refund
           </Text>
         </View>
@@ -202,7 +205,6 @@ export default function BecomeVIPScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     paddingTop: 50,
@@ -217,7 +219,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
   },
   content: {
     flex: 1,
@@ -225,13 +226,11 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
   },
   benefitsContainer: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -244,13 +243,14 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
   },
   benefitContent: {
     flex: 1,
@@ -259,11 +259,9 @@ const styles = StyleSheet.create({
   benefitTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   benefitDescription: {
     fontSize: 14,
-    color: '#666',
   },
   plansContainer: {
     marginBottom: 32,
@@ -271,11 +269,9 @@ const styles = StyleSheet.create({
   plansTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   planCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -315,7 +311,6 @@ const styles = StyleSheet.create({
   planDuration: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   planPricing: {
     alignItems: 'flex-end',
@@ -323,26 +318,21 @@ const styles = StyleSheet.create({
   planPrice: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFD700',
   },
   planSavings: {
     fontSize: 12,
-    color: '#2ECC71',
     fontWeight: '600',
   },
   subscribeButton: {
-    backgroundColor: '#FFD700',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   subscribeButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
   guaranteeContainer: {
-    backgroundColor: '#E8F5E8',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -350,12 +340,10 @@ const styles = StyleSheet.create({
   guaranteeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2ECC71',
     marginBottom: 4,
   },
   guaranteeText: {
     fontSize: 12,
-    color: '#2ECC71',
     textAlign: 'center',
   },
   vipActiveContainer: {
@@ -367,7 +355,6 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#FFF8E1',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
@@ -376,19 +363,16 @@ const styles = StyleSheet.create({
   vipActiveTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   vipActiveSubtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 22,
   },
   benefitsList: {
     width: '100%',
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',

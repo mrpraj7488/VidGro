@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { TouchableOpacity, StyleSheet, Platform, View } from 'react-native';
 import { Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import Animated, {
@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withSequence,
+  withTiming,
   interpolateColor,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -17,19 +18,23 @@ export default function ThemeToggle() {
   // Animation values
   const scale = useSharedValue(1);
   const rotation = useSharedValue(0);
+  const slideX = useSharedValue(isDark ? 24 : 0);
   const colorProgress = useSharedValue(isDark ? 1 : 0);
 
   useEffect(() => {
     // Animate color transition
-    colorProgress.value = withSpring(isDark ? 1 : 0, {
-      damping: 15,
-      stiffness: 150,
+    colorProgress.value = withTiming(isDark ? 1 : 0, {
+      duration: 300,
     });
     
-    // Animate rotation
-    rotation.value = withSpring(isDark ? 180 : 0, {
-      damping: 15,
-      stiffness: 150,
+    // Animate slide transition
+    slideX.value = withTiming(isDark ? 24 : 0, {
+      duration: 300,
+    });
+    
+    // Animate rotation with smooth timing
+    rotation.value = withTiming(isDark ? 180 : 0, {
+      duration: 300,
     });
   }, [isDark]);
 
@@ -48,15 +53,28 @@ export default function ThemeToggle() {
     toggleTheme();
   };
 
-  const animatedStyle = useAnimatedStyle(() => {
+  const containerAnimatedStyle = useAnimatedStyle(() => {
     const backgroundColor = interpolateColor(
       colorProgress.value,
       [0, 1],
-      ['rgba(255, 215, 0, 0.2)', 'rgba(147, 112, 219, 0.2)']
+      ['rgba(255, 215, 0, 0.15)', 'rgba(147, 112, 219, 0.15)']
+    );
+
+    return {
+      backgroundColor,
+    };
+  });
+
+  const sliderAnimatedStyle = useAnimatedStyle(() => {
+    const backgroundColor = interpolateColor(
+      colorProgress.value,
+      [0, 1],
+      ['#FFD700', '#9370DB']
     );
 
     return {
       transform: [
+        { translateX: slideX.value },
         { scale: scale.value },
         { rotate: `${rotation.value}deg` }
       ],
@@ -68,12 +86,16 @@ export default function ThemeToggle() {
 
   return (
     <TouchableOpacity onPress={handleToggle} activeOpacity={0.7}>
-      <Animated.View style={[styles.container, animatedStyle]}>
-        {isDark ? (
-          <Moon size={20} color={iconColor} fill={iconColor} />
-        ) : (
-          <Sun size={20} color={iconColor} fill={iconColor} />
-        )}
+      <Animated.View style={[styles.container, containerAnimatedStyle]}>
+        <View style={styles.track}>
+          <Animated.View style={[styles.slider, sliderAnimatedStyle]}>
+            {isDark ? (
+              <Moon size={16} color={iconColor} fill={iconColor} />
+            ) : (
+              <Sun size={16} color={iconColor} fill={iconColor} />
+            )}
+          </Animated.View>
+        </View>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -81,12 +103,28 @@ export default function ThemeToggle() {
 
 const styles = StyleSheet.create({
   container: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 56,
+    height: 32,
+    borderRadius: 16,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  track: {
+    flex: 1,
+    position: 'relative',
+  },
+  slider: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
