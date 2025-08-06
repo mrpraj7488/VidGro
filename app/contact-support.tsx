@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, MessageCircle, Send, Phone, Mail, CircleHelp as HelpCircle } from 'lucide-react-native';
 
-export default function ContactSupportScreen() {
+function ContactSupportScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
   const router = useRouter();
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   contactInfo: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#F8F9FA',
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
+    color: '#333333',
     marginBottom: 16,
   },
   contactItem: {
@@ -253,12 +253,14 @@ const styles = StyleSheet.create({
   },
   contactText: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: '#666666',
   },
   responseTime: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#666666',
     marginTop: 16,
     textAlign: 'center',
   },
 });
+
+export default ContactSupportScreen;

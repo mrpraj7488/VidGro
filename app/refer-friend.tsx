@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Share2, Copy, Gift, Users, Coins } from 'lucide-react-native';
 
-export default function ReferFriendScreen() {
+function ReferFriendScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
   const router = useRouter();
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
+    backgroundColor: '#800080',
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -391,3 +391,5 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+export default ReferFriendScreen;
