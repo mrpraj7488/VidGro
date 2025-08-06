@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
 import { ChartBar as BarChart3, Eye, Coins, Play, Pause, CircleCheck as CheckCircle, Timer, CreditCard as Edit3, Activity, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getUserComprehensiveAnalytics, getUserVideosWithAnalytics, getUserRecentActivity } from '@/lib/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface UserAnalytics {
   total_videos_promoted: number;
@@ -52,6 +53,7 @@ interface VideoAnalytics {
 
 export default function Analytics() {
   const { user, profile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -296,7 +298,7 @@ export default function Analytics() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <GlobalHeader 
           title="Analytics" 
           showCoinDisplay={true}
@@ -304,15 +306,15 @@ export default function Analytics() {
           setMenuVisible={setMenuVisible} 
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#800080" />
-          <Text style={styles.loadingText}>Loading analytics...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>Loading analytics...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <GlobalHeader 
         title="Analytics" 
         showCoinDisplay={true}
@@ -329,25 +331,25 @@ export default function Analytics() {
       >
         {/* Overview Cards - Only 2 columns */}
         <View style={styles.overviewSection}>
-          <Text style={styles.sectionTitle}>Overview</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Overview</Text>
           
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
               <View style={styles.statHeader}>
                 <Play size={20} color="#3498DB" />
-                <Text style={styles.statLabel}>Videos Promoted</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Videos Promoted</Text>
               </View>
-              <Text style={styles.statValue}>
+              <Text style={[styles.statValue, { color: colors.text }]}>
                 {analytics?.total_videos_promoted || 0}
               </Text>
             </View>
 
-            <View style={styles.statCard}>
+            <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
               <View style={styles.statHeader}>
                 <Coins size={20} color="#FFD700" />
-                <Text style={styles.statLabel}>Coins Earned</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Coins Earned</Text>
               </View>
-              <Text style={styles.statValue}>
+              <Text style={[styles.statValue, { color: colors.text }]}>
                 {analytics?.total_coins_earned || 0}
               </Text>
             </View>
@@ -356,22 +358,22 @@ export default function Analytics() {
 
         {/* Video Status Summary */}
         <View style={styles.statusSection}>
-          <Text style={styles.sectionTitle}>Video Status</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Video Status</Text>
           
           <View style={styles.statusGrid}>
-            <View style={[styles.statusCard, { borderLeftColor: '#2ECC71' }]}>
-              <Text style={styles.statusNumber}>{analytics?.active_videos || 0}</Text>
-              <Text style={styles.statusLabel}>Active</Text>
+            <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#2ECC71' }]}>
+              <Text style={[styles.statusNumber, { color: colors.text }]}>{analytics?.active_videos || 0}</Text>
+              <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Active</Text>
             </View>
             
-            <View style={[styles.statusCard, { borderLeftColor: '#3498DB' }]}>
-              <Text style={styles.statusNumber}>{analytics?.completed_videos || 0}</Text>
-              <Text style={styles.statusLabel}>Completed</Text>
+            <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#3498DB' }]}>
+              <Text style={[styles.statusNumber, { color: colors.text }]}>{analytics?.completed_videos || 0}</Text>
+              <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Completed</Text>
             </View>
             
-            <View style={[styles.statusCard, { borderLeftColor: '#F39C12' }]}>
-              <Text style={styles.statusNumber}>{analytics?.on_hold_videos || 0}</Text>
-              <Text style={styles.statusLabel}>On Hold</Text>
+            <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#F39C12' }]}>
+              <Text style={[styles.statusNumber, { color: colors.text }]}>{analytics?.on_hold_videos || 0}</Text>
+              <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>On Hold</Text>
             </View>
           </View>
         </View>
@@ -379,15 +381,15 @@ export default function Analytics() {
         {/* Promoted Videos */}
         <View style={styles.videosSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Promoted Videos</Text>
-            <BarChart3 size={20} color="#800080" />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Promoted Videos</Text>
+            <BarChart3 size={20} color={colors.primary} />
           </View>
           
           {videos.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Play size={48} color="#CCC" />
-              <Text style={styles.emptyTitle}>No Videos Yet</Text>
-              <Text style={styles.emptyText}>
+            <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
+              <Play size={48} color={colors.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Videos Yet</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                 Start promoting your videos to see analytics here
               </Text>
             </View>
@@ -398,27 +400,27 @@ export default function Analytics() {
                 return (
                   <TouchableOpacity
                     key={video.video_id}
-                    style={styles.videoCard}
+                    style={[styles.videoCard, { backgroundColor: colors.surface }]}
                     onPress={() => handleVideoPress(video)}
                   >
                     <View style={styles.videoHeader}>
                       <View style={styles.videoTitleContainer}>
-                        <Text style={styles.videoTitle} numberOfLines={2}>
+                        <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
                           {video.title}
                         </Text>
-                        <Text style={styles.videoDate}>
+                        <Text style={[styles.videoDate, { color: colors.textSecondary }]}>
                           {formatDate(video.created_at)}
                         </Text>
                       </View>
                       <TouchableOpacity style={styles.editButton}>
-                        <Edit3 size={16} color="#666" />
+                        <Edit3 size={16} color={colors.textSecondary} />
                       </TouchableOpacity>
                     </View>
 
                     <View style={styles.videoStats}>
                       <View style={styles.videoStat}>
-                        <Eye size={16} color="#666" />
-                        <Text style={styles.videoStatText}>
+                        <Eye size={16} color={colors.textSecondary} />
+                        <Text style={[styles.videoStatText, { color: colors.textSecondary }]}>
                           {video.views_count}/{video.target_views}
                         </Text>
                       </View>
@@ -432,7 +434,7 @@ export default function Analytics() {
                     </View>
 
                     <View style={styles.progressContainer}>
-                      <View style={styles.progressBar}>
+                      <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
                         <View 
                           style={[
                             styles.progressFill, 
@@ -443,11 +445,11 @@ export default function Analytics() {
                           ]} 
                         />
                       </View>
-                      <Text style={styles.progressText}>{video.completion_rate}%</Text>
+                      <Text style={[styles.progressText, { color: colors.textSecondary }]}>{video.completion_rate}%</Text>
                     </View>
 
                     <View style={styles.videoCosts}>
-                      <Text style={styles.costText}>
+                      <Text style={[styles.costText, { color: colors.textSecondary }]}>
                         Spent: 🪙{video.coin_cost}
                       </Text>
                       {video.completed && (
@@ -462,19 +464,19 @@ export default function Analytics() {
               
               {videos.length > 1 && (
                 <TouchableOpacity
-                  style={styles.viewMoreButton}
+                  style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
                   onPress={() => setShowAllVideos(!showAllVideos)}
                 >
-                  <Text style={styles.viewMoreText}>
+                  <Text style={[styles.viewMoreText, { color: colors.primary }]}>
                     {showAllVideos 
                       ? 'Show Less' 
                       : `View More (${getRemainingCount(videos.length, 1)} more)`
                     }
                   </Text>
                   {showAllVideos ? (
-                    <ChevronUp size={16} color="#800080" />
+                    <ChevronUp size={16} color={colors.primary} />
                   ) : (
-                    <ChevronDown size={16} color="#800080" />
+                    <ChevronDown size={16} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -485,28 +487,28 @@ export default function Analytics() {
         {/* Recent Activity */}
         <View style={styles.activitySection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <Activity size={20} color="#800080" />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            <Activity size={20} color={colors.primary} />
           </View>
           
           {recentActivity.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Activity size={48} color="#CCC" />
-              <Text style={styles.emptyTitle}>No Recent Activity</Text>
-              <Text style={styles.emptyText}>
+            <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
+              <Activity size={48} color={colors.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Recent Activity</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                 Your coin transactions will appear here
               </Text>
             </View>
           ) : (
             <>
               {getDisplayedActivity().map((activity, index) => (
-                <View key={`${activity.activity_type}-${activity.created_at}-${index}`} style={styles.activityCard}>
+                <View key={`${activity.activity_type}-${activity.created_at}-${index}`} style={[styles.activityCard, { backgroundColor: colors.surface }]}>
                   <View style={styles.activityHeader}>
                     <View style={styles.activityInfo}>
-                      <Text style={styles.activityType}>
+                      <Text style={[styles.activityType, { color: colors.text }]}>
                         {formatTransactionType(activity.activity_type)}
                       </Text>
-                      <Text style={styles.activityDate}>
+                      <Text style={[styles.activityDate, { color: colors.textSecondary }]}>
                         {formatDate(activity.created_at)}
                       </Text>
                     </View>
@@ -517,7 +519,7 @@ export default function Analytics() {
                       {activity.amount > 0 ? '+' : ''}{activity.amount} 🪙
                     </Text>
                   </View>
-                  <Text style={styles.activityDescription} numberOfLines={2}>
+                  <Text style={[styles.activityDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                     {activity.description}
                   </Text>
                 </View>
@@ -525,19 +527,19 @@ export default function Analytics() {
               
               {recentActivity.length > 1 && (
                 <TouchableOpacity
-                  style={styles.viewMoreButton}
+                  style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
                   onPress={() => setShowAllActivity(!showAllActivity)}
                 >
-                  <Text style={styles.viewMoreText}>
+                  <Text style={[styles.viewMoreText, { color: colors.primary }]}>
                     {showAllActivity 
                       ? 'Show Less' 
                       : `View More (${getRemainingCount(recentActivity.length, 1)} more)`
                     }
                   </Text>
                   {showAllActivity ? (
-                    <ChevronUp size={16} color="#800080" />
+                    <ChevronUp size={16} color={colors.primary} />
                   ) : (
-                    <ChevronDown size={16} color="#800080" />
+                    <ChevronDown size={16} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -553,7 +555,6 @@ export default function Analytics() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
@@ -567,12 +568,10 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   sectionHeader: {
@@ -590,7 +589,6 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -606,14 +604,12 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
     marginLeft: 6,
     fontWeight: '500',
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
   statusSection: {
     marginBottom: 24,
@@ -624,7 +620,6 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     flex: 1,
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
@@ -637,12 +632,10 @@ const styles = StyleSheet.create({
   statusNumber: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
     textAlign: 'center',
   },
   statusLabel: {
     fontSize: 12,
-    color: '#666',
     textAlign: 'center',
     marginTop: 4,
     fontWeight: '500',
@@ -651,7 +644,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   activityCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -673,12 +665,10 @@ const styles = StyleSheet.create({
   activityType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 2,
   },
   activityDate: {
     fontSize: 12,
-    color: '#999',
   },
   activityAmount: {
     fontSize: 16,
@@ -686,14 +676,12 @@ const styles = StyleSheet.create({
   },
   activityDescription: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   videosSection: {
     marginBottom: 24,
   },
   emptyState: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 40,
     alignItems: 'center',
@@ -706,18 +694,15 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 20,
   },
   videoCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -740,13 +725,11 @@ const styles = StyleSheet.create({
   videoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     lineHeight: 22,
     marginBottom: 4,
   },
   videoDate: {
     fontSize: 12,
-    color: '#999',
   },
   editButton: {
     padding: 4,
@@ -763,7 +746,6 @@ const styles = StyleSheet.create({
   },
   videoStatText: {
     fontSize: 12,
-    color: '#666',
     fontWeight: '500',
   },
   progressContainer: {
@@ -774,7 +756,6 @@ const styles = StyleSheet.create({
   progressBar: {
     flex: 1,
     height: 6,
-    backgroundColor: '#E0E0E0',
     borderRadius: 3,
     marginRight: 8,
   },
@@ -784,7 +765,6 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    color: '#666',
     fontWeight: '600',
     minWidth: 35,
   },
@@ -793,7 +773,6 @@ const styles = StyleSheet.create({
   },
   costText: {
     fontSize: 12,
-    color: '#999',
   },
   engagementText: {
     fontSize: 11,
@@ -810,7 +789,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
@@ -824,6 +802,5 @@ const styles = StyleSheet.create({
   viewMoreText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#800080',
   },
 });

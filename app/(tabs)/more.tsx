@@ -4,9 +4,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
 import { DollarSign, Crown, ShieldOff, Star, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User, X, ChartBar as BarChart3 } from 'lucide-react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function MoreTab() {
   const { user, profile, signOut } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -86,7 +88,7 @@ export default function MoreTab() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <GlobalHeader 
         title="More" 
         menuVisible={menuVisible} 
@@ -109,15 +111,16 @@ export default function MoreTab() {
               key={index}
               style={[
                 styles.menuItem,
+                { backgroundColor: colors.primary },
                 item.action === 'tap' && styles.menuItemTap
               ]}
               onPress={() => handleItemPress(item)}
             >
               <View style={styles.menuItemIcon}>
-                <item.icon size={24} color="#FFD700" />
+                <item.icon size={24} color={colors.accent} />
               </View>
-              <Text style={styles.menuItemTitle}>{item.title}</Text>
-              <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+              <Text style={[styles.menuItemTitle, { color: colors.text }]}>{item.title}</Text>
+              <Text style={[styles.menuItemSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -129,7 +132,6 @@ export default function MoreTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
@@ -139,7 +141,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   menuItem: {
-    backgroundColor: '#800080',
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
@@ -154,7 +155,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -162,13 +163,11 @@ const styles = StyleSheet.create({
   menuItemTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: 'white',
     marginBottom: 4,
     flex: 1,
   },
   menuItemSubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   sideMenu: {
     position: 'absolute',
