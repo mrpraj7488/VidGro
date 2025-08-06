@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -14,6 +15,7 @@ export default function SignupScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
 
   const handleSignup = async () => {
@@ -73,7 +75,7 @@ export default function SignupScreen() {
 
   return (
     <LinearGradient
-      colors={['#800080', '#FF4757']}
+      colors={isDark ? ['#2D1B69', '#11998E'] : ['#800080', '#FF4757']}
       style={styles.container}
     >
       <KeyboardAvoidingView 
@@ -81,15 +83,15 @@ export default function SignupScreen() {
         style={styles.keyboardView}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Join VidGro</Text>
-          <Text style={styles.subtitle}>Start earning by watching videos</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Join VidGro</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Start earning by watching videos</Text>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
                 placeholder="Email"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textSecondary}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -99,9 +101,9 @@ export default function SignupScreen() {
 
             <View style={styles.inputContainer}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
                 placeholder="Username"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textSecondary}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
@@ -110,9 +112,9 @@ export default function SignupScreen() {
 
             <View style={styles.inputContainer}>
               <TextInput
-                style={[styles.input, { paddingRight: 50 }]}
+                style={[styles.input, { paddingRight: 50, backgroundColor: colors.inputBackground, color: colors.text }]}
                 placeholder="Password"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textSecondary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -122,18 +124,18 @@ export default function SignupScreen() {
                 onPress={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
-                  <EyeOff size={20} color="#666" />
+                  <EyeOff size={20} color={colors.textSecondary} />
                 ) : (
-                  <Eye size={20} color="#666" />
+                  <Eye size={20} color={colors.textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
 
             <View style={styles.inputContainer}>
               <TextInput
-                style={[styles.input, { paddingRight: 50 }]}
+                style={[styles.input, { paddingRight: 50, backgroundColor: colors.inputBackground, color: colors.text }]}
                 placeholder="Confirm Password"
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textSecondary}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!showConfirmPassword}
@@ -143,15 +145,15 @@ export default function SignupScreen() {
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               >
                 {showConfirmPassword ? (
-                  <EyeOff size={20} color="#666" />
+                  <EyeOff size={20} color={colors.textSecondary} />
                 ) : (
-                  <Eye size={20} color="#666" />
+                  <Eye size={20} color={colors.textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, { backgroundColor: colors.accent }, loading && styles.buttonDisabled]}
               onPress={handleSignup}
               disabled={loading}
             >
@@ -161,9 +163,9 @@ export default function SignupScreen() {
             </TouchableOpacity>
 
             <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Already have an account? </Text>
+              <Text style={[styles.loginText, { color: colors.textSecondary }]}>Already have an account? </Text>
               <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-                <Text style={styles.loginLink}>Sign In</Text>
+                <Text style={[styles.loginLink, { color: colors.accent }]}>Sign In</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -206,12 +208,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   input: {
-    backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
     fontSize: 16,
-    color: '#333',
   },
   eyeButton: {
     position: 'absolute',
@@ -219,7 +219,6 @@ const styles = StyleSheet.create({
     top: 16,
   },
   button: {
-    backgroundColor: '#FFD700',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -229,7 +228,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#800080',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -239,11 +238,9 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   loginText: {
-    color: 'white',
     fontSize: 16,
   },
   loginLink: {
-    color: '#FFD700',
     fontSize: 16,
     fontWeight: 'bold',
   },

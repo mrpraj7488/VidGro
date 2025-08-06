@@ -18,9 +18,11 @@ import { validateYouTubeUrl, validateVideoTitle, extractYouTubeVideoId } from '.
 import VideoPreview from '@/components/VideoPreview';
 import GlobalHeader from '@/components/GlobalHeader';
 import { Play, Eye, Clock, Crown } from 'lucide-react-native';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   
@@ -186,7 +188,7 @@ export default function PromoteTab() {
   const vipDiscount = getVipDiscount();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <GlobalHeader 
         title="Promote" 
         showCoinDisplay={true}
@@ -204,11 +206,11 @@ export default function PromoteTab() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>YouTube Video URL</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>YouTube Video URL</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
               placeholder="https://www.youtube.com/watch?v=..."
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textSecondary}
               value={youtubeUrl}
               onChangeText={setYoutubeUrl}
               autoCapitalize="none"
@@ -227,11 +229,11 @@ export default function PromoteTab() {
           )}
 
           <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Video Title</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Video Title</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
               placeholder="Enter video title"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textSecondary}
               value={videoTitle}
               onChangeText={setVideoTitle}
               multiline
@@ -240,21 +242,22 @@ export default function PromoteTab() {
           </View>
 
           <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Target Views</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Target Views</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
               {targetViewsOptions.map((views) => (
                 <TouchableOpacity
                   key={views}
                   style={[
                     styles.optionButton,
-                    targetViews === views && styles.selectedOption
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    targetViews === views && { backgroundColor: colors.primary, borderColor: colors.primary }
                   ]}
                   onPress={() => setTargetViews(views)}
                 >
-                  <Eye size={16} color={targetViews === views ? 'white' : '#800080'} />
+                  <Eye size={16} color={targetViews === views ? 'white' : colors.primary} />
                   <Text style={[
                     styles.optionText,
-                    targetViews === views && styles.selectedOptionText
+                    { color: targetViews === views ? 'white' : colors.primary }
                   ]}>
                     {views}
                   </Text>
@@ -264,21 +267,22 @@ export default function PromoteTab() {
           </View>
 
           <View style={styles.inputSection}>
-            <Text style={styles.inputLabel}>Video Duration (seconds)</Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Video Duration (seconds)</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.optionsScroll}>
               {durationOptions.map((duration) => (
                 <TouchableOpacity
                   key={duration}
                   style={[
                     styles.optionButton,
-                    videoDuration === duration && styles.selectedOption
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    videoDuration === duration && { backgroundColor: colors.primary, borderColor: colors.primary }
                   ]}
                   onPress={() => setVideoDuration(duration)}
                 >
-                  <Clock size={16} color={videoDuration === duration ? 'white' : '#800080'} />
+                  <Clock size={16} color={videoDuration === duration ? 'white' : colors.primary} />
                   <Text style={[
                     styles.optionText,
-                    videoDuration === duration && styles.selectedOptionText
+                    { color: videoDuration === duration ? 'white' : colors.primary }
                   ]}>
                     {duration}s
                   </Text>
@@ -287,20 +291,20 @@ export default function PromoteTab() {
             </ScrollView>
           </View>
 
-          <View style={styles.costSection}>
-            <Text style={styles.costTitle}>Promotion Summary</Text>
+          <View style={[styles.costSection, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.costTitle, { color: colors.text }]}>Promotion Summary</Text>
             <View style={styles.costRow}>
-              <Text style={styles.costLabel}>Target Views:</Text>
-              <Text style={styles.costValue}>{targetViews}</Text>
+              <Text style={[styles.costLabel, { color: colors.textSecondary }]}>Target Views:</Text>
+              <Text style={[styles.costValue, { color: colors.text }]}>{targetViews}</Text>
             </View>
             <View style={styles.costRow}>
-              <Text style={styles.costLabel}>Duration:</Text>
-              <Text style={styles.costValue}>{videoDuration}s</Text>
+              <Text style={[styles.costLabel, { color: colors.textSecondary }]}>Duration:</Text>
+              <Text style={[styles.costValue, { color: colors.text }]}>{videoDuration}s</Text>
             </View>
             {vipDiscount > 0 && (
               <View style={styles.costRow}>
-                <Text style={styles.costLabel}>Base Cost:</Text>
-                <Text style={styles.costValue}>🪙{Math.ceil((targetViews * videoDuration) / 50 * 8)}</Text>
+                <Text style={[styles.costLabel, { color: colors.textSecondary }]}>Base Cost:</Text>
+                <Text style={[styles.costValue, { color: colors.text }]}>🪙{Math.ceil((targetViews * videoDuration) / 50 * 8)}</Text>
               </View>
             )}
             {vipDiscount > 0 && (
@@ -334,6 +338,7 @@ export default function PromoteTab() {
           <TouchableOpacity
             style={[
               styles.promoteButton,
+              { backgroundColor: colors.primary },
               (!isValidVideo || loading) && styles.promoteButtonDisabled
             ]}
             onPress={handlePromoteVideo}
@@ -349,9 +354,9 @@ export default function PromoteTab() {
             </Text>
           </TouchableOpacity>
 
-          <View style={styles.infoSection}>
-            <Text style={styles.infoTitle}>How it works</Text>
-            <Text style={styles.infoText}>
+          <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoTitle, { color: colors.text }]}>How it works</Text>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
               1. Enter your YouTube video URL{'\n'}
               2. Set your target views and duration{'\n'}
               3. Pay with coins to promote your video (reward varies by duration){'\n'}
@@ -370,7 +375,6 @@ export default function PromoteTab() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
@@ -385,18 +389,14 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: 'white',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#333',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -409,29 +409,18 @@ const styles = StyleSheet.create({
   optionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
     marginRight: 12,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
     gap: 6,
-  },
-  selectedOption: {
-    backgroundColor: '#800080',
-    borderColor: '#800080',
   },
   optionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#800080',
-  },
-  selectedOptionText: {
-    color: 'white',
   },
   costSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -444,7 +433,6 @@ const styles = StyleSheet.create({
   costTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   costRow: {
@@ -455,12 +443,10 @@ const styles = StyleSheet.create({
   },
   costLabel: {
     fontSize: 16,
-    color: '#666',
   },
   costValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
   },
   vipDiscountValue: {
     fontSize: 16,
@@ -498,7 +484,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#800080',
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -518,7 +503,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   infoSection: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 32,
@@ -531,12 +515,10 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
 });

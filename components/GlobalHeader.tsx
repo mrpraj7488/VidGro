@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Menu, X, User, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/contexts/ThemeContext';
+import ThemeToggle from './ThemeToggle';
 
 interface GlobalHeaderProps {
   title: string;
@@ -19,6 +21,7 @@ export default function GlobalHeader({
 }: GlobalHeaderProps) {
   const { profile, signOut } = useAuth();
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
   const sideMenuItems = [
     { icon: Share2, title: 'Refer a Friend', route: '/refer-friend' },
@@ -53,15 +56,18 @@ export default function GlobalHeader({
   };
 
   const renderSideMenu = () => (
-    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300 }]}>
-      <View style={styles.sideMenuHeader}>
+    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
+      <View style={[styles.sideMenuHeader, { backgroundColor: colors.headerBackground }]}>
+        <View style={styles.themeToggleContainer}>
+          <ThemeToggle />
+        </View>
         <View style={styles.profileSection}>
           <View style={styles.profileAvatar}>
             <User size={32} color="white" />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile?.username || 'User'}</Text>
-            <Text style={styles.profileEmail}>{profile?.email || 'user@example.com'}</Text>
+            <Text style={[styles.profileName, { color: colors.text }]}>{profile?.username || 'User'}</Text>
+            <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{profile?.email || 'user@example.com'}</Text>
           </View>
         </View>
         <TouchableOpacity 
@@ -72,15 +78,16 @@ export default function GlobalHeader({
         </TouchableOpacity>
       </View>
       
-      <View style={styles.sideMenuContent}>
+      <ScrollView style={[styles.sideMenuContent, { backgroundColor: colors.surface }]}>
         {sideMenuItems.map((item, index) => (
           <TouchableOpacity
             key={index}
-            style={styles.sideMenuItem}
+            style={[styles.sideMenuItem, { borderBottomColor: colors.border }]}
             onPress={() => handleItemPress(item)}
           >
             <item.icon size={20} color={item.color || '#800080'} />
             <Text style={[styles.sideMenuText, item.color && { color: item.color }]}>
+            <Text style={[styles.sideMenuText, { color: item.color || colors.text }]}>
               {item.title}
             </Text>
           </TouchableOpacity>
@@ -91,7 +98,7 @@ export default function GlobalHeader({
 
   return (
     <>
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.headerBackground }]}>
         <View style={styles.leftSection}>
           <TouchableOpacity 
             style={styles.menuButton}
@@ -104,11 +111,12 @@ export default function GlobalHeader({
             )}
           </TouchableOpacity>
           <Text style={styles.title}>{title}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         </View>
         
         {showCoinDisplay && profile && (
           <View style={styles.coinDisplay}>
-            <View style={styles.coinBadge}>
+            <View style={[styles.coinBadge, { backgroundColor: `rgba(${isDark ? '147, 112, 219' : '255, 255, 255'}, 0.2)` }]}>
               <Text style={styles.coinIcon}>🪙</Text>
               <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
             </View>
@@ -135,7 +143,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#800080',
     paddingTop: 50,
   },
   leftSection: {
@@ -148,7 +155,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
   },
   coinDisplay: {
     flexDirection: 'row',
@@ -157,7 +163,6 @@ const styles = StyleSheet.create({
   coinBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
@@ -185,18 +190,21 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   sideMenuHeader: {
-    backgroundColor: '#800080',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 16,
+  },
+  themeToggleContainer: {
+    alignSelf: 'flex-end',
   },
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    width: '100%',
+    justifyContent: 'space-between',
   },
   profileAvatar: {
     width: 48,
@@ -213,11 +221,9 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: 'white',
   },
   profileEmail: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   closeButton: {
     padding: 8,
@@ -231,11 +237,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   sideMenuText: {
     fontSize: 16,
-    color: '#333',
     marginLeft: 16,
   },
   overlay: {

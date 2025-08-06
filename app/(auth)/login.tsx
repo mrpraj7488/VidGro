@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -20,6 +21,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -53,23 +55,23 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={isDark ? ['#2D1B69', '#11998E'] : ['#667eea', '#764ba2']}
         style={styles.gradient}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to your account</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Sign in to your account</Text>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
                 placeholder="Email"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.textSecondary}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -80,9 +82,9 @@ export default function Login() {
 
             <View style={styles.inputContainer}>
               <TextInput
-                style={[styles.input, styles.passwordInput]}
+                style={[styles.input, styles.passwordInput, { backgroundColor: colors.inputBackground, color: colors.text }]}
                 placeholder="Password"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.textSecondary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -94,15 +96,15 @@ export default function Login() {
                 onPress={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
-                  <EyeOff size={20} color="#9CA3AF" />
+                  <EyeOff size={20} color={colors.textSecondary} />
                 ) : (
-                  <Eye size={20} color="#9CA3AF" />
+                  <Eye size={20} color={colors.textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
               onPress={handleLogin}
               disabled={loading}
             >
@@ -115,7 +117,7 @@ export default function Login() {
               style={styles.linkButton}
               onPress={() => router.push('/(auth)/signup')}
             >
-              <Text style={styles.linkText}>
+              <Text style={[styles.linkText, { color: colors.textSecondary }]}>
                 Don't have an account? Sign up
               </Text>
             </TouchableOpacity>
@@ -158,12 +160,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#1F2937',
   },
   passwordInput: {
     paddingRight: 50,
@@ -175,7 +175,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   button: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 12,
     paddingVertical: 16,
     marginTop: 16,
@@ -195,7 +194,6 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   linkText: {
-    color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
     textAlign: 'center',
   },
