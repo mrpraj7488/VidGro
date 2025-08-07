@@ -14,26 +14,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
-import { 
-  ArrowLeft, 
-  Search, 
-  Bug, 
-  Wifi, 
-  Play, 
-  Coins, 
-  Crown, 
-  Shield, 
-  RefreshCw, 
-  Smartphone, 
-  AlertTriangle, 
-  Send,
-  ChevronRight,
-  Clock,
-  Database,
-  Settings,
-  Eye,
-  Volume2
-} from 'lucide-react-native';
+import { ArrowLeft, Search, Bug, Wifi, Play, Coins, Crown, Shield, RefreshCw, Smartphone, TriangleAlert as AlertTriangle, Send, ChevronRight, Clock, Database, Settings, Eye, Volume2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 const { width: screenWidth } = Dimensions.get('window');
