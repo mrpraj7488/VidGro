@@ -35,7 +35,7 @@ export default function ThemeToggle() {
     });
     
     // Animate slide transition
-    slideX.value = withTiming(isDark ? 24 : 0, {
+    slideX.value = withTiming(isDark ? 20 : 0, {
       duration: 400,
       easing: Easing.bezier(0.4, 0, 0.2, 1),
     });
@@ -130,9 +130,9 @@ export default function ThemeToggle() {
         <View style={styles.track}>
           <Animated.View style={[styles.slider, sliderAnimatedStyle]}>
             {isDark ? (
-              <Moon size={16} color="white" fill="white" />
+              <Moon size={12} color="white" fill="white" />
             ) : (
-              <Sun size={16} color={iconColor} fill={iconColor} />
+              <Sun size={12} color={iconColor} fill={iconColor} />
             )}
           </Animated.View>
         </View>
@@ -143,20 +143,20 @@ export default function ThemeToggle() {
 
 const styles = StyleSheet.create({
   container: {
-    width: 52,
-    height: 28,
-    borderRadius: 14,
+    width: 44,
+    height: 24,
+    borderRadius: 12,
     padding: 2,
     borderWidth: 2,
     position: 'relative',
   },
   glowEffect: {
     position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 18,
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderRadius: 15,
     backgroundColor: 'rgba(74, 144, 226, 0.3)',
   },
   track: {
@@ -165,25 +165,25 @@ const styles = StyleSheet.create({
   },
   slider: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    top: 2,
-    left: 2,
+    top: 1,
+    left: 1,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 6,
+        elevation: 4,
       },
       web: {
-        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 3px 6px rgba(0, 0, 0, 0.3)',
       },
     }),
   },
