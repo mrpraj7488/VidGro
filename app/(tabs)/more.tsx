@@ -278,7 +278,7 @@ export default function MoreTab() {
             styles.freeCoinsSectionTitle, 
             { 
               color: colors.text,
-              fontSize: isVerySmallScreen ? 20 : 22
+              fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 22
             }
           ]}>
             🎁 Free Coins Available
@@ -332,52 +332,58 @@ export default function MoreTab() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <View style={styles.freeCoinsHeader}>
-                <View style={[
-                  styles.freeCoinsIcon,
-                  { 
-                    backgroundColor: freeCoinsAvailable 
-                      ? (isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.25)')
-                      : (isDark ? 'rgba(107, 114, 128, 0.2)' : 'rgba(156, 163, 175, 0.2)')
-                  }
-                ]}>
-                  {freeCoinsAvailable ? (
-                    <View style={styles.iconContainer}>
-                      <Gift size={isVerySmallScreen ? 28 : 32} color={colors.success} />
-                      <Animated.View style={[styles.sparkleIcon, sparkleAnimatedStyle]}>
-                        <Sparkles size={isVerySmallScreen ? 12 : 14} color="#FFD700" />
-                      </Animated.View>
-                    </View>
-                  ) : (
-                    <Clock size={isVerySmallScreen ? 28 : 32} color={colors.textSecondary} />
-                  )}
+              {/* Horizontal Layout for Small Screens */}
+              <View style={styles.freeCoinsHorizontalLayout}>
+                {/* Left Section - Icon and Status */}
+                <View style={styles.freeCoinsLeftSection}>
+                  <View style={[
+                    styles.freeCoinsIcon,
+                    { 
+                      backgroundColor: freeCoinsAvailable 
+                        ? (isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.25)')
+                        : (isDark ? 'rgba(107, 114, 128, 0.2)' : 'rgba(156, 163, 175, 0.2)')
+                    }
+                  ]}>
+                    {freeCoinsAvailable ? (
+                      <View style={styles.iconContainer}>
+                        <Gift size={isVerySmallScreen ? 20 : 24} color={colors.success} />
+                        <Animated.View style={[styles.sparkleIcon, sparkleAnimatedStyle]}>
+                          <Sparkles size={isVerySmallScreen ? 8 : 10} color="#FFD700" />
+                        </Animated.View>
+                      </View>
+                    ) : (
+                      <Clock size={isVerySmallScreen ? 20 : 24} color={colors.textSecondary} />
+                    )}
+                  </View>
                 </View>
-                
-                <View style={styles.freeCoinsContent}>
+
+                {/* Center Section - Content */}
+                <View style={styles.freeCoinsCenterSection}>
                   <Text style={[
                     styles.freeCoinsTitle,
                     { 
                       color: freeCoinsAvailable ? colors.text : colors.textSecondary,
-                      fontSize: isVerySmallScreen ? 18 : 20
+                      fontSize: isVerySmallScreen ? 14 : 16
                     }
                   ]}>
-                    {freeCoinsAvailable ? '🎬 Watch & Earn' : '⏰ Cooldown Active'}
+                    {freeCoinsAvailable ? '🎬 Watch & Earn' : '⏰ Cooldown'}
                   </Text>
                   <Text style={[
                     styles.freeCoinsSubtitle,
                     { 
                       color: freeCoinsAvailable ? colors.textSecondary : colors.textSecondary,
-                      fontSize: isVerySmallScreen ? 13 : 15
+                      fontSize: isVerySmallScreen ? 11 : 12
                     }
                   ]}>
                     {freeCoinsAvailable 
-                      ? '30-second ad = 100 coins' 
-                      : `Next reward in ${timeRemaining}`
+                      ? '30s ad = 100 coins' 
+                      : `Next in ${timeRemaining}`
                     }
                   </Text>
                 </View>
 
-                <Animated.View style={[styles.freeCoinsReward, coinBounceStyle]}>
+                {/* Right Section - Coin Badge */}
+                <Animated.View style={[styles.freeCoinsRightSection, coinBounceStyle]}>
                   <View style={[
                     styles.coinsBadge,
                     { 
@@ -386,12 +392,12 @@ export default function MoreTab() {
                         : (isDark ? 'rgba(107, 114, 128, 0.2)' : 'rgba(156, 163, 175, 0.15)')
                     }
                   ]}>
-                    <Coins size={isVerySmallScreen ? 16 : 18} color={freeCoinsAvailable ? '#FFD700' : colors.textSecondary} />
+                    <Coins size={isVerySmallScreen ? 12 : 14} color={freeCoinsAvailable ? '#FFD700' : colors.textSecondary} />
                     <Text style={[
                       styles.coinsAmount,
                       { 
                         color: freeCoinsAvailable ? '#FFD700' : colors.textSecondary,
-                        fontSize: isVerySmallScreen ? 16 : 18
+                        fontSize: isVerySmallScreen ? 14 : 16
                       }
                     ]}>
                       100
@@ -587,34 +593,45 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   freeCoinsGradient: {
-    padding: isVerySmallScreen ? 24 : 28,
+    padding: isVerySmallScreen ? 16 : 20,
     zIndex: 2,
   },
-  freeCoinsHeader: {
+  freeCoinsHorizontalLayout: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: isVerySmallScreen ? 16 : 20,
+    marginBottom: isVerySmallScreen ? 12 : 16,
+    gap: isVerySmallScreen ? 8 : 12,
+  },
+  freeCoinsLeftSection: {
+    flexShrink: 0,
+  },
+  freeCoinsCenterSection: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  freeCoinsRightSection: {
+    flexShrink: 0,
+    alignItems: 'center',
   },
   freeCoinsIcon: {
-    width: isVerySmallScreen ? 64 : 72,
-    height: isVerySmallScreen ? 64 : 72,
-    borderRadius: isVerySmallScreen ? 32 : 36,
+    width: isVerySmallScreen ? 40 : 48,
+    height: isVerySmallScreen ? 40 : 48,
+    borderRadius: isVerySmallScreen ? 20 : 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: isVerySmallScreen ? 16 : 20,
     position: 'relative',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 6,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
       },
     }),
   },
@@ -625,43 +642,37 @@ const styles = StyleSheet.create({
   },
   sparkleIcon: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-  },
-  freeCoinsContent: {
-    flex: 1,
+    top: isVerySmallScreen ? -4 : -6,
+    right: isVerySmallScreen ? -4 : -6,
   },
   freeCoinsTitle: {
     fontWeight: 'bold',
-    marginBottom: 6,
+    marginBottom: isVerySmallScreen ? 2 : 4,
     letterSpacing: 0.5,
   },
   freeCoinsSubtitle: {
-    lineHeight: 20,
+    lineHeight: isVerySmallScreen ? 14 : 16,
     fontWeight: '500',
-  },
-  freeCoinsReward: {
-    alignItems: 'center',
   },
   coinsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: isVerySmallScreen ? 12 : 16,
-    paddingVertical: isVerySmallScreen ? 8 : 10,
-    borderRadius: 20,
-    gap: isVerySmallScreen ? 6 : 8,
+    paddingHorizontal: isVerySmallScreen ? 8 : 10,
+    paddingVertical: isVerySmallScreen ? 4 : 6,
+    borderRadius: isVerySmallScreen ? 12 : 16,
+    gap: isVerySmallScreen ? 4 : 6,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
       },
       android: {
-        elevation: 4,
+        elevation: 2,
       },
       web: {
-        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
       },
     }),
   },
@@ -675,9 +686,9 @@ const styles = StyleSheet.create({
   adPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: isVerySmallScreen ? 16 : 20,
-    paddingVertical: isVerySmallScreen ? 10 : 12,
-    borderRadius: 16,
+    paddingHorizontal: isVerySmallScreen ? 12 : 16,
+    paddingVertical: isVerySmallScreen ? 8 : 10,
+    borderRadius: isVerySmallScreen ? 12 : 14,
     gap: isVerySmallScreen ? 8 : 10,
     ...Platform.select({
       ios: {
@@ -704,9 +715,9 @@ const styles = StyleSheet.create({
   cooldownBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: isVerySmallScreen ? 16 : 20,
-    paddingVertical: isVerySmallScreen ? 10 : 12,
-    borderRadius: 16,
+    paddingHorizontal: isVerySmallScreen ? 12 : 16,
+    paddingVertical: isVerySmallScreen ? 8 : 10,
+    borderRadius: isVerySmallScreen ? 12 : 14,
     gap: isVerySmallScreen ? 8 : 10,
   },
   cooldownText: {

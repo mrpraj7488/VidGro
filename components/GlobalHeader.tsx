@@ -320,26 +320,21 @@ const styles = StyleSheet.create({
   },
   versionSection: {
     marginTop: 'auto',
-    paddingTop: 20,
+    paddingTop: 16,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     borderTopWidth: 1,
     alignItems: 'center',
   },
   appName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
     letterSpacing: 1,
   },
   appVersion: {
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  appDescription: {
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 16,
+    fontSize: 13,
+    fontWeight: '500',
   },
   overlay: {
     position: 'absolute',
