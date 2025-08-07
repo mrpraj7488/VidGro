@@ -11,17 +11,20 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, User, Mail, CreditCard as Edit3, Save, Camera, Lock, Eye, EyeOff, Shield } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, CreditCard as Edit3, Save, Camera, Lock, Eye, EyeOff, Crown, Coins, Calendar, Hash } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withSequence,
+  withTiming,
+  interpolate,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
@@ -29,8 +32,10 @@ import { supabase } from '../lib/supabase';
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 380;
 const isVerySmallScreen = screenWidth < 350;
+const isTinyScreen = screenWidth < 320;
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export default function EditProfileScreen() {
   const { user, profile, refreshProfile } = useAuth();
@@ -52,6 +57,14 @@ export default function EditProfileScreen() {
   // Animation values
   const saveButtonScale = useSharedValue(1);
   const avatarScale = useSharedValue(1);
+  const cardScale = useSharedValue(0.95);
+  const fadeIn = useSharedValue(0);
+
+  React.useEffect(() => {
+    // Entrance animations
+    cardScale.value = withTiming(1, { duration: 600 });
+    fadeIn.value = withTiming(1, { duration: 800 });
+  }, []);
 
   const handleSaveProfile = async () => {
     if (!username.trim()) {
@@ -190,6 +203,11 @@ export default function EditProfileScreen() {
     );
   };
 
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+    opacity: fadeIn.value,
+  }));
+
   const saveButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: saveButtonScale.value }],
   }));
@@ -201,17 +219,20 @@ export default function EditProfileScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
+      <LinearGradient
+        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#9B59B6']}
+        style={styles.header}
+      >
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
-            <ArrowLeft size={isVerySmallScreen ? 20 : 24} color="white" />
+            <ArrowLeft size={isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24} color="white" />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { fontSize: isVerySmallScreen ? 18 : 22 }]}>
             Edit Profile
           </Text>
-          <Edit3 size={isVerySmallScreen ? 20 : 24} color="white" />
+          <Edit3 size={isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24} color="white" />
         </View>
-      </View>
+      </LinearGradient>
 
       <KeyboardAvoidingView 
         style={styles.content}
@@ -223,28 +244,43 @@ export default function EditProfileScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {/* Profile Avatar Section */}
-          <View style={[styles.avatarSection, { backgroundColor: colors.surface }]}>
+          <Animated.View style={[styles.avatarSection, { backgroundColor: colors.surface }, cardAnimatedStyle]}>
+            <LinearGradient
+              colors={isDark ? ['rgba(74, 144, 226, 0.1)', 'rgba(74, 144, 226, 0.05)'] : ['rgba(128, 0, 128, 0.1)', 'rgba(128, 0, 128, 0.05)']}
+              style={styles.avatarGradient}
+            >
+              <View style={styles.avatarHeader}>
+                <Text style={[styles.avatarSectionTitle, { color: colors.text }]}>
+                  👤 Profile Picture
+                </Text>
+              </View>
+              
             <AnimatedTouchableOpacity
               style={[
                 styles.avatarContainer,
-                { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)' },
+                { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.25)' : 'rgba(128, 0, 128, 0.25)' },
                 avatarAnimatedStyle
               ]}
               onPress={handleAvatarPress}
               activeOpacity={0.8}
             >
-              <User size={isVerySmallScreen ? 40 : 48} color={colors.primary} />
+              <User size={isTinyScreen ? 32 : isVerySmallScreen ? 40 : 48} color="white" />
               <View style={[styles.cameraIcon, { backgroundColor: colors.primary }]}>
-                <Camera size={isVerySmallScreen ? 12 : 14} color="white" />
+                <Camera size={isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14} color="white" />
               </View>
             </AnimatedTouchableOpacity>
-            <Text style={[styles.avatarLabel, { color: colors.textSecondary }]}>
+              <Text style={[styles.avatarLabel, { color: colors.textSecondary }]}>
               Tap to change profile picture
             </Text>
-          </View>
+            </LinearGradient>
+          </Animated.View>
 
           {/* Basic Information */}
-          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Animated.View style={[styles.section, { backgroundColor: colors.surface }, cardAnimatedStyle]}>
+            <LinearGradient
+              colors={isDark ? ['rgba(74, 144, 226, 0.08)', 'rgba(74, 144, 226, 0.03)'] : ['rgba(128, 0, 128, 0.08)', 'rgba(128, 0, 128, 0.03)']}
+              style={styles.sectionGradient}
+            >
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               👤 Basic Information
             </Text>
@@ -252,7 +288,7 @@ export default function EditProfileScreen() {
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>Username</Text>
               <View style={styles.inputContainer}>
-                <User size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                <User size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.primary} />
                 <TextInput
                   style={[
                     styles.input,
@@ -260,7 +296,7 @@ export default function EditProfileScreen() {
                       backgroundColor: colors.inputBackground,
                       color: colors.text,
                       borderColor: colors.border,
-                      fontSize: isVerySmallScreen ? 14 : 16
+                      fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16
                     }
                   ]}
                   placeholder="Enter your username"
@@ -276,7 +312,7 @@ export default function EditProfileScreen() {
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { color: colors.text }]}>Email</Text>
               <View style={styles.inputContainer}>
-                <Mail size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                <Mail size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
                 <TextInput
                   style={[
                     styles.input,
@@ -285,7 +321,7 @@ export default function EditProfileScreen() {
                       backgroundColor: colors.border + '30',
                       color: colors.textSecondary,
                       borderColor: colors.border,
-                      fontSize: isVerySmallScreen ? 14 : 16
+                      fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16
                     }
                   ]}
                   placeholder="Email address"
@@ -312,28 +348,33 @@ export default function EditProfileScreen() {
               {loading ? (
                 <ActivityIndicator size="small" color="white" />
               ) : (
-                <Save size={isVerySmallScreen ? 16 : 18} color="white" />
+                <Save size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color="white" />
               )}
-              <Text style={[styles.saveButtonText, { fontSize: isVerySmallScreen ? 14 : 16 }]}>
+              <Text style={[styles.saveButtonText, { fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16 }]}>
                 {loading ? 'Saving...' : 'Save Changes'}
               </Text>
             </AnimatedTouchableOpacity>
-          </View>
+            </LinearGradient>
+          </Animated.View>
 
           {/* Password Section */}
-          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Animated.View style={[styles.section, { backgroundColor: colors.surface }, cardAnimatedStyle]}>
+            <LinearGradient
+              colors={isDark ? ['rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.03)'] : ['rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.03)']}
+              style={styles.sectionGradient}
+            >
             <TouchableOpacity
               style={styles.sectionHeader}
               onPress={() => setShowPasswordSection(!showPasswordSection)}
               activeOpacity={0.7}
             >
               <View style={styles.sectionTitleRow}>
-                <Lock size={isVerySmallScreen ? 18 : 20} color={colors.primary} />
+                <Lock size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.warning} />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
                   🔒 Change Password
                 </Text>
               </View>
-              <Text style={[styles.expandText, { color: colors.primary }]}>
+              <Text style={[styles.expandText, { color: colors.warning }]}>
                 {showPasswordSection ? 'Hide' : 'Show'}
               </Text>
             </TouchableOpacity>
@@ -343,7 +384,7 @@ export default function EditProfileScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>Current Password</Text>
                   <View style={styles.inputContainer}>
-                    <Lock size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                    <Lock size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.warning} />
                     <TextInput
                       style={[
                         styles.input,
@@ -352,7 +393,7 @@ export default function EditProfileScreen() {
                           backgroundColor: colors.inputBackground,
                           color: colors.text,
                           borderColor: colors.border,
-                          fontSize: isVerySmallScreen ? 14 : 16
+                          fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16
                         }
                       ]}
                       placeholder="Enter current password"
@@ -368,9 +409,9 @@ export default function EditProfileScreen() {
                       onPress={() => setShowCurrentPassword(!showCurrentPassword)}
                     >
                       {showCurrentPassword ? (
-                        <EyeOff size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                        <EyeOff size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
                       ) : (
-                        <Eye size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                        <Eye size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
                       )}
                     </TouchableOpacity>
                   </View>
@@ -379,7 +420,7 @@ export default function EditProfileScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>New Password</Text>
                   <View style={styles.inputContainer}>
-                    <Lock size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                    <Lock size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.warning} />
                     <TextInput
                       style={[
                         styles.input,
@@ -388,7 +429,7 @@ export default function EditProfileScreen() {
                           backgroundColor: colors.inputBackground,
                           color: colors.text,
                           borderColor: colors.border,
-                          fontSize: isVerySmallScreen ? 14 : 16
+                          fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16
                         }
                       ]}
                       placeholder="Enter new password"
@@ -404,9 +445,9 @@ export default function EditProfileScreen() {
                       onPress={() => setShowNewPassword(!showNewPassword)}
                     >
                       {showNewPassword ? (
-                        <EyeOff size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                        <EyeOff size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
                       ) : (
-                        <Eye size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                        <Eye size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
                       )}
                     </TouchableOpacity>
                   </View>
@@ -415,7 +456,7 @@ export default function EditProfileScreen() {
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: colors.text }]}>Confirm New Password</Text>
                   <View style={styles.inputContainer}>
-                    <Lock size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                    <Lock size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.warning} />
                     <TextInput
                       style={[
                         styles.input,
@@ -424,7 +465,7 @@ export default function EditProfileScreen() {
                           backgroundColor: colors.inputBackground,
                           color: colors.text,
                           borderColor: colors.border,
-                          fontSize: isVerySmallScreen ? 14 : 16
+                          fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16
                         }
                       ]}
                       placeholder="Confirm new password"
@@ -440,9 +481,9 @@ export default function EditProfileScreen() {
                       onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
                       {showConfirmPassword ? (
-                        <EyeOff size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                        <EyeOff size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
                       ) : (
-                        <Eye size={isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
+                        <Eye size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.textSecondary} />
                       )}
                     </TouchableOpacity>
                   </View>
@@ -460,42 +501,56 @@ export default function EditProfileScreen() {
                   {passwordLoading ? (
                     <ActivityIndicator size="small" color="white" />
                   ) : (
-                    <Shield size={isVerySmallScreen ? 16 : 18} color="white" />
+                    <Lock size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color="white" />
                   )}
-                  <Text style={[styles.passwordButtonText, { fontSize: isVerySmallScreen ? 14 : 16 }]}>
+                  <Text style={[styles.passwordButtonText, { fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16 }]}>
                     {passwordLoading ? 'Updating...' : 'Update Password'}
                   </Text>
                 </TouchableOpacity>
               </View>
             )}
-          </View>
+            </LinearGradient>
+          </Animated.View>
 
           {/* Account Information */}
-          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Animated.View style={[styles.section, { backgroundColor: colors.surface }, cardAnimatedStyle]}>
+            <LinearGradient
+              colors={isDark ? ['rgba(0, 212, 255, 0.08)', 'rgba(0, 212, 255, 0.03)'] : ['rgba(0, 212, 255, 0.08)', 'rgba(0, 212, 255, 0.03)']}
+              style={styles.sectionGradient}
+            >
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               📊 Account Information
             </Text>
 
-            <View style={styles.infoGrid}>
-              <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Current Coins</Text>
-                <Text style={[styles.infoValue, { color: colors.primary }]}>
+            <View style={[styles.infoGrid, isTinyScreen && styles.infoGridTiny]}>
+              <View style={[styles.infoCard, { backgroundColor: isDark ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 215, 0, 0.1)' }]}>
+                <View style={styles.infoCardHeader}>
+                  <Coins size={isTinyScreen ? 14 : 16} color="#FFD700" />
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Coins</Text>
+                </View>
+                <Text style={[styles.infoValue, { color: '#FFD700' }]}>
                   🪙{profile?.coins?.toLocaleString() || '0'}
                 </Text>
               </View>
 
-              <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>VIP Status</Text>
+              <View style={[styles.infoCard, { backgroundColor: isDark ? 'rgba(157, 78, 221, 0.15)' : 'rgba(157, 78, 221, 0.1)' }]}>
+                <View style={styles.infoCardHeader}>
+                  <Crown size={isTinyScreen ? 14 : 16} color="#9D4EDD" />
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Status</Text>
+                </View>
                 <Text style={[
                   styles.infoValue, 
-                  { color: profile?.is_vip ? colors.warning : colors.textSecondary }
+                  { color: profile?.is_vip ? '#9D4EDD' : colors.textSecondary }
                 ]}>
                   {profile?.is_vip ? '👑 VIP' : 'Regular'}
                 </Text>
               </View>
 
-              <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Member Since</Text>
+              <View style={[styles.infoCard, { backgroundColor: isDark ? 'rgba(52, 152, 219, 0.15)' : 'rgba(52, 152, 219, 0.1)' }]}>
+                <View style={styles.infoCardHeader}>
+                  <Calendar size={isTinyScreen ? 14 : 16} color="#3498DB" />
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Member</Text>
+                </View>
                 <Text style={[styles.infoValue, { color: colors.text }]}>
                   {profile?.created_at 
                     ? new Date(profile.created_at).toLocaleDateString('en-US', {
@@ -507,27 +562,18 @@ export default function EditProfileScreen() {
                 </Text>
               </View>
 
-              <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Referral Code</Text>
+              <View style={[styles.infoCard, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
+                <View style={styles.infoCardHeader}>
+                  <Hash size={isTinyScreen ? 14 : 16} color="#10B981" />
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Referral</Text>
+                </View>
                 <Text style={[styles.infoValue, { color: colors.accent }]}>
                   {profile?.referral_code || 'N/A'}
                 </Text>
               </View>
             </View>
-          </View>
-
-          {/* Security Notice */}
-          <View style={[styles.securityNotice, { backgroundColor: colors.primary + '15' }]}>
-            <Shield size={isVerySmallScreen ? 18 : 20} color={colors.primary} />
-            <View style={styles.securityContent}>
-              <Text style={[styles.securityTitle, { color: colors.primary }]}>
-                🔐 Security Notice
-              </Text>
-              <Text style={[styles.securityText, { color: colors.primary }]}>
-                Your account is protected with bank-grade encryption. Always use a strong password and never share your login credentials.
-              </Text>
-            </View>
-          </View>
+            </LinearGradient>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -539,21 +585,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 12,
-    paddingHorizontal: isVerySmallScreen ? 12 : 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 50,
+    paddingBottom: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    paddingHorizontal: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 5,
+        elevation: 8,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
       },
     }),
   },
@@ -561,7 +607,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: isVerySmallScreen ? 32 : 36,
+    height: isTinyScreen ? 28 : isVerySmallScreen ? 32 : 36,
   },
   headerTitle: {
     fontWeight: 'bold',
@@ -575,127 +621,142 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: isTinyScreen ? 20 : 40,
   },
 
   // Avatar Section
   avatarSection: {
-    alignItems: 'center',
-    paddingVertical: isVerySmallScreen ? 24 : 32,
-    paddingHorizontal: isVerySmallScreen ? 16 : 20,
-    margin: isVerySmallScreen ? 12 : 16,
-    borderRadius: isVerySmallScreen ? 16 : 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 3px 12px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  avatarContainer: {
-    width: isVerySmallScreen ? 80 : 96,
-    height: isVerySmallScreen ? 80 : 96,
-    borderRadius: isVerySmallScreen ? 40 : 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    marginBottom: isVerySmallScreen ? 12 : 16,
+    margin: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.12,
         shadowRadius: 8,
       },
       android: {
         elevation: 6,
       },
       web: {
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+      },
+    }),
+  },
+  avatarGradient: {
+    alignItems: 'center',
+    paddingVertical: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+    paddingHorizontal: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+  },
+  avatarHeader: {
+    marginBottom: isTinyScreen ? 12 : 16,
+  },
+  avatarSectionTitle: {
+    fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  avatarContainer: {
+    width: isTinyScreen ? 64 : isVerySmallScreen ? 80 : 96,
+    height: isTinyScreen ? 64 : isVerySmallScreen ? 80 : 96,
+    borderRadius: isTinyScreen ? 32 : isVerySmallScreen ? 40 : 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    marginBottom: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 6px 20px rgba(0, 0, 0, 0.25)',
       },
     }),
   },
   cameraIcon: {
     position: 'absolute',
-    bottom: isVerySmallScreen ? 4 : 6,
-    right: isVerySmallScreen ? 4 : 6,
-    width: isVerySmallScreen ? 24 : 28,
-    height: isVerySmallScreen ? 24 : 28,
-    borderRadius: isVerySmallScreen ? 12 : 14,
+    bottom: isTinyScreen ? 2 : isVerySmallScreen ? 4 : 6,
+    right: isTinyScreen ? 2 : isVerySmallScreen ? 4 : 6,
+    width: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
+    height: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'white',
   },
   avatarLabel: {
-    fontSize: isVerySmallScreen ? 12 : 14,
+    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
     textAlign: 'center',
     fontWeight: '500',
   },
 
   // Form Sections
   section: {
-    margin: isVerySmallScreen ? 12 : 16,
-    borderRadius: isVerySmallScreen ? 16 : 20,
-    padding: isVerySmallScreen ? 16 : 20,
+    margin: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 3,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
       },
     }),
+  },
+  sectionGradient: {
+    padding: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: isVerySmallScreen ? 12 : 16,
+    marginBottom: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isVerySmallScreen ? 8 : 10,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
   },
   sectionTitle: {
-    fontSize: isVerySmallScreen ? 16 : 18,
+    fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18,
     fontWeight: 'bold',
   },
   expandText: {
-    fontSize: isVerySmallScreen ? 12 : 14,
+    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
     fontWeight: '600',
   },
   inputGroup: {
-    marginBottom: isVerySmallScreen ? 16 : 20,
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
   },
   inputLabel: {
-    fontSize: isVerySmallScreen ? 13 : 14,
+    fontSize: isTinyScreen ? 11 : isVerySmallScreen ? 13 : 14,
     fontWeight: '600',
-    marginBottom: isVerySmallScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: isVerySmallScreen ? 10 : 12,
-    paddingHorizontal: isVerySmallScreen ? 12 : 16,
-    paddingVertical: isVerySmallScreen ? 12 : 14,
+    borderRadius: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    paddingHorizontal: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    paddingVertical: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 14,
     borderWidth: 1,
-    gap: isVerySmallScreen ? 8 : 10,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   input: {
     flex: 1,
@@ -705,20 +766,20 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   passwordInput: {
-    paddingRight: isVerySmallScreen ? 32 : 40,
+    paddingRight: isTinyScreen ? 28 : isVerySmallScreen ? 32 : 40,
   },
   eyeButton: {
     position: 'absolute',
-    right: isVerySmallScreen ? 12 : 16,
-    padding: 4,
+    right: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    padding: isTinyScreen ? 2 : 4,
   },
   helperText: {
-    fontSize: isVerySmallScreen ? 11 : 12,
-    marginTop: isVerySmallScreen ? 4 : 6,
+    fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 11 : 12,
+    marginTop: isTinyScreen ? 2 : isVerySmallScreen ? 4 : 6,
     fontStyle: 'italic',
   },
   passwordContent: {
-    paddingTop: isVerySmallScreen ? 8 : 12,
+    paddingTop: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
   },
 
   // Buttons
@@ -726,22 +787,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: isVerySmallScreen ? 12 : 16,
-    borderRadius: isVerySmallScreen ? 10 : 12,
-    gap: isVerySmallScreen ? 6 : 8,
-    marginTop: isVerySmallScreen ? 8 : 12,
+    paddingVertical: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginTop: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
       },
       android: {
-        elevation: 5,
+        elevation: 8,
       },
       web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)',
       },
     }),
   },
@@ -749,22 +810,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: isVerySmallScreen ? 12 : 16,
-    borderRadius: isVerySmallScreen ? 10 : 12,
-    gap: isVerySmallScreen ? 6 : 8,
-    marginTop: isVerySmallScreen ? 12 : 16,
+    paddingVertical: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginTop: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
       },
       android: {
-        elevation: 5,
+        elevation: 8,
       },
       web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)',
       },
     }),
   },
@@ -784,59 +845,46 @@ const styles = StyleSheet.create({
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: isVerySmallScreen ? 8 : 12,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
+  },
+  infoGridTiny: {
+    flexDirection: 'column',
+    gap: 8,
   },
   infoCard: {
-    width: isVerySmallScreen ? (screenWidth - 56) / 2 : (screenWidth - 64) / 2,
-    borderRadius: isVerySmallScreen ? 10 : 12,
-    padding: isVerySmallScreen ? 12 : 16,
-    alignItems: 'center',
+    width: isTinyScreen ? '100%' : isVerySmallScreen ? (screenWidth - 56) / 2 : (screenWidth - 64) / 2,
+    borderRadius: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    padding: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 2,
+        elevation: 4,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.12)',
       },
     }),
   },
+  infoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginBottom: isTinyScreen ? 4 : 6,
+  },
   infoLabel: {
-    fontSize: isVerySmallScreen ? 10 : 12,
+    fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
     fontWeight: '500',
-    marginBottom: isVerySmallScreen ? 4 : 6,
     textAlign: 'center',
   },
   infoValue: {
-    fontSize: isVerySmallScreen ? 12 : 14,
+    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
     fontWeight: 'bold',
     textAlign: 'center',
-  },
-
-  // Security Notice
-  securityNotice: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    margin: isVerySmallScreen ? 12 : 16,
-    borderRadius: isVerySmallScreen ? 12 : 16,
-    padding: isVerySmallScreen ? 16 : 20,
-    gap: isVerySmallScreen ? 10 : 12,
-  },
-  securityContent: {
-    flex: 1,
-  },
-  securityTitle: {
-    fontSize: isVerySmallScreen ? 14 : 16,
-    fontWeight: 'bold',
-    marginBottom: isVerySmallScreen ? 6 : 8,
-  },
-  securityText: {
-    fontSize: isVerySmallScreen ? 12 : 14,
-    lineHeight: isVerySmallScreen ? 16 : 20,
   },
 });
