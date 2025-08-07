@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
-import { DollarSign, Crown, ShieldOff, Star, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User, X, ChartBar as BarChart3, History } from 'lucide-react-native';
+import { DollarSign, Crown, ShieldOff, Star, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User, X, Bug, History } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function MoreTab() {
@@ -17,7 +17,7 @@ export default function MoreTab() {
     { icon: Crown, title: 'Become VIP', subtitle: 'Premium Access', route: '/become-vip' },
     { icon: ShieldOff, title: 'Stop Ads', subtitle: '5 Hours Ad-Free', route: '/configure-ads' },
     { icon: Star, title: 'Rate Us', subtitle: 'Get 100 Coins', route: '/rate-us' },
-    { icon: BarChart3, title: 'System Monitor', subtitle: 'System Statistics', route: '/balance-monitor' },
+    { icon: Bug, title: 'Report Problem', subtitle: 'Technical Issues', route: '/report-problem' },
     { icon: History, title: 'Transaction History', subtitle: 'View All Transactions', route: '/transaction-history' },
   ];
 
