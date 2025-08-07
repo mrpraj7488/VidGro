@@ -793,10 +793,10 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 3,
     gap: 8,
   },
   viewMoreText: {
