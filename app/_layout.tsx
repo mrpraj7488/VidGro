@@ -19,6 +19,7 @@ export default function RootLayout() {
           <Stack.Screen name="buy-coins" />
           <Stack.Screen name="configure-ads" />
           <Stack.Screen name="balance-monitor" />
+          <Stack.Screen name="transaction-history" />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style="auto" />

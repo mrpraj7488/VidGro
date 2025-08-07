@@ -162,3 +162,66 @@ export const getUserRecentActivity = async (userId: string) => {
   });
   return { data, error };
 };
+
+// Record coin purchase transaction
+export const recordCoinPurchase = async (
+  userId: string,
+  packageId: string,
+  coinsAmount: number,
+  bonusCoins: number,
+  pricePaid: number,
+  transactionId: string,
+  platform: string = 'unknown'
+) => {
+  try {
+    const { data, error } = await supabase.rpc('record_coin_purchase', {
+      user_uuid: userId,
+      package_id: packageId,
+      coins_amount: coinsAmount,
+      bonus_coins: bonusCoins,
+      price_paid: pricePaid,
+      transaction_id: transactionId,
+      purchase_platform: platform
+    });
+
+    if (error) {
+      console.error('Error recording coin purchase:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('recordCoinPurchase error:', err);
+    return { data: null, error: err };
+  }
+};
+
+// Get user transaction history
+export const getUserTransactionHistory = async (userId: string, limit: number = 50) => {
+  try {
+    const { data, error } = await supabase
+      .from('coin_transactions')
+      .select(`
+        id,
+        amount,
+        transaction_type,
+        description,
+        reference_id,
+        metadata,
+        created_at
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching transaction history:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('getUserTransactionHistory error:', err);
+    return { data: null, error: err };
+  }
+};

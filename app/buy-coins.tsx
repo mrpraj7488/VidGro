@@ -28,10 +28,13 @@ import Animated, {
   Easing as ReanimatedEasing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import * as InAppPurchases from 'react-native-iap';
+import { supabase } from '../lib/supabase';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 380;
 const isVerySmallScreen = screenWidth < 350;
+const isTablet = screenWidth >= 768;
 
 interface CoinPackage {
   id: string;
@@ -46,18 +49,20 @@ interface CoinPackage {
   valueProps: string[];
   badge?: string;
   savings: number;
+  productId: string; // For in-app purchases
 }
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export default function BuyCoinsScreen() {
-  const { profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const [iapAvailable, setIapAvailable] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
 
   const coinPackages: CoinPackage[] = [
     {
@@ -72,6 +77,7 @@ export default function BuyCoinsScreen() {
       socialProof: '2.3K creators started',
       valueProps: ['Perfect for testing', 'Quick boost'],
       savings: 10,
+      productId: 'com.vidgro.coins.starter',
     },
     {
       id: 'creator',
@@ -86,6 +92,7 @@ export default function BuyCoinsScreen() {
       valueProps: ['Most popular', '20% bonus', 'Best for growth'],
       badge: 'RECOMMENDED',
       savings: 20,
+      productId: 'com.vidgro.coins.creator',
     },
     {
       id: 'pro',
@@ -100,6 +107,7 @@ export default function BuyCoinsScreen() {
       valueProps: ['Maximum value', '30% bonus', 'Serious creators'],
       badge: 'BEST VALUE',
       savings: 50,
+      productId: 'com.vidgro.coins.pro',
     },
     {
       id: 'enterprise',
@@ -114,6 +122,7 @@ export default function BuyCoinsScreen() {
       valueProps: ['Agency level', '30% bonus', 'Bulk promotion'],
       badge: 'ENTERPRISE',
       savings: 100,
+      productId: 'com.vidgro.coins.enterprise',
     },
     {
       id: 'ultimate',
@@ -128,6 +137,7 @@ export default function BuyCoinsScreen() {
       valueProps: ['Ultimate package', '32% bonus', 'Viral potential'],
       badge: 'ULTIMATE',
       savings: 200,
+      productId: 'com.vidgro.coins.ultimate',
     },
     {
       id: 'legendary',
@@ -142,27 +152,28 @@ export default function BuyCoinsScreen() {
       valueProps: ['Legendary status', '40% bonus', 'Unlimited potential'],
       badge: 'LEGENDARY',
       savings: 400,
+      productId: 'com.vidgro.coins.legendary',
     },
   ];
 
   // Animation values
-  const headerScale = useSharedValue(0.8);
-  const headerOpacity = useSharedValue(0);
   const cardAnimations = useRef<{ [key: string]: RNAnimated.Value }>(
     coinPackages.reduce((acc, pkg) => {
       acc[pkg.id] = new RNAnimated.Value(0);
       return acc;
     }, {} as { [key: string]: RNAnimated.Value })
   );
-  const pulseAnimation = useSharedValue(1);
+  const buttonAnimations = useRef<{ [key: string]: Animated.SharedValue<number> }>(
+    coinPackages.reduce((acc, pkg) => {
+      acc[pkg.id] = useSharedValue(1);
+      return acc;
+    }, {} as { [key: string]: Animated.SharedValue<number> })
+  );
   const shimmerAnimation = useSharedValue(0);
-  const floatingCoins = useSharedValue(0);
 
   useEffect(() => {
-    // Entrance animations
-    headerScale.value = withSpring(1, { damping: 20, stiffness: 100 });
-    headerOpacity.value = withTiming(1, { duration: 800 });
-
+    initializeIAP();
+    
     // Staggered card entrance
     coinPackages.forEach((pkg, index) => {
       RNAnimated.timing(cardAnimations.current[pkg.id], {
@@ -174,83 +185,177 @@ export default function BuyCoinsScreen() {
       }).start();
     });
 
-    // Continuous animations
-    pulseAnimation.value = withRepeat(
-      withSequence(
-        withTiming(1.05, { duration: 2000, easing: ReanimatedEasing.inOut(ReanimatedEasing.sin) }),
-        withTiming(1, { duration: 2000, easing: ReanimatedEasing.inOut(ReanimatedEasing.sin) })
-      ),
-      -1,
-      true
-    );
-
+    // Continuous shimmer animation
     shimmerAnimation.value = withRepeat(
       withTiming(1, { duration: 3000, easing: ReanimatedEasing.linear }),
       -1,
       false
     );
 
-    floatingCoins.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 4000, easing: ReanimatedEasing.inOut(ReanimatedEasing.sin) }),
-        withTiming(0, { duration: 4000, easing: ReanimatedEasing.inOut(ReanimatedEasing.sin) })
-      ),
-      -1,
-      true
-    );
+    return () => {
+      InAppPurchases.endConnection();
+    };
   }, []);
+
+  const initializeIAP = async () => {
+    try {
+      const result = await InAppPurchases.initConnection();
+      console.log('IAP connection result:', result);
+      setIapAvailable(true);
+
+      if (Platform.OS === 'android') {
+        await InAppPurchases.flushFailedPurchasesCachedAsPendingAndroid();
+      }
+
+      // Get available products
+      const productIds = coinPackages.map(pkg => pkg.productId);
+      const availableProducts = await InAppPurchases.getProducts({ skus: productIds });
+      setProducts(availableProducts);
+      console.log('Available products:', availableProducts);
+    } catch (error) {
+      console.error('IAP initialization error:', error);
+      setIapAvailable(false);
+    }
+  };
+
+  const recordPurchaseTransaction = async (packageItem: CoinPackage, transactionId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('coin_transactions')
+        .insert({
+          user_id: user.id,
+          amount: packageItem.coins + packageItem.bonus,
+          transaction_type: 'purchase',
+          description: `Purchased ${packageItem.coins.toLocaleString()} + ${packageItem.bonus.toLocaleString()} bonus coins`,
+          reference_id: transactionId,
+          metadata: {
+            package_id: packageItem.id,
+            original_coins: packageItem.coins,
+            bonus_coins: packageItem.bonus,
+            price_paid: packageItem.price,
+            platform: Platform.OS
+          }
+        });
+
+      if (error) {
+        console.error('Error recording transaction:', error);
+      }
+
+      // Update user's coin balance
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          coins: (profile?.coins || 0) + packageItem.coins + packageItem.bonus 
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Error updating coin balance:', updateError);
+      }
+    } catch (error) {
+      console.error('Error in recordPurchaseTransaction:', error);
+    }
+  };
 
   const handlePurchase = async (packageItem: CoinPackage) => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
+    // Animate button
+    buttonAnimations.current[packageItem.id].value = withSequence(
+      withSpring(0.95, { damping: 15, stiffness: 400 }),
+      withSpring(1.05, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
     setSelectedPackage(packageItem.id);
     setLoading(true);
-    
-    Alert.alert(
-      '💎 Confirm Premium Purchase',
-      `🪙 ${packageItem.coins.toLocaleString()} + ${packageItem.bonus.toLocaleString()} bonus coins\n💰 Total: ${(packageItem.coins + packageItem.bonus).toLocaleString()} coins\n💳 Price: ₹${packageItem.price}\n\n✨ ${packageItem.socialProof}`,
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => {
-          setSelectedPackage(null);
-          setLoading(false);
-        }},
-        { 
-          text: '🚀 Purchase Now', 
-          onPress: async () => {
-            // Simulate purchase process with premium feedback
-            setTimeout(() => {
-              setShowConfetti(true);
-              if (Platform.OS !== 'web') {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              }
-              
-              Alert.alert(
-                '🎉 Purchase Successful!',
-                `🪙 ${(packageItem.coins + packageItem.bonus).toLocaleString()} coins added to your account!\n\n🎯 You're now ready to promote your videos and reach viral status!\n\n💎 Thank you for choosing VidGro Premium!`,
-                [{ text: '🚀 Start Promoting', onPress: () => {
-                  refreshProfile();
-                  router.replace('/(tabs)/promote');
-                }}]
-              );
-              setLoading(false);
+
+    try {
+      if (Platform.OS === 'web' || !iapAvailable) {
+        // Web fallback - simulate purchase
+        Alert.alert(
+          '💎 Confirm Premium Purchase',
+          `🪙 ${packageItem.coins.toLocaleString()} + ${packageItem.bonus.toLocaleString()} bonus coins\n💰 Total: ${(packageItem.coins + packageItem.bonus).toLocaleString()} coins\n💳 Price: ₹${packageItem.price}\n\n✨ ${packageItem.socialProof}`,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => {
               setSelectedPackage(null);
-            }, 2000);
+              setLoading(false);
+            }},
+            { 
+              text: '🚀 Purchase Now', 
+              onPress: async () => {
+                // Simulate purchase process
+                setTimeout(async () => {
+                  await recordPurchaseTransaction(packageItem, `web_${Date.now()}`);
+                  
+                  if (Platform.OS !== 'web') {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                  
+                  Alert.alert(
+                    '🎉 Purchase Successful!',
+                    `🪙 ${(packageItem.coins + packageItem.bonus).toLocaleString()} coins added to your account!\n\n🎯 You're now ready to promote your videos and reach viral status!\n\n💎 Thank you for choosing VidGro Premium!`,
+                    [{ text: '🚀 Start Promoting', onPress: () => {
+                      refreshProfile();
+                      router.replace('/(tabs)/promote');
+                    }}]
+                  );
+                  setLoading(false);
+                  setSelectedPackage(null);
+                }, 2000);
+              }
+            }
+          ]
+        );
+      } else {
+        // Native in-app purchase
+        try {
+          const purchase = await InAppPurchases.requestPurchase({
+            sku: packageItem.productId,
+            andDangerouslyFinishTransactionAutomaticallyIOS: false,
+          });
+
+          console.log('Purchase result:', purchase);
+
+          if (purchase) {
+            // Record the transaction
+            await recordPurchaseTransaction(packageItem, purchase.transactionId || `iap_${Date.now()}`);
+
+            // Finish the transaction
+            await InAppPurchases.finishTransaction({ purchase, isConsumable: true });
+
+            if (Platform.OS !== 'web') {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
+
+            Alert.alert(
+              '🎉 Purchase Successful!',
+              `🪙 ${(packageItem.coins + packageItem.bonus).toLocaleString()} coins added to your account!\n\n🎯 You're now ready to promote your videos and reach viral status!\n\n💎 Thank you for choosing VidGro Premium!`,
+              [{ text: '🚀 Start Promoting', onPress: () => {
+                refreshProfile();
+                router.replace('/(tabs)/promote');
+              }}]
+            );
+          }
+        } catch (error: any) {
+          console.error('Purchase error:', error);
+          if (error.code !== 'E_USER_CANCELLED') {
+            Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
           }
         }
-      ]
-    );
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+      setSelectedPackage(null);
+    }
   };
-
-  const headerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: headerScale.value }],
-    opacity: headerOpacity.value,
-  }));
-
-  const pulseAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseAnimation.value }],
-  }));
 
   const shimmerAnimatedStyle = useAnimatedStyle(() => {
     const translateX = interpolate(
@@ -263,19 +368,9 @@ export default function BuyCoinsScreen() {
     };
   });
 
-  const floatingAnimatedStyle = useAnimatedStyle(() => {
-    const translateY = interpolate(
-      floatingCoins.value,
-      [0, 1],
-      [0, -20]
-    );
-    return {
-      transform: [{ translateY }],
-    };
-  });
-
   const renderPackageCard = (packageItem: CoinPackage, index: number) => {
     const cardAnimation = cardAnimations.current[packageItem.id];
+    const buttonAnimation = buttonAnimations.current[packageItem.id];
     
     const animatedStyle = {
       opacity: cardAnimation,
@@ -295,6 +390,10 @@ export default function BuyCoinsScreen() {
       ],
     };
 
+    const buttonAnimatedStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: buttonAnimation.value }],
+    }));
+
     const isSelected = selectedPackage === packageItem.id;
     const costPerThousand = (packageItem.price / (packageItem.coins + packageItem.bonus) * 1000).toFixed(1);
 
@@ -306,7 +405,8 @@ export default function BuyCoinsScreen() {
             { backgroundColor: colors.surface },
             packageItem.popular && styles.popularPackage,
             packageItem.bestValue && styles.bestValuePackage,
-            isSelected && styles.selectedPackage
+            isSelected && styles.selectedPackage,
+            isTablet && styles.packageCardTablet
           ]}
           onPress={() => handlePurchase(packageItem)}
           disabled={loading}
@@ -349,18 +449,16 @@ export default function BuyCoinsScreen() {
             </View>
           )}
 
-          {/* Horizontal Layout Content */}
-          <View style={styles.horizontalContent}>
+          {/* Responsive Layout Content */}
+          <View style={[styles.horizontalContent, isTablet && styles.horizontalContentTablet]}>
             {/* Left side - Coin info */}
             <View style={styles.leftSection}>
-              <Animated.View style={floatingAnimatedStyle}>
-                <Text style={[styles.coinAmount, { color: colors.text }]}>
-                  {packageItem.coins.toLocaleString()}
-                </Text>
-                <Text style={[styles.coinLabel, { color: colors.textSecondary }]}>
-                  COINS
-                </Text>
-              </Animated.View>
+              <Text style={[styles.coinAmount, { color: colors.text }, isTablet && styles.coinAmountTablet]}>
+                {packageItem.coins.toLocaleString()}
+              </Text>
+              <Text style={[styles.coinLabel, { color: colors.textSecondary }]}>
+                COINS
+              </Text>
 
               {/* Bonus section */}
               {packageItem.bonus > 0 && (
@@ -377,7 +475,7 @@ export default function BuyCoinsScreen() {
                 <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>
                   Total
                 </Text>
-                <Text style={[styles.totalValue, { color: colors.accent }]}>
+                <Text style={[styles.totalValue, { color: colors.accent }, isTablet && styles.totalValueTablet]}>
                   {(packageItem.coins + packageItem.bonus).toLocaleString()}
                 </Text>
               </View>
@@ -389,7 +487,7 @@ export default function BuyCoinsScreen() {
               <View style={styles.priceSection}>
                 <View style={styles.priceRow}>
                   <Text style={[styles.currency, { color: colors.textSecondary }]}>₹</Text>
-                  <Text style={[styles.price, { color: colors.text }]}>
+                  <Text style={[styles.price, { color: colors.text }, isTablet && styles.priceTablet]}>
                     {packageItem.price}
                   </Text>
                 </View>
@@ -415,13 +513,14 @@ export default function BuyCoinsScreen() {
                 )}
               </View>
 
-              {/* Purchase button */}
-              <TouchableOpacity
+              {/* Animated Purchase button */}
+              <AnimatedTouchableOpacity
                 style={[
                   styles.purchaseButton,
                   packageItem.popular && styles.popularPurchaseButton,
                   packageItem.bestValue && styles.bestValuePurchaseButton,
-                  isSelected && styles.selectedPurchaseButton
+                  isSelected && styles.selectedPurchaseButton,
+                  buttonAnimatedStyle
                 ]}
                 onPress={() => handlePurchase(packageItem)}
                 disabled={loading}
@@ -457,15 +556,15 @@ export default function BuyCoinsScreen() {
                     </View>
                   )}
                 </LinearGradient>
-              </TouchableOpacity>
+              </AnimatedTouchableOpacity>
             </View>
           </View>
 
           {/* Bottom section - Value props and social proof */}
           <View style={styles.bottomSection}>
-            {/* Value props - Compact for mobile */}
-            <View style={styles.valueProps}>
-              {packageItem.valueProps.slice(0, 2).map((prop, propIndex) => (
+            {/* Value props - Responsive for different screen sizes */}
+            <View style={[styles.valueProps, isTablet && styles.valuePropsTablet]}>
+              {packageItem.valueProps.slice(0, isTablet ? 3 : 2).map((prop, propIndex) => (
                 <View key={propIndex} style={styles.valueProp}>
                   <CheckCircle size={8} color={colors.success} />
                   <Text style={[styles.valuePropText, { color: colors.textSecondary }]}>
@@ -475,7 +574,7 @@ export default function BuyCoinsScreen() {
               ))}
             </View>
 
-            {/* Social proof - Compact */}
+            {/* Social proof - Responsive */}
             <View style={[styles.socialProof, { backgroundColor: colors.primary + '15' }]}>
               <Users size={10} color={colors.primary} />
               <Text style={[styles.socialProofText, { color: colors.primary }]}>
@@ -490,91 +589,50 @@ export default function BuyCoinsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Updated Header to match app style */}
+      {/* Updated Header with coin balance */}
       <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Buy Coins</Text>
-          <Coins size={24} color="white" />
+          
+          {/* Coin balance in header */}
+          <View style={styles.headerCoinDisplay}>
+            <View style={[styles.headerCoinBadge, { 
+              backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.15)',
+              borderColor: isDark ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255, 255, 255, 0.2)'
+            }]}>
+              <Text style={styles.headerCoinIcon}>🪙</Text>
+              <Text style={styles.headerCoinText}>{profile?.coins?.toLocaleString() || '0'}</Text>
+            </View>
+          </View>
         </View>
       </View>
 
       <ScrollView 
         style={styles.content} 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
       >
-        {/* Compact Hero section for mobile */}
-        <View style={[styles.heroSection, { backgroundColor: colors.surface }]}>
-          <LinearGradient
-            colors={isDark 
-              ? ['rgba(74, 144, 226, 0.1)', 'rgba(0, 212, 255, 0.1)']
-              : ['rgba(157, 78, 221, 0.1)', 'rgba(255, 215, 0, 0.1)']
-            }
-            style={styles.heroGradient}
-          >
-            <View style={styles.heroContent}>
-              <Animated.View style={pulseAnimatedStyle}>
-                <Coins size={32} color="#FFD700" />
-              </Animated.View>
-              <Text style={[styles.heroTitle, { color: colors.text }]}>
-                🚀 Supercharge Your Growth
-              </Text>
-              <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-                Join 50,000+ creators who've unlocked viral success
-              </Text>
-              
-              {/* Current balance display */}
-              <View style={[styles.currentBalance, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)' }]}>
-                <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>
-                  Current Balance
-                </Text>
-                <Animated.View style={floatingAnimatedStyle}>
-                  <Text style={[styles.balanceAmount, { color: colors.text }]}>
-                    🪙{profile?.coins?.toLocaleString() || '0'}
-                  </Text>
-                </Animated.View>
-              </View>
-              
-              {/* Compact live stats */}
-              <View style={styles.liveStats}>
-                <View style={[styles.liveStat, { backgroundColor: colors.success + '20' }]}>
-                  <TrendingUp size={12} color={colors.success} />
-                  <Text style={[styles.liveStatText, { color: colors.success }]}>
-                    +2.3M views today
-                  </Text>
-                </View>
-                <View style={[styles.liveStat, { backgroundColor: colors.primary + '20' }]}>
-                  <Users size={12} color={colors.primary} />
-                  <Text style={[styles.liveStatText, { color: colors.primary }]}>
-                    1,247 online
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-
-        {/* Package grid - Horizontal layout for mobile */}
+        {/* Package grid - Responsive layout */}
         <View style={styles.packagesContainer}>
-          <Text style={[styles.packagesTitle, { color: colors.text }]}>
+          <Text style={[styles.packagesTitle, { color: colors.text }, isTablet && styles.packagesTitleTablet]}>
             💎 Choose Your Power Level
           </Text>
           
-          <View style={styles.packagesGrid}>
+          <View style={[styles.packagesGrid, isTablet && styles.packagesGridTablet]}>
             {coinPackages.map((packageItem, index) => renderPackageCard(packageItem, index))}
           </View>
         </View>
 
-        {/* Compact Trust signals */}
-        <View style={[styles.trustSection, { backgroundColor: colors.surface }]}>
+        {/* Trust signals - Responsive */}
+        <View style={[styles.trustSection, { backgroundColor: colors.surface }, isTablet && styles.trustSectionTablet]}>
           <Text style={[styles.trustTitle, { color: colors.text }]}>
             🛡️ Security & Guarantees
           </Text>
           
-          <View style={styles.trustSignals}>
+          <View style={[styles.trustSignals, isTablet && styles.trustSignalsTablet]}>
             <View style={[styles.trustSignal, { backgroundColor: colors.success + '15' }]}>
               <Shield size={16} color={colors.success} />
               <View style={styles.trustContent}>
@@ -613,39 +671,7 @@ export default function BuyCoinsScreen() {
           </View>
         </View>
 
-        {/* Compact Success stories */}
-        <View style={[styles.successSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.successTitle, { color: colors.text }]}>
-            🌟 Creator Success Stories
-          </Text>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.successScroll}>
-            {[
-              { name: 'Sarah K.', growth: '2.3M views', quote: 'VidGro took my channel from 1K to 100K!' },
-              { name: 'Mike R.', growth: '500K views', quote: 'Best investment for my content!' },
-              { name: 'Lisa M.', growth: '1.8M views', quote: 'Went viral in just 2 weeks!' },
-            ].map((story, index) => (
-              <View key={index} style={[styles.successCard, { backgroundColor: colors.card }]}>
-                <View style={[styles.successAvatar, { backgroundColor: colors.primary + '20' }]}>
-                  <Text style={[styles.successAvatarText, { color: colors.primary }]}>
-                    {story.name.charAt(0)}
-                  </Text>
-                </View>
-                <Text style={[styles.successName, { color: colors.text }]}>
-                  {story.name}
-                </Text>
-                <Text style={[styles.successGrowth, { color: colors.success }]}>
-                  {story.growth}
-                </Text>
-                <Text style={[styles.successQuote, { color: colors.textSecondary }]} numberOfLines={2}>
-                  "{story.quote}"
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Compact Security footer */}
+        {/* Security footer - Responsive */}
         <View style={[styles.securityFooter, { backgroundColor: colors.success + '10' }]}>
           <Shield size={14} color={colors.success} />
           <Text style={[styles.securityText, { color: colors.success }]}>
@@ -653,13 +679,6 @@ export default function BuyCoinsScreen() {
           </Text>
         </View>
       </ScrollView>
-
-      {/* Confetti overlay */}
-      {showConfetti && (
-        <View style={styles.confettiOverlay}>
-          <Text style={styles.confettiText}>🎉</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -689,6 +708,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 0.5,
     color: 'white',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 16,
+  },
+  headerCoinDisplay: {
+    flexShrink: 0,
+  },
+  headerCoinBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    minWidth: 70,
+    justifyContent: 'center',
+  },
+  headerCoinIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  headerCoinText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   content: {
     flex: 1,
@@ -696,83 +741,14 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
-  heroSection: {
-    margin: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-      },
-    }),
-  },
-  heroGradient: {
-    padding: 20,
-  },
-  heroContent: {
-    alignItems: 'center',
-  },
-  heroTitle: {
-    fontSize: isVerySmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 6,
-    letterSpacing: 0.5,
-  },
-  heroSubtitle: {
-    fontSize: isVerySmallScreen ? 12 : 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  currentBalance: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    marginBottom: 16,
-    alignItems: 'center',
-    minWidth: 120,
-  },
-  balanceLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  balanceAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  liveStats: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  liveStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  liveStatText: {
-    fontSize: 9,
-    fontWeight: '600',
+  scrollContentTablet: {
+    paddingHorizontal: 40,
+    paddingBottom: 60,
   },
   packagesContainer: {
     paddingHorizontal: 16,
     marginBottom: 24,
+    marginTop: 20,
   },
   packagesTitle: {
     fontSize: isVerySmallScreen ? 18 : 20,
@@ -781,8 +757,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     letterSpacing: 0.5,
   },
+  packagesTitleTablet: {
+    fontSize: 28,
+    marginBottom: 32,
+  },
   packagesGrid: {
     gap: 12,
+  },
+  packagesGridTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 20,
   },
   packageCard: {
     borderRadius: 16,
@@ -805,6 +790,10 @@ const styles = StyleSheet.create({
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
       },
     }),
+  },
+  packageCardTablet: {
+    width: (screenWidth - 120) / 2, // 2 columns on tablet
+    padding: 24,
   },
   popularPackage: {
     borderColor: '#FFD700',
@@ -900,18 +889,24 @@ const styles = StyleSheet.create({
     zIndex: 2,
     marginBottom: 12,
   },
+  horizontalContentTablet: {
+    marginBottom: 16,
+  },
   leftSection: {
     flex: 1,
     alignItems: 'flex-start',
   },
   rightSection: {
     alignItems: 'flex-end',
-    minWidth: 100,
+    minWidth: isTablet ? 120 : 100,
   },
   coinAmount: {
     fontSize: isVerySmallScreen ? 20 : 24,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  coinAmountTablet: {
+    fontSize: 32,
   },
   coinLabel: {
     fontSize: 8,
@@ -946,6 +941,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
+  totalValueTablet: {
+    fontSize: 20,
+  },
   priceSection: {
     alignItems: 'flex-end',
     marginBottom: 8,
@@ -962,6 +960,9 @@ const styles = StyleSheet.create({
     fontSize: isVerySmallScreen ? 20 : 24,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  priceTablet: {
+    fontSize: 28,
   },
   priceLabel: {
     fontSize: 9,
@@ -992,7 +993,7 @@ const styles = StyleSheet.create({
   purchaseButton: {
     borderRadius: 10,
     overflow: 'hidden',
-    minWidth: 80,
+    minWidth: isTablet ? 100 : 80,
   },
   popularPurchaseButton: {
     ...Platform.select({
@@ -1030,8 +1031,8 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.02 }],
   },
   purchaseButtonGradient: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: isTablet ? 12 : 10,
+    paddingHorizontal: isTablet ? 16 : 12,
     alignItems: 'center',
   },
   purchaseButtonContent: {
@@ -1041,7 +1042,7 @@ const styles = StyleSheet.create({
   },
   purchaseButtonText: {
     color: 'white',
-    fontSize: 11,
+    fontSize: isTablet ? 13 : 11,
     fontWeight: 'bold',
     letterSpacing: 0.3,
   },
@@ -1062,6 +1063,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
+  valuePropsTablet: {
+    gap: 12,
+  },
   valueProp: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1069,7 +1073,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   valuePropText: {
-    fontSize: 8,
+    fontSize: isTablet ? 10 : 8,
     fontWeight: '500',
     flex: 1,
   },
@@ -1083,7 +1087,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   socialProofText: {
-    fontSize: 8,
+    fontSize: isTablet ? 10 : 8,
     fontWeight: '600',
   },
   trustSection: {
@@ -1105,6 +1109,10 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  trustSectionTablet: {
+    margin: 24,
+    padding: 32,
+  },
   trustTitle: {
     fontSize: isVerySmallScreen ? 16 : 18,
     fontWeight: 'bold',
@@ -1114,12 +1122,17 @@ const styles = StyleSheet.create({
   trustSignals: {
     gap: 12,
   },
+  trustSignalsTablet: {
+    flexDirection: 'row',
+    gap: 20,
+  },
   trustSignal: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
     borderRadius: 10,
     gap: 10,
+    flex: isTablet ? 1 : undefined,
   },
   trustContent: {
     flex: 1,
@@ -1132,84 +1145,6 @@ const styles = StyleSheet.create({
   trustSignalText: {
     fontSize: isVerySmallScreen ? 10 : 11,
     lineHeight: 16,
-  },
-  successSection: {
-    margin: 16,
-    borderRadius: 20,
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 3px 12px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  successTitle: {
-    fontSize: isVerySmallScreen ? 16 : 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  successScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  successCard: {
-    padding: 14,
-    borderRadius: 12,
-    marginRight: 12,
-    alignItems: 'center',
-    width: isVerySmallScreen ? 140 : 160,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  successAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  successAvatarText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  successName: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 3,
-  },
-  successGrowth: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  successQuote: {
-    fontSize: 9,
-    textAlign: 'center',
-    lineHeight: 12,
-    fontStyle: 'italic',
   },
   securityFooter: {
     flexDirection: 'row',
@@ -1226,19 +1161,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
     lineHeight: 16,
-  },
-  confettiOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1000,
-  },
-  confettiText: {
-    fontSize: 100,
   },
 });
