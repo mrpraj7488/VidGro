@@ -199,6 +199,13 @@ export default function BuyCoinsScreen() {
 
   const initializeIAP = async () => {
     try {
+      // Check if we're in a web environment first
+      if (Platform.OS === 'web') {
+        console.log('IAP not available on web platform - using web fallback');
+        setIapAvailable(false);
+        return;
+      }
+
       const result = await InAppPurchases.initConnection();
       console.log('IAP connection result:', result);
       setIapAvailable(true);
@@ -213,7 +220,7 @@ export default function BuyCoinsScreen() {
       setProducts(availableProducts);
       console.log('Available products:', availableProducts);
     } catch (error) {
-      console.error('IAP initialization error:', error);
+      console.log('IAP not available - using web fallback:', error);
       setIapAvailable(false);
     }
   };
@@ -275,7 +282,7 @@ export default function BuyCoinsScreen() {
     setLoading(true);
 
     try {
-      if (Platform.OS === 'web' || !iapAvailable) {
+      if (!iapAvailable) {
         // Web fallback - simulate purchase
         Alert.alert(
           '💎 Confirm Premium Purchase',
