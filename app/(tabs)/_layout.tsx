@@ -61,26 +61,6 @@ export default function TabLayout() {
           },
           tabBarBackground: () => (
             <View style={{ flex: 1, position: 'relative' }}>
-              {/* Blur effect above tab bar */}
-              <Animated.View style={[
-                {
-                  position: 'absolute',
-                  top: -20,
-                  left: 0,
-                  right: 0,
-                  height: 20,
-                },
-                blurAnimatedStyle
-              ]}>
-                <LinearGradient
-                  colors={isDark 
-                    ? ['transparent', 'rgba(10, 14, 26, 0.8)', 'rgba(10, 14, 26, 0.95)']
-                    : ['transparent', 'rgba(245, 245, 245, 0.8)', 'rgba(245, 245, 245, 0.95)']
-                  }
-                  style={{ flex: 1 }}
-                  locations={[0, 0.3, 1]}
-                />
-              </Animated.View>
               
               {/* Tab bar background */}
               <LinearGradient
