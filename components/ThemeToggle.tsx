@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Platform, View } from 'react-native';
+import { TouchableOpacity, StyleSheet, Platform, View, Dimensions } from 'react-native';
 import { Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import Animated, {
@@ -9,8 +9,12 @@ import Animated, {
   withSequence,
   withTiming,
   interpolateColor,
+  withDelay,
+  Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function ThemeToggle() {
   const { isDark, toggleTheme, colors } = useTheme();
@@ -18,36 +22,54 @@ export default function ThemeToggle() {
   // Animation values
   const scale = useSharedValue(1);
   const rotation = useSharedValue(0);
-  const slideX = useSharedValue(isDark ? 20 : 0);
+  const slideX = useSharedValue(isDark ? 24 : 0);
   const colorProgress = useSharedValue(isDark ? 1 : 0);
+  const glowOpacity = useSharedValue(0);
+  const iconScale = useSharedValue(1);
 
   useEffect(() => {
     // Animate color transition
     colorProgress.value = withTiming(isDark ? 1 : 0, {
-      duration: 300,
+      duration: 400,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
     });
     
     // Animate slide transition
-    slideX.value = withTiming(isDark ? 20 : 0, {
-      duration: 300,
+    slideX.value = withTiming(isDark ? 24 : 0, {
+      duration: 400,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
     });
     
-    // Animate rotation with smooth timing
-    rotation.value = withTiming(isDark ? 180 : 0, {
-      duration: 300,
+    // Enhanced rotation animation
+    rotation.value = withTiming(isDark ? 360 : 0, {
+      duration: 500,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
+    });
+
+    // Icon scale animation for smooth transition
+    iconScale.value = withSequence(
+      withTiming(0.8, { duration: 200, easing: Easing.bezier(0.4, 0, 0.2, 1) }),
+      withTiming(1, { duration: 200, easing: Easing.bezier(0.4, 0, 0.2, 1) })
+    );
+
+    // Glow effect for dark mode
+    glowOpacity.value = withTiming(isDark ? 1 : 0, {
+      duration: 400,
+      easing: Easing.bezier(0.4, 0, 0.2, 1),
     });
   }, [isDark]);
 
   const handleToggle = () => {
     // Haptic feedback (only on native platforms)
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    // Scale animation for press feedback
+    // Enhanced scale animation for press feedback
     scale.value = withSequence(
-      withSpring(0.9, { damping: 15, stiffness: 300 }),
-      withSpring(1, { damping: 15, stiffness: 300 })
+      withSpring(0.85, { damping: 20, stiffness: 400 }),
+      withSpring(1.05, { damping: 20, stiffness: 400 }),
+      withSpring(1, { damping: 20, stiffness: 400 })
     );
 
     toggleTheme();
@@ -57,11 +79,19 @@ export default function ThemeToggle() {
     const backgroundColor = interpolateColor(
       colorProgress.value,
       [0, 1],
-      ['rgba(255, 215, 0, 0.15)', 'rgba(147, 112, 219, 0.15)']
+      ['rgba(255, 215, 0, 0.2)', 'rgba(74, 144, 226, 0.25)']
+    );
+
+    const borderColor = interpolateColor(
+      colorProgress.value,
+      [0, 1],
+      ['rgba(255, 215, 0, 0.3)', 'rgba(74, 144, 226, 0.4)']
     );
 
     return {
       backgroundColor,
+      borderColor,
+      transform: [{ scale: scale.value }],
     };
   });
 
@@ -69,28 +99,48 @@ export default function ThemeToggle() {
     const backgroundColor = interpolateColor(
       colorProgress.value,
       [0, 1],
-      ['#FFD700', '#9370DB']
+      ['#FFD700', '#4A90E2']
+    );
+
+    const shadowColor = interpolateColor(
+      colorProgress.value,
+      [0, 1],
+      ['rgba(255, 215, 0, 0.6)', 'rgba(74, 144, 226, 0.8)']
     );
 
     return {
       transform: [
         { translateX: slideX.value },
-        { scale: scale.value },
+        { scale: iconScale.value },
         { rotate: `${rotation.value}deg` }
       ],
       backgroundColor,
+      shadowColor,
+      shadowOpacity: glowOpacity.value * 0.8,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: glowOpacity.value * 8,
     };
   });
 
-  const iconColor = isDark ? '#9370DB' : '#FFD700';
+  const glowAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: glowOpacity.value * 0.6,
+      transform: [{ scale: 1 + glowOpacity.value * 0.1 }],
+    };
+  });
+  const iconColor = isDark ? '#4A90E2' : '#FFD700';
 
   return (
     <TouchableOpacity onPress={handleToggle} activeOpacity={0.7}>
       <Animated.View style={[styles.container, containerAnimatedStyle]}>
+        {isDark && (
+          <Animated.View style={[styles.glowEffect, glowAnimatedStyle]} />
+        )}
         <View style={styles.track}>
           <Animated.View style={[styles.slider, sliderAnimatedStyle]}>
             {isDark ? (
-              <Moon size={16} color={iconColor} fill={iconColor} />
+              <Moon size={16} color="white" fill="white" />
             ) : (
               <Sun size={16} color={iconColor} fill={iconColor} />
             )}
@@ -103,12 +153,21 @@ export default function ThemeToggle() {
 
 const styles = StyleSheet.create({
   container: {
-    width: 48,
-    height: 26,
-    borderRadius: 13,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    width: 52,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+    borderWidth: 2,
+    position: 'relative',
+  },
+  glowEffect: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 18,
+    backgroundColor: 'rgba(74, 144, 226, 0.3)',
   },
   track: {
     flex: 1,
@@ -116,15 +175,17 @@ const styles = StyleSheet.create({
   },
   slider: {
     position: 'absolute',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    top: 2,
+    left: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });

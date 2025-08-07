@@ -22,7 +22,7 @@ export default function SplashScreen() {
 
   return (
     <LinearGradient
-      colors={isDark ? ['#2D1B69', '#11998E'] : ['#800080', '#FF4757']}
+      colors={isDark ? ['#0F172A', '#1E293B', '#334155'] : ['#800080', '#FF4757']}
       style={styles.container}
     >
       <View style={styles.content}>

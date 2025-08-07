@@ -606,6 +606,7 @@ export default function EditVideoScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={handleNavigateBack}>
             <ArrowLeft size={24} color="white" />

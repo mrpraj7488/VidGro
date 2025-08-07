@@ -59,10 +59,10 @@ export default function GlobalHeader({
 
   const renderSideMenu = () => (
     <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
-      <View style={[styles.sideMenuHeader, { backgroundColor: '#800080' }]}>
+      <View style={[styles.sideMenuHeader, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.sideMenuHeaderContent}>
           <View style={styles.profileSection}>
-            <View style={[styles.profileAvatar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+            <View style={[styles.profileAvatar, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.2)' }]}>
               <User size={28} color="white" />
             </View>
             <View style={styles.profileInfo}>
@@ -78,6 +78,7 @@ export default function GlobalHeader({
           </TouchableOpacity>
         </View>
         <View style={styles.themeToggleRow}>
+        <View style={[styles.themeToggleRow, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.15)' : 'rgba(255, 255, 255, 0.1)' }]}>
           <Text style={styles.themeLabel}>Dark Mode</Text>
           <ThemeToggle />
         </View>
@@ -103,6 +104,7 @@ export default function GlobalHeader({
   return (
     <>
       <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <View style={styles.leftSection}>
             <TouchableOpacity 
@@ -121,7 +123,10 @@ export default function GlobalHeader({
           <View style={styles.rightSection}>
             {showCoinDisplay && profile && (
               <View style={styles.coinDisplay}>
-                <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>
+                <View style={[styles.coinBadge, { 
+                  backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.15)',
+                  borderColor: isDark ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255, 255, 255, 0.2)'
+                }]}>
                   <Text style={styles.coinIcon}>🪙</Text>
                   <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
                 </View>
@@ -196,7 +201,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
     minWidth: 70,
     justifyContent: 'center',
   },
@@ -239,7 +243,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 4,
     paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
   },
   themeLabel: {

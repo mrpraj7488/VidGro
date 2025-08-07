@@ -64,6 +64,7 @@ Violation of these terms may result in account suspension or termination.`
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />

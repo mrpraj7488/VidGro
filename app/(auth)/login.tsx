@@ -59,7 +59,7 @@ export default function Login() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={isDark ? ['#2D1B69', '#11998E'] : ['#667eea', '#764ba2']}
+        colors={isDark ? ['#0F172A', '#1E293B', '#334155'] : ['#667eea', '#764ba2']}
         style={styles.gradient}
       >
         <View style={styles.content}>
