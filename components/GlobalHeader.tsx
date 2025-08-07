@@ -59,9 +59,9 @@ export default function GlobalHeader({
   };
 
   const renderSideMenu = () => (
-    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -screenWidth * 0.8, backgroundColor: colors.surface }]}>
+    <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
       <LinearGradient
-        colors={['#800080', '#9D4EDD']}
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
         style={styles.sideMenuHeader}
       >
         <View style={styles.sideMenuHeaderContent}>
@@ -80,6 +80,10 @@ export default function GlobalHeader({
           >
             <X size={24} color="white" />
           </TouchableOpacity>
+        </View>
+        <View style={styles.themeToggleRow}>
+          <Text style={styles.themeLabel}>Theme</Text>
+          <ThemeToggle />
         </View>
       </LinearGradient>
       
@@ -102,7 +106,10 @@ export default function GlobalHeader({
 
   return (
     <>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <LinearGradient
+        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
+        style={styles.header}
+      >
         <View style={styles.headerContent}>
           <View style={styles.leftSection}>
             <TouchableOpacity 
@@ -115,19 +122,24 @@ export default function GlobalHeader({
                 <Menu size={24} color="white" />
               )}
             </TouchableOpacity>
-            <Text style={[styles.title, { color: 'white' }]} numberOfLines={1}>{title}</Text>
+            <Text style={styles.title} numberOfLines={1}>{title}</Text>
           </View>
           
-          {showCoinDisplay && profile && (
-            <View style={styles.coinDisplay}>
-              <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>
-                <Text style={styles.coinIcon}>🪙</Text>
-                <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
+          <View style={styles.rightSection}>
+            {showCoinDisplay && profile && (
+              <View style={styles.coinDisplay}>
+                <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                  <Text style={styles.coinIcon}>🪙</Text>
+                  <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
+                </View>
               </View>
+            )}
+            <View style={styles.themeToggleContainer}>
+              <ThemeToggle />
             </View>
-          )}
+          </View>
         </View>
-      </View>
+      </LinearGradient>
       
       {renderSideMenu()}
       
@@ -143,41 +155,43 @@ export default function GlobalHeader({
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: 44,
-    paddingBottom: 12,
+    paddingTop: 50,
+    paddingBottom: 16,
     paddingHorizontal: 20,
-    minHeight: 80,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    minHeight: 90, // Fixed minimum height
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: 40,
+    height: 44, // Fixed height for content
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    minWidth: 0,
+    minWidth: 0, // Allow shrinking
+  },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8, // Reduced gap for smaller screens
+    flexShrink: 0, // Prevent shrinking
   },
   menuButton: {
-    marginRight: 16,
+    marginRight: 12, // Reduced margin
     padding: 4,
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
-    fontSize: 22,
+    fontSize: Math.min(20, screenWidth * 0.05), // Responsive font size
     fontWeight: 'bold',
+    color: 'white',
     flex: 1,
-    marginRight: 16,
+    marginRight: 8, // Add margin to prevent overlap
   },
   coinDisplay: {
     flexShrink: 0,
@@ -185,27 +199,28 @@ const styles = StyleSheet.create({
   coinBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 70,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: screenWidth < 380 ? 8 : 12, // Responsive padding
+    paddingVertical: 6,
+    borderRadius: 16,
+    minWidth: screenWidth < 380 ? 50 : 60, // Responsive min width
   },
   coinIcon: {
-    fontSize: 14,
+    fontSize: 12,
     marginRight: 4,
   },
   coinText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: screenWidth < 380 ? 12 : 14, // Responsive font size
+    fontWeight: '600',
+  },
+  themeToggleContainer: {
+    flexShrink: 0,
   },
   sideMenu: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    width: Math.min(320, screenWidth * 0.85),
+    width: Math.min(300, screenWidth * 0.8), // Responsive width
     zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
@@ -214,14 +229,26 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   sideMenuHeader: {
-    paddingTop: 44,
-    paddingBottom: 20,
+    paddingTop: 50,
+    paddingBottom: 16,
     paddingHorizontal: 20,
   },
   sideMenuHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  themeToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  themeLabel: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   profileSection: {
     flexDirection: 'row',
@@ -229,23 +256,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   profileEmail: {
     fontSize: 14,
-    marginTop: 2,
   },
   closeButton: {
     padding: 8,
@@ -256,14 +282,13 @@ const styles = StyleSheet.create({
   sideMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 18,
+    paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
   },
   sideMenuText: {
-    fontSize: 17,
-    marginLeft: 18,
-    fontWeight: '500',
+    fontSize: 16,
+    marginLeft: 16,
   },
   overlay: {
     position: 'absolute',

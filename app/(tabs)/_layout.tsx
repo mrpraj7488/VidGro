@@ -23,7 +23,7 @@ export default function TabLayout() {
           shadowRadius: 4,
           elevation: 8,
         },
-        tabBarActiveTintColor: '#800080',
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarLabelStyle: {
           fontSize: 12,
