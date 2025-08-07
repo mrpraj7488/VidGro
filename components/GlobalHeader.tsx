@@ -59,7 +59,7 @@ export default function GlobalHeader({
 
   const renderSideMenu = () => (
     <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
-      <View style={[styles.sideMenuHeader, { backgroundColor: '#800080' }]}>
+      <View style={[styles.sideMenuHeader, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.sideMenuHeaderContent}>
           <View style={styles.profileSection}>
             <View style={[styles.profileAvatar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
@@ -103,6 +103,7 @@ export default function GlobalHeader({
   return (
     <>
       <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <View style={styles.leftSection}>
             <TouchableOpacity 
