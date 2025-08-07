@@ -131,6 +131,9 @@ export default function BecomeVIPScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.vipIcon, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.2)' }]}>
+          <Crown size={48} color="#FFD700" />
+        </View>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Unlock premium features and maximize your earnings
         </Text>
 
