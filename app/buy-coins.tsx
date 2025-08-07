@@ -199,8 +199,8 @@ export default function BuyCoinsScreen() {
 
   const initializeIAP = async () => {
     try {
-      // Check if we're in a web environment first
-      if (Platform.OS === 'web') {
+      // Only initialize IAP on iOS and Android platforms
+      if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
         console.log('IAP not available on web platform - using web fallback');
         setIapAvailable(false);
         return;
