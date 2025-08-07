@@ -115,11 +115,20 @@ export default function ThemeToggle() {
         { rotate: `${rotation.value}deg` }
       ],
       backgroundColor,
-      shadowColor,
-      shadowOpacity: glowOpacity.value * 0.8,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 0 },
-      elevation: glowOpacity.value * 8,
+      ...Platform.select({
+        ios: {
+          shadowColor,
+          shadowOpacity: glowOpacity.value * 0.8,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 0 },
+        },
+        android: {
+          elevation: glowOpacity.value * 8,
+        },
+        web: {
+          boxShadow: `0 0 ${8 * glowOpacity.value}px ${shadowColor}`,
+        },
+      }),
     };
   });
 
@@ -182,10 +191,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     top: 2,
     left: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
+      },
+    }),
   },
 });
