@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, MessageCircle, Send, Phone, Mail, CircleHelp as HelpCircle, Bug, CreditCard, User, Coins, Clock, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, MessageCircle, Send, Phone, Mail, CircleHelp as HelpCircle, Bug, CreditCard, User, Coins, Clock, CircleCheck as CheckCircle } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
