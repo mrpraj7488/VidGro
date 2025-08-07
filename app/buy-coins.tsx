@@ -48,6 +48,7 @@ interface CoinPurchaseRequest {
 
 const { width, height } = Dimensions.get('window');
 const isSmallDevice = width < 375;
+const isVerySmallDevice = width < 350;
 
 export default function BuyCoinsScreen() {
   const { profile, refreshProfile, token } = useAuth();
@@ -433,7 +434,7 @@ export default function BuyCoinsScreen() {
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <ArrowLeft size={24} color="white" />
+            <ArrowLeft size={isVerySmallDevice ? 20 : 24} color="white" />
           </TouchableOpacity>
           
           <View style={styles.headerCenter}>
@@ -442,10 +443,15 @@ export default function BuyCoinsScreen() {
           </View>
           
           <View style={styles.currentBalance}>
-            <Coins size={18} color="white" />
-            <Text style={styles.balanceText}>
-              {profile?.coins?.toLocaleString() || '0'}
-            </Text>
+            <View style={styles.coinIcon}>
+              <Coins size={16} color="#FFD700" />
+            </View>
+            <View style={styles.balanceInfo}>
+              <Text style={styles.balanceLabel}>Balance</Text>
+              <Text style={styles.balanceText}>
+                {profile?.coins?.toLocaleString() || '0'}
+              </Text>
+            </View>
           </View>
         </View>
       </LinearGradient>
@@ -501,19 +507,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 25,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? (isVerySmallDevice ? 45 : 50) : (isVerySmallDevice ? 35 : 40),
+    paddingBottom: isVerySmallDevice ? 20 : 25,
+    paddingHorizontal: isVerySmallDevice ? 16 : 20,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: isVerySmallDevice ? 40 : 50,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: isVerySmallDevice ? 36 : 40,
+    height: isVerySmallDevice ? 36 : 40,
+    borderRadius: isVerySmallDevice ? 18 : 20,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -521,70 +528,99 @@ const styles = StyleSheet.create({
   headerCenter: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: isVerySmallDevice ? 8 : 12,
   },
   headerTitle: {
-    fontSize: isSmallDevice ? 20 : 24,
+    fontSize: isVerySmallDevice ? 18 : isSmallDevice ? 20 : 24,
     fontWeight: '700',
     color: 'white',
     marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: isVerySmallDevice ? 12 : 14,
     color: 'rgba(255, 255, 255, 0.8)',
   },
   currentBalance: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: isVerySmallDevice ? 8 : 12,
+    paddingVertical: isVerySmallDevice ? 6 : 8,
+    borderRadius: isVerySmallDevice ? 16 : 20,
+    gap: isVerySmallDevice ? 6 : 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  coinIcon: {
+    width: isVerySmallDevice ? 24 : 28,
+    height: isVerySmallDevice ? 24 : 28,
+    borderRadius: isVerySmallDevice ? 12 : 14,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+  },
+  balanceInfo: {
+    alignItems: 'flex-start',
+  },
+  balanceLabel: {
+    fontSize: isVerySmallDevice ? 9 : 10,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '500',
+    lineHeight: isVerySmallDevice ? 12 : 14,
+    marginBottom: -2,
   },
   balanceText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: isVerySmallDevice ? 13 : 15,
+    fontWeight: '700',
     color: 'white',
+    letterSpacing: 0.5,
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: 20,
-    paddingTop: 10,
+    padding: isVerySmallDevice ? 12 : isSmallDevice ? 16 : 20,
+    paddingTop: isVerySmallDevice ? 8 : 10,
   },
   statsContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 12,
+    flexDirection: isVerySmallDevice ? 'column' : 'row',
+    marginBottom: isVerySmallDevice ? 16 : 20,
+    gap: isVerySmallDevice ? 8 : 12,
   },
   statCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: isVerySmallDevice ? 12 : 16,
+    paddingVertical: isVerySmallDevice ? 10 : 12,
     borderRadius: 12,
     gap: 8,
   },
   statText: {
-    fontSize: 13,
+    fontSize: isVerySmallDevice ? 12 : 13,
     fontWeight: '500',
     flex: 1,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: isVerySmallDevice ? 14 : 16,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
-    paddingHorizontal: 10,
+    marginBottom: isVerySmallDevice ? 20 : 24,
+    lineHeight: isVerySmallDevice ? 20 : 24,
+    paddingHorizontal: isVerySmallDevice ? 5 : 10,
   },
   packagesContainer: {
-    gap: 16,
-    marginBottom: 32,
+    gap: isVerySmallDevice ? 12 : 16,
+    marginBottom: isVerySmallDevice ? 24 : 32,
   },
   packageCard: {
-    borderRadius: 20,
+    borderRadius: isVerySmallDevice ? 16 : 20,
     padding: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -595,14 +631,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   popularPackage: {
-    borderWidth: 2,
+    borderWidth: isVerySmallDevice ? 1.5 : 2,
     borderColor: '#FFD700',
     shadowColor: '#FFD700',
     shadowOpacity: 0.3,
-    transform: [{ scale: 1.02 }],
+    transform: [{ scale: isVerySmallDevice ? 1.01 : 1.02 }],
   },
   selectedPackage: {
-    borderWidth: 2,
+    borderWidth: isVerySmallDevice ? 1.5 : 2,
     borderColor: '#8B5CF6',
   },
   popularBadge: {
@@ -613,74 +649,74 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: isVerySmallDevice ? 6 : 8,
     gap: 4,
     zIndex: 1,
   },
   popularText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: isVerySmallDevice ? 10 : 12,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   savingsBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 10,
+    top: isVerySmallDevice ? 8 : 12,
+    right: isVerySmallDevice ? 8 : 12,
+    paddingHorizontal: isVerySmallDevice ? 8 : 10,
     paddingVertical: 4,
     borderRadius: 12,
     zIndex: 1,
   },
   savingsText: {
     color: 'white',
-    fontSize: 11,
+    fontSize: isVerySmallDevice ? 10 : 11,
     fontWeight: 'bold',
   },
   packageContent: {
-    padding: 20,
-    paddingTop: 24,
+    padding: isVerySmallDevice ? 14 : isSmallDevice ? 16 : 20,
+    paddingTop: isVerySmallDevice ? 18 : 24,
   },
   packageHeader: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: isVerySmallDevice ? 12 : 16,
   },
   badgeText: {
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: isVerySmallDevice ? 14 : 16,
+    marginBottom: isVerySmallDevice ? 6 : 8,
   },
   coinAmount: {
-    fontSize: isSmallDevice ? 28 : 32,
+    fontSize: isVerySmallDevice ? 24 : isSmallDevice ? 28 : 32,
     fontWeight: 'bold',
     marginBottom: 2,
   },
   coinsLabel: {
-    fontSize: 16,
+    fontSize: isVerySmallDevice ? 14 : 16,
     color: '#888',
-    marginBottom: 8,
+    marginBottom: isVerySmallDevice ? 6 : 8,
   },
   bonusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: isVerySmallDevice ? 10 : 12,
+    paddingVertical: isVerySmallDevice ? 4 : 6,
     borderRadius: 16,
     gap: 4,
   },
   bonusText: {
-    fontSize: 14,
+    fontSize: isVerySmallDevice ? 12 : 14,
     fontWeight: '600',
   },
   description: {
-    fontSize: 15,
+    fontSize: isVerySmallDevice ? 13 : 15,
     textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20,
+    marginBottom: isVerySmallDevice ? 12 : 16,
+    lineHeight: isVerySmallDevice ? 18 : 20,
   },
   featuresContainer: {
-    marginBottom: 20,
-    gap: 8,
+    marginBottom: isVerySmallDevice ? 16 : 20,
+    gap: isVerySmallDevice ? 6 : 8,
   },
   featureRow: {
     flexDirection: 'row',
@@ -688,22 +724,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   featureText: {
-    fontSize: 14,
+    fontSize: isVerySmallDevice ? 12 : 14,
     flex: 1,
   },
   priceSection: {
-    flexDirection: 'row',
+    flexDirection: isVerySmallDevice ? 'column' : 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    alignItems: isVerySmallDevice ? 'center' : 'center',
+    marginBottom: isVerySmallDevice ? 16 : 20,
+    gap: isVerySmallDevice ? 8 : 0,
   },
   totalCoins: {
-    fontSize: 14,
+    fontSize: isVerySmallDevice ? 12 : 14,
     marginBottom: 4,
+    textAlign: isVerySmallDevice ? 'center' : 'left',
   },
   price: {
-    fontSize: isSmallDevice ? 24 : 28,
+    fontSize: isVerySmallDevice ? 20 : isSmallDevice ? 24 : 28,
     fontWeight: 'bold',
+    textAlign: isVerySmallDevice ? 'center' : 'left',
   },
   valueIndicator: {
     flexDirection: 'row',
@@ -711,14 +750,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   valueText: {
-    fontSize: 12,
+    fontSize: isVerySmallDevice ? 11 : 12,
     fontWeight: '600',
   },
   purchaseButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: isVerySmallDevice ? 12 : 16,
     borderRadius: 14,
     gap: 8,
   },
@@ -732,16 +771,16 @@ const styles = StyleSheet.create({
   },
   purchaseButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: isVerySmallDevice ? 14 : 16,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   securityContainer: {
-    flexDirection: 'row',
+    flexDirection: isVerySmallDevice ? 'column' : 'row',
     alignItems: 'center',
     borderRadius: 16,
-    padding: 20,
-    gap: 16,
+    padding: isVerySmallDevice ? 16 : 20,
+    gap: isVerySmallDevice ? 12 : 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -750,15 +789,18 @@ const styles = StyleSheet.create({
   },
   securityContent: {
     flex: 1,
+    alignItems: isVerySmallDevice ? 'center' : 'flex-start',
   },
   securityTitle: {
-    fontSize: 16,
+    fontSize: isVerySmallDevice ? 14 : 16,
     fontWeight: '600',
     marginBottom: 4,
+    textAlign: isVerySmallDevice ? 'center' : 'left',
   },
   securityText: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: isVerySmallDevice ? 11 : 13,
+    lineHeight: isVerySmallDevice ? 16 : 18,
+    textAlign: isVerySmallDevice ? 'center' : 'left',
   },
   loadingScreen: {
     flex: 1,
