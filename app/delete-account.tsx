@@ -93,18 +93,7 @@ export default function DeleteAccountScreen() {
             ))}
           </View>
 
-          <View style={[styles.alternativesSection, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.alternativesTitle, { color: colors.text }]}>Consider these alternatives:</Text>
-            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: isDark ? colors.card : colors.card }]}>
-              <Shield size={20} color="#2ECC71" />
-              <Text style={[styles.alternativeText, { color: colors.text }]}>Temporarily deactivate account</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: isDark ? colors.card : colors.card }]}>
-              <Shield size={20} color="#3498DB" />
-              <Text style={[styles.alternativeText, { color: colors.text }]}>Contact support for help</Text>
-            </TouchableOpacity>
-          </View>
-
+      
           <TouchableOpacity
             style={[styles.continueButton, { backgroundColor: colors.error }]}
             onPress={() => setStep(2)}
