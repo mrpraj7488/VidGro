@@ -57,7 +57,6 @@ export default function BuyCoinsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: '#800080' }]}>
-      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
@@ -71,56 +70,6 @@ export default function BuyCoinsScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Choose a coin package to unlock more video promotions
-        </Text>
-
-        <View style={styles.packagesContainer}>
-          {coinPackages.map((packageItem, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.packageCard,
-                { backgroundColor: colors.surface },
-                packageItem.popular && styles.popularPackage
-              ]}
-              onPress={() => handlePurchase(packageItem)}
-              disabled={loading}
-            >
-              {packageItem.popular && (
-                <View style={styles.popularBadge}>
-                  <Crown size={16} color="white" />
-                  <Text style={styles.popularText}>POPULAR</Text>
-                </View>
-              )}
-              
-              <View style={styles.packageHeader}>
-                <Text style={[styles.coinAmount, { color: colors.text }]}>
-                  {packageItem.coins.toLocaleString()} Coins
-                </Text>
-                {packageItem.bonus > 0 && (
-                  <Text style={[styles.bonusText, { color: colors.success }]}>
-                    +{packageItem.bonus.toLocaleString()} Bonus
-                  </Text>
-                )}
-              </View>
-
-              <View style={styles.packageDetails}>
-                <Text style={[styles.totalCoins, { color: colors.textSecondary }]}>
-                  Total: {(packageItem.coins + packageItem.bonus).toLocaleString()} Coins
-                </Text>
-                <Text style={[styles.price, { color: colors.primary }]}>₹{packageItem.price}</Text>
-              </View>
-
-              <View style={[styles.purchaseButton, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.purchaseButtonText, { color: 'white' }]}>
-                  {loading ? 'Processing...' : 'Purchase'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Choose a coin package to unlock more video promotions
         </Text>

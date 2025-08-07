@@ -606,7 +606,6 @@ export default function EditVideoScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: '#800080' }]}>
-      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={handleNavigateBack}>
             <ArrowLeft size={24} color="white" />
@@ -860,10 +859,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     letterSpacing: 0.5,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   scrollView: {
     flex: 1,

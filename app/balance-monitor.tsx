@@ -31,8 +31,6 @@ export default function BalanceMonitorScreen() {
 }
 
 const styles = StyleSheet.create({
-    }
-  )
   container: {
     flex: 1,
   },
@@ -57,5 +55,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
-});
 });
