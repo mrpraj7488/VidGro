@@ -28,7 +28,6 @@ import Animated, {
   Easing as ReanimatedEasing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import * as InAppPurchases from 'react-native-iap';
 import { supabase } from '../lib/supabase';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -193,7 +192,14 @@ export default function BuyCoinsScreen() {
     );
 
     return () => {
-      InAppPurchases.endConnection();
+      // Only end connection if IAP was available
+      if (iapAvailable && (Platform.OS === 'ios' || Platform.OS === 'android')) {
+        import('react-native-iap').then(InAppPurchases => {
+          InAppPurchases.endConnection();
+        }).catch(() => {
+          // Ignore cleanup errors
+        });
+      }
     };
   }, []);
 
@@ -206,6 +212,9 @@ export default function BuyCoinsScreen() {
         return;
       }
 
+      // Dynamically import IAP only on supported platforms
+      const InAppPurchases = await import('react-native-iap');
+      
       const result = await InAppPurchases.initConnection();
       console.log('IAP connection result:', result);
       setIapAvailable(true);
@@ -321,6 +330,9 @@ export default function BuyCoinsScreen() {
       } else {
         // Native in-app purchase
         try {
+          // Dynamically import IAP for native platforms
+          const InAppPurchases = await import('react-native-iap');
+          
           const purchase = await InAppPurchases.requestPurchase({
             sku: packageItem.productId,
             andDangerouslyFinishTransactionAutomaticallyIOS: false,
