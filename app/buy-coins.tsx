@@ -30,6 +30,8 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 380;
+const isVerySmallScreen = screenWidth < 350;
 
 interface CoinPackage {
   id: string;
@@ -67,8 +69,8 @@ export default function BuyCoinsScreen() {
       popular: false,
       bestValue: false,
       limitedTime: true,
-      socialProof: '2.3K creators started here',
-      valueProps: ['Perfect for testing', 'Quick video boost'],
+      socialProof: '2.3K creators started',
+      valueProps: ['Perfect for testing', 'Quick boost'],
       savings: 10,
     },
     {
@@ -81,7 +83,7 @@ export default function BuyCoinsScreen() {
       bestValue: false,
       limitedTime: false,
       socialProof: '15K+ creators love this',
-      valueProps: ['Most popular choice', '20% bonus coins', 'Best for growth'],
+      valueProps: ['Most popular', '20% bonus', 'Best for growth'],
       badge: 'RECOMMENDED',
       savings: 20,
     },
@@ -95,7 +97,7 @@ export default function BuyCoinsScreen() {
       bestValue: true,
       limitedTime: false,
       socialProof: '8K+ pros upgraded',
-      valueProps: ['Maximum value', '30% bonus coins', 'Serious creators only'],
+      valueProps: ['Maximum value', '30% bonus', 'Serious creators'],
       badge: 'BEST VALUE',
       savings: 50,
     },
@@ -108,8 +110,8 @@ export default function BuyCoinsScreen() {
       popular: false,
       bestValue: false,
       limitedTime: false,
-      socialProof: '1.2K+ agencies use this',
-      valueProps: ['Agency level', '30% bonus coins', 'Bulk promotion'],
+      socialProof: '1.2K+ agencies',
+      valueProps: ['Agency level', '30% bonus', 'Bulk promotion'],
       badge: 'ENTERPRISE',
       savings: 100,
     },
@@ -123,7 +125,7 @@ export default function BuyCoinsScreen() {
       bestValue: false,
       limitedTime: false,
       socialProof: '500+ top creators',
-      valueProps: ['Ultimate package', '32% bonus coins', 'Viral potential'],
+      valueProps: ['Ultimate package', '32% bonus', 'Viral potential'],
       badge: 'ULTIMATE',
       savings: 200,
     },
@@ -136,8 +138,8 @@ export default function BuyCoinsScreen() {
       popular: false,
       bestValue: false,
       limitedTime: false,
-      socialProof: '100+ legendary creators',
-      valueProps: ['Legendary status', '40% bonus coins', 'Unlimited potential'],
+      socialProof: '100+ legendary',
+      valueProps: ['Legendary status', '40% bonus', 'Unlimited potential'],
       badge: 'LEGENDARY',
       savings: 400,
     },
@@ -329,17 +331,21 @@ export default function BuyCoinsScreen() {
               packageItem.popular && styles.popularBadge,
               packageItem.bestValue && styles.bestValueBadge
             ]}>
-              {packageItem.popular && <Crown size={14} color="white" />}
-              {packageItem.bestValue && <Star size={14} color="white" />}
-              <Text style={styles.badgeText}>{packageItem.badge}</Text>
+              {packageItem.popular && <Crown size={isVerySmallScreen ? 10 : 12} color="white" />}
+              {packageItem.bestValue && <Star size={isVerySmallScreen ? 10 : 12} color="white" />}
+              <Text style={[styles.badgeText, { fontSize: isVerySmallScreen ? 9 : 10 }]}>
+                {packageItem.badge}
+              </Text>
             </View>
           )}
 
           {/* Limited time indicator */}
           {packageItem.limitedTime && (
             <View style={[styles.limitedTimeBadge, { backgroundColor: colors.error }]}>
-              <Clock size={12} color="white" />
-              <Text style={styles.limitedTimeText}>24H LEFT</Text>
+              <Clock size={10} color="white" />
+              <Text style={[styles.limitedTimeText, { fontSize: isVerySmallScreen ? 8 : 9 }]}>
+                24H LEFT
+              </Text>
             </View>
           )}
 
@@ -347,17 +353,37 @@ export default function BuyCoinsScreen() {
           <View style={styles.packageContent}>
             {/* Coin amount with floating animation */}
             <Animated.View style={floatingAnimatedStyle}>
-              <Text style={[styles.coinAmount, { color: colors.text }]}>
+              <Text style={[
+                styles.coinAmount, 
+                { 
+                  color: colors.text,
+                  fontSize: isVerySmallScreen ? 24 : isSmallScreen ? 28 : 32
+                }
+              ]}>
                 {packageItem.coins.toLocaleString()}
               </Text>
-              <Text style={[styles.coinLabel, { color: colors.textSecondary }]}>COINS</Text>
+              <Text style={[
+                styles.coinLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 10 : 11
+                }
+              ]}>
+                COINS
+              </Text>
             </Animated.View>
 
             {/* Bonus section */}
             {packageItem.bonus > 0 && (
               <View style={[styles.bonusContainer, { backgroundColor: colors.success + '20' }]}>
-                <Sparkles size={16} color={colors.success} />
-                <Text style={[styles.bonusText, { color: colors.success }]}>
+                <Sparkles size={isVerySmallScreen ? 12 : 14} color={colors.success} />
+                <Text style={[
+                  styles.bonusText, 
+                  { 
+                    color: colors.success,
+                    fontSize: isVerySmallScreen ? 10 : 11
+                  }
+                ]}>
                   +{packageItem.bonus.toLocaleString()} BONUS
                 </Text>
               </View>
@@ -365,23 +391,55 @@ export default function BuyCoinsScreen() {
 
             {/* Total coins */}
             <View style={styles.totalContainer}>
-              <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>Total Coins</Text>
-              <Text style={[styles.totalValue, { color: colors.accent }]}>
+              <Text style={[
+                styles.totalLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 10 : 11
+                }
+              ]}>
+                Total Coins
+              </Text>
+              <Text style={[
+                styles.totalValue, 
+                { 
+                  color: colors.accent,
+                  fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 22
+                }
+              ]}>
                 {(packageItem.coins + packageItem.bonus).toLocaleString()}
               </Text>
             </View>
 
             {/* Value proposition */}
             <View style={styles.valueContainer}>
-              <Text style={[styles.costPerThousand, { color: colors.textSecondary }]}>
+              <Text style={[
+                styles.costPerThousand, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 10 : 11
+                }
+              ]}>
                 ₹{costPerThousand}/1K coins
               </Text>
               {packageItem.originalPrice && (
                 <View style={styles.savingsContainer}>
-                  <Text style={[styles.originalPrice, { color: colors.textSecondary }]}>
+                  <Text style={[
+                    styles.originalPrice, 
+                    { 
+                      color: colors.textSecondary,
+                      fontSize: isVerySmallScreen ? 10 : 11
+                    }
+                  ]}>
                     ₹{packageItem.originalPrice}
                   </Text>
-                  <Text style={[styles.savings, { color: colors.success }]}>
+                  <Text style={[
+                    styles.savings, 
+                    { 
+                      color: colors.success,
+                      fontSize: isVerySmallScreen ? 10 : 11
+                    }
+                  ]}>
                     Save ₹{packageItem.savings}
                   </Text>
                 </View>
@@ -390,25 +448,63 @@ export default function BuyCoinsScreen() {
 
             {/* Price section */}
             <View style={styles.priceSection}>
-              <Text style={[styles.currency, { color: colors.textSecondary }]}>₹</Text>
-              <Text style={[styles.price, { color: colors.text }]}>{packageItem.price}</Text>
-              <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>one-time</Text>
+              <Text style={[
+                styles.currency, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 14 : 16
+                }
+              ]}>
+                ₹
+              </Text>
+              <Text style={[
+                styles.price, 
+                { 
+                  color: colors.text,
+                  fontSize: isVerySmallScreen ? 24 : isSmallScreen ? 28 : 32
+                }
+              ]}>
+                {packageItem.price}
+              </Text>
+              <Text style={[
+                styles.priceLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 10 : 11
+                }
+              ]}>
+                one-time
+              </Text>
             </View>
 
-            {/* Value props */}
+            {/* Value props - Compact for mobile */}
             <View style={styles.valueProps}>
-              {packageItem.valueProps.map((prop, propIndex) => (
+              {packageItem.valueProps.slice(0, isVerySmallScreen ? 2 : 3).map((prop, propIndex) => (
                 <View key={propIndex} style={styles.valueProp}>
-                  <CheckCircle size={12} color={colors.success} />
-                  <Text style={[styles.valuePropText, { color: colors.textSecondary }]}>{prop}</Text>
+                  <CheckCircle size={isVerySmallScreen ? 10 : 12} color={colors.success} />
+                  <Text style={[
+                    styles.valuePropText, 
+                    { 
+                      color: colors.textSecondary,
+                      fontSize: isVerySmallScreen ? 10 : 11
+                    }
+                  ]}>
+                    {prop}
+                  </Text>
                 </View>
               ))}
             </View>
 
-            {/* Social proof */}
+            {/* Social proof - Compact */}
             <View style={[styles.socialProof, { backgroundColor: colors.primary + '15' }]}>
-              <Users size={14} color={colors.primary} />
-              <Text style={[styles.socialProofText, { color: colors.primary }]}>
+              <Users size={isVerySmallScreen ? 10 : 12} color={colors.primary} />
+              <Text style={[
+                styles.socialProofText, 
+                { 
+                  color: colors.primary,
+                  fontSize: isVerySmallScreen ? 9 : 10
+                }
+              ]}>
                 {packageItem.socialProof}
               </Text>
             </View>
@@ -440,14 +536,24 @@ export default function BuyCoinsScreen() {
                 {isSelected && loading ? (
                   <View style={styles.loadingContainer}>
                     <RNAnimated.View style={styles.loadingSpinner}>
-                      <Coins size={20} color="white" />
+                      <Coins size={isVerySmallScreen ? 16 : 18} color="white" />
                     </RNAnimated.View>
-                    <Text style={styles.purchaseButtonText}>Processing...</Text>
+                    <Text style={[
+                      styles.purchaseButtonText,
+                      { fontSize: isVerySmallScreen ? 13 : 14 }
+                    ]}>
+                      Processing...
+                    </Text>
                   </View>
                 ) : (
                   <View style={styles.purchaseButtonContent}>
-                    <Zap size={18} color="white" />
-                    <Text style={styles.purchaseButtonText}>Get Coins Now</Text>
+                    <Zap size={isVerySmallScreen ? 14 : 16} color="white" />
+                    <Text style={[
+                      styles.purchaseButtonText,
+                      { fontSize: isVerySmallScreen ? 13 : 14 }
+                    ]}>
+                      Get Coins Now
+                    </Text>
                   </View>
                 )}
               </LinearGradient>
@@ -460,34 +566,54 @@ export default function BuyCoinsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Premium Header */}
+      {/* Compact Header for Mobile */}
       <LinearGradient
         colors={isDark 
           ? ['#1E293B', '#334155', '#475569'] 
           : ['#800080', '#9D4EDD', '#C77DFF']
         }
-        style={styles.header}
+        style={[styles.header, { paddingBottom: isVerySmallScreen ? 12 : 16 }]}
       >
         <Animated.View style={[styles.headerContent, headerAnimatedStyle]}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color="white" />
+            <ArrowLeft size={isVerySmallScreen ? 20 : 24} color="white" />
           </TouchableOpacity>
           
           <View style={styles.headerCenter}>
             <Animated.View style={pulseAnimatedStyle}>
-              <Coins size={32} color="#FFD700" />
+              <Coins size={isVerySmallScreen ? 24 : 28} color="#FFD700" />
             </Animated.View>
-            <Text style={styles.headerTitle}>Premium Coins</Text>
-            <Text style={styles.headerSubtitle}>Unlock Your Potential</Text>
+            <Text style={[
+              styles.headerTitle,
+              { fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24 }
+            ]}>
+              Premium Coins
+            </Text>
+            <Text style={[
+              styles.headerSubtitle,
+              { fontSize: isVerySmallScreen ? 11 : 12 }
+            ]}>
+              Unlock Your Potential
+            </Text>
           </View>
           
           <View style={styles.currentBalance}>
             <Animated.View style={floatingAnimatedStyle}>
-              <Text style={styles.balanceLabel}>Balance</Text>
-              <Text style={styles.balanceAmount}>🪙{profile?.coins?.toLocaleString() || '0'}</Text>
+              <Text style={[
+                styles.balanceLabel,
+                { fontSize: isVerySmallScreen ? 8 : 9 }
+              ]}>
+                Balance
+              </Text>
+              <Text style={[
+                styles.balanceAmount,
+                { fontSize: isVerySmallScreen ? 11 : 12 }
+              ]}>
+                🪙{profile?.coins?.toLocaleString() || '0'}
+              </Text>
             </Animated.View>
           </View>
         </Animated.View>
@@ -498,7 +624,7 @@ export default function BuyCoinsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Hero section */}
+        {/* Compact Hero section for mobile */}
         <View style={[styles.heroSection, { backgroundColor: colors.surface }]}>
           <LinearGradient
             colors={isDark 
@@ -508,25 +634,49 @@ export default function BuyCoinsScreen() {
             style={styles.heroGradient}
           >
             <View style={styles.heroContent}>
-              <Text style={[styles.heroTitle, { color: colors.text }]}>
+              <Text style={[
+                styles.heroTitle, 
+                { 
+                  color: colors.text,
+                  fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24
+                }
+              ]}>
                 🚀 Supercharge Your Growth
               </Text>
-              <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-                Join 50,000+ creators who've unlocked viral success with VidGro Premium
+              <Text style={[
+                styles.heroSubtitle, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 12 : 13
+                }
+              ]}>
+                Join 50,000+ creators who've unlocked viral success
               </Text>
               
-              {/* Live stats */}
+              {/* Compact live stats */}
               <View style={styles.liveStats}>
                 <View style={[styles.liveStat, { backgroundColor: colors.success + '20' }]}>
-                  <TrendingUp size={16} color={colors.success} />
-                  <Text style={[styles.liveStatText, { color: colors.success }]}>
+                  <TrendingUp size={isVerySmallScreen ? 12 : 14} color={colors.success} />
+                  <Text style={[
+                    styles.liveStatText, 
+                    { 
+                      color: colors.success,
+                      fontSize: isVerySmallScreen ? 9 : 10
+                    }
+                  ]}>
                     +2.3M views today
                   </Text>
                 </View>
                 <View style={[styles.liveStat, { backgroundColor: colors.primary + '20' }]}>
-                  <Users size={16} color={colors.primary} />
-                  <Text style={[styles.liveStatText, { color: colors.primary }]}>
-                    1,247 online now
+                  <Users size={isVerySmallScreen ? 12 : 14} color={colors.primary} />
+                  <Text style={[
+                    styles.liveStatText, 
+                    { 
+                      color: colors.primary,
+                      fontSize: isVerySmallScreen ? 9 : 10
+                    }
+                  ]}>
+                    1,247 online
                   </Text>
                 </View>
               </View>
@@ -534,9 +684,15 @@ export default function BuyCoinsScreen() {
           </LinearGradient>
         </View>
 
-        {/* Package grid */}
+        {/* Package grid - Optimized for mobile */}
         <View style={styles.packagesContainer}>
-          <Text style={[styles.packagesTitle, { color: colors.text }]}>
+          <Text style={[
+            styles.packagesTitle, 
+            { 
+              color: colors.text,
+              fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 22
+            }
+          ]}>
             💎 Choose Your Power Level
           </Text>
           
@@ -545,60 +701,154 @@ export default function BuyCoinsScreen() {
           </View>
         </View>
 
-        {/* Trust signals */}
+        {/* Compact Trust signals */}
         <View style={[styles.trustSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.trustTitle, { color: colors.text }]}>
-            🛡️ Premium Security & Guarantees
+          <Text style={[
+            styles.trustTitle, 
+            { 
+              color: colors.text,
+              fontSize: isVerySmallScreen ? 16 : 18
+            }
+          ]}>
+            🛡️ Security & Guarantees
           </Text>
           
           <View style={styles.trustSignals}>
             <View style={[styles.trustSignal, { backgroundColor: colors.success + '15' }]}>
-              <Shield size={24} color={colors.success} />
-              <Text style={[styles.trustSignalTitle, { color: colors.text }]}>Bank-Grade Security</Text>
-              <Text style={[styles.trustSignalText, { color: colors.textSecondary }]}>
-                256-bit SSL encryption
-              </Text>
+              <Shield size={isVerySmallScreen ? 18 : 20} color={colors.success} />
+              <View style={styles.trustContent}>
+                <Text style={[
+                  styles.trustSignalTitle, 
+                  { 
+                    color: colors.text,
+                    fontSize: isVerySmallScreen ? 12 : 13
+                  }
+                ]}>
+                  Bank-Grade Security
+                </Text>
+                <Text style={[
+                  styles.trustSignalText, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isVerySmallScreen ? 10 : 11
+                  }
+                ]}>
+                  256-bit SSL encryption
+                </Text>
+              </View>
             </View>
             
             <View style={[styles.trustSignal, { backgroundColor: colors.primary + '15' }]}>
-              <CheckCircle size={24} color={colors.primary} />
-              <Text style={[styles.trustSignalTitle, { color: colors.text }]}>Instant Delivery</Text>
-              <Text style={[styles.trustSignalText, { color: colors.textSecondary }]}>
-                Coins added immediately
-              </Text>
+              <CheckCircle size={isVerySmallScreen ? 18 : 20} color={colors.primary} />
+              <View style={styles.trustContent}>
+                <Text style={[
+                  styles.trustSignalTitle, 
+                  { 
+                    color: colors.text,
+                    fontSize: isVerySmallScreen ? 12 : 13
+                  }
+                ]}>
+                  Instant Delivery
+                </Text>
+                <Text style={[
+                  styles.trustSignalText, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isVerySmallScreen ? 10 : 11
+                  }
+                ]}>
+                  Coins added immediately
+                </Text>
+              </View>
             </View>
             
             <View style={[styles.trustSignal, { backgroundColor: colors.warning + '15' }]}>
-              <Star size={24} color={colors.warning} />
-              <Text style={[styles.trustSignalTitle, { color: colors.text }]}>30-Day Guarantee</Text>
-              <Text style={[styles.trustSignalText, { color: colors.textSecondary }]}>
-                Full refund if not satisfied
-              </Text>
+              <Star size={isVerySmallScreen ? 18 : 20} color={colors.warning} />
+              <View style={styles.trustContent}>
+                <Text style={[
+                  styles.trustSignalTitle, 
+                  { 
+                    color: colors.text,
+                    fontSize: isVerySmallScreen ? 12 : 13
+                  }
+                ]}>
+                  30-Day Guarantee
+                </Text>
+                <Text style={[
+                  styles.trustSignalText, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isVerySmallScreen ? 10 : 11
+                  }
+                ]}>
+                  Full refund if not satisfied
+                </Text>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Success stories */}
+        {/* Compact Success stories */}
         <View style={[styles.successSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.successTitle, { color: colors.text }]}>
+          <Text style={[
+            styles.successTitle, 
+            { 
+              color: colors.text,
+              fontSize: isVerySmallScreen ? 16 : 18
+            }
+          ]}>
             🌟 Creator Success Stories
           </Text>
           
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.successScroll}>
             {[
-              { name: 'Sarah K.', growth: '2.3M views', quote: 'VidGro took my channel from 1K to 100K subs!' },
-              { name: 'Mike R.', growth: '500K views', quote: 'Best investment I made for my content!' },
-              { name: 'Lisa M.', growth: '1.8M views', quote: 'Went viral in just 2 weeks with VidGro!' },
+              { name: 'Sarah K.', growth: '2.3M views', quote: 'VidGro took my channel from 1K to 100K!' },
+              { name: 'Mike R.', growth: '500K views', quote: 'Best investment for my content!' },
+              { name: 'Lisa M.', growth: '1.8M views', quote: 'Went viral in just 2 weeks!' },
             ].map((story, index) => (
-              <View key={index} style={[styles.successCard, { backgroundColor: colors.card }]}>
+              <View key={index} style={[
+                styles.successCard, 
+                { 
+                  backgroundColor: colors.card,
+                  width: isVerySmallScreen ? 160 : 180
+                }
+              ]}>
                 <View style={[styles.successAvatar, { backgroundColor: colors.primary + '20' }]}>
-                  <Text style={[styles.successAvatarText, { color: colors.primary }]}>
+                  <Text style={[
+                    styles.successAvatarText, 
+                    { 
+                      color: colors.primary,
+                      fontSize: isVerySmallScreen ? 16 : 18
+                    }
+                  ]}>
                     {story.name.charAt(0)}
                   </Text>
                 </View>
-                <Text style={[styles.successName, { color: colors.text }]}>{story.name}</Text>
-                <Text style={[styles.successGrowth, { color: colors.success }]}>{story.growth}</Text>
-                <Text style={[styles.successQuote, { color: colors.textSecondary }]}>
+                <Text style={[
+                  styles.successName, 
+                  { 
+                    color: colors.text,
+                    fontSize: isVerySmallScreen ? 12 : 13
+                  }
+                ]}>
+                  {story.name}
+                </Text>
+                <Text style={[
+                  styles.successGrowth, 
+                  { 
+                    color: colors.success,
+                    fontSize: isVerySmallScreen ? 10 : 11
+                  }
+                ]}>
+                  {story.growth}
+                </Text>
+                <Text style={[
+                  styles.successQuote, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isVerySmallScreen ? 9 : 10
+                  }
+                ]} numberOfLines={2}>
                   "{story.quote}"
                 </Text>
               </View>
@@ -606,32 +856,92 @@ export default function BuyCoinsScreen() {
           </ScrollView>
         </View>
 
-        {/* ROI Calculator */}
+        {/* Compact ROI Calculator */}
         <View style={[styles.roiSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.roiTitle, { color: colors.text }]}>
+          <Text style={[
+            styles.roiTitle, 
+            { 
+              color: colors.text,
+              fontSize: isVerySmallScreen ? 16 : 18
+            }
+          ]}>
             📊 Your ROI Potential
           </Text>
-          <Text style={[styles.roiSubtitle, { color: colors.textSecondary }]}>
-            See what other creators achieved with their investment
+          <Text style={[
+            styles.roiSubtitle, 
+            { 
+              color: colors.textSecondary,
+              fontSize: isVerySmallScreen ? 11 : 12
+            }
+          ]}>
+            See what other creators achieved
           </Text>
           
           <View style={styles.roiCards}>
             <View style={[styles.roiCard, { backgroundColor: colors.primary + '15' }]}>
-              <Text style={[styles.roiNumber, { color: colors.primary }]}>847%</Text>
-              <Text style={[styles.roiLabel, { color: colors.textSecondary }]}>Avg ROI</Text>
+              <Text style={[
+                styles.roiNumber, 
+                { 
+                  color: colors.primary,
+                  fontSize: isVerySmallScreen ? 18 : 20
+                }
+              ]}>
+                847%
+              </Text>
+              <Text style={[
+                styles.roiLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 10 : 11
+                }
+              ]}>
+                Avg ROI
+              </Text>
             </View>
             <View style={[styles.roiCard, { backgroundColor: colors.success + '15' }]}>
-              <Text style={[styles.roiNumber, { color: colors.success }]}>12.5K</Text>
-              <Text style={[styles.roiLabel, { color: colors.textSecondary }]}>Avg Views</Text>
+              <Text style={[
+                styles.roiNumber, 
+                { 
+                  color: colors.success,
+                  fontSize: isVerySmallScreen ? 18 : 20
+                }
+              ]}>
+                12.5K
+              </Text>
+              <Text style={[
+                styles.roiLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 10 : 11
+                }
+              ]}>
+                Avg Views
+              </Text>
             </View>
             <View style={[styles.roiCard, { backgroundColor: colors.warning + '15' }]}>
-              <Text style={[styles.roiNumber, { color: colors.warning }]}>3.2x</Text>
-              <Text style={[styles.roiLabel, { color: colors.textSecondary }]}>Growth Rate</Text>
+              <Text style={[
+                styles.roiNumber, 
+                { 
+                  color: colors.warning,
+                  fontSize: isVerySmallScreen ? 18 : 20
+                }
+              ]}>
+                3.2x
+              </Text>
+              <Text style={[
+                styles.roiLabel, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isVerySmallScreen ? 10 : 11
+                }
+              ]}>
+                Growth
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Final CTA */}
+        {/* Compact Final CTA */}
         <View style={[styles.finalCTA, { backgroundColor: colors.surface }]}>
           <LinearGradient
             colors={isDark 
@@ -640,27 +950,51 @@ export default function BuyCoinsScreen() {
             }
             style={styles.ctaGradient}
           >
-            <Text style={[styles.ctaTitle, { color: colors.text }]}>
+            <Text style={[
+              styles.ctaTitle, 
+              { 
+                color: colors.text,
+                fontSize: isVerySmallScreen ? 18 : 20
+              }
+            ]}>
               🎯 Ready to Go Viral?
             </Text>
-            <Text style={[styles.ctaSubtitle, { color: colors.textSecondary }]}>
-              Don't let your amazing content go unnoticed. Join the creators who are already winning.
+            <Text style={[
+              styles.ctaSubtitle, 
+              { 
+                color: colors.textSecondary,
+                fontSize: isVerySmallScreen ? 12 : 13
+              }
+            ]}>
+              Don't let your amazing content go unnoticed.
             </Text>
             
             <View style={styles.urgencyContainer}>
-              <Clock size={16} color={colors.warning} />
-              <Text style={[styles.urgencyText, { color: colors.warning }]}>
-                Limited time: Extra bonus coins on all packages!
+              <Clock size={isVerySmallScreen ? 12 : 14} color={colors.warning} />
+              <Text style={[
+                styles.urgencyText, 
+                { 
+                  color: colors.warning,
+                  fontSize: isVerySmallScreen ? 11 : 12
+                }
+              ]}>
+                Limited time: Extra bonus coins!
               </Text>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Security footer */}
+        {/* Compact Security footer */}
         <View style={[styles.securityFooter, { backgroundColor: colors.success + '10' }]}>
-          <Shield size={20} color={colors.success} />
-          <Text style={[styles.securityText, { color: colors.success }]}>
-            🔒 Secured by industry-leading encryption • Trusted by 50,000+ creators
+          <Shield size={isVerySmallScreen ? 16 : 18} color={colors.success} />
+          <Text style={[
+            styles.securityText, 
+            { 
+              color: colors.success,
+              fontSize: isVerySmallScreen ? 10 : 11
+            }
+          ]}>
+            🔒 Secured by encryption • Trusted by 50,000+ creators
           </Text>
         </View>
       </ScrollView>
@@ -668,7 +1002,6 @@ export default function BuyCoinsScreen() {
       {/* Confetti overlay */}
       {showConfetti && (
         <View style={styles.confettiOverlay}>
-          {/* Add confetti animation here */}
           <Text style={styles.confettiText}>🎉</Text>
         </View>
       )}
@@ -682,8 +1015,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: isVerySmallScreen ? 12 : 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -705,43 +1037,43 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    padding: 8,
+    padding: isVerySmallScreen ? 6 : 8,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 20,
+    marginHorizontal: isVerySmallScreen ? 8 : 12,
   },
   headerTitle: {
-    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
-    marginTop: 8,
+    marginTop: 4,
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
+    textAlign: 'center',
   },
   currentBalance: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: isVerySmallScreen ? 8 : 10,
+    paddingVertical: isVerySmallScreen ? 6 : 8,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: isVerySmallScreen ? 60 : 70,
   },
   balanceLabel: {
-    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
+    fontWeight: '500',
   },
   balanceAmount: {
-    fontSize: 14,
     fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',
@@ -753,76 +1085,74 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   heroSection: {
-    margin: 20,
-    borderRadius: 20,
+    margin: isVerySmallScreen ? 12 : 16,
+    borderRadius: isVerySmallScreen ? 16 : 20,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
       },
     }),
   },
   heroGradient: {
-    padding: 24,
+    padding: isVerySmallScreen ? 16 : 20,
   },
   heroContent: {
     alignItems: 'center',
   },
   heroTitle: {
-    fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
     letterSpacing: 0.5,
   },
   heroSubtitle: {
-    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
+    lineHeight: isVerySmallScreen ? 18 : 20,
+    marginBottom: isVerySmallScreen ? 12 : 16,
   },
   liveStats: {
     flexDirection: 'row',
-    gap: 16,
+    gap: isVerySmallScreen ? 8 : 12,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   liveStat: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
+    paddingHorizontal: isVerySmallScreen ? 8 : 10,
+    paddingVertical: isVerySmallScreen ? 4 : 6,
+    borderRadius: 12,
+    gap: 4,
   },
   liveStatText: {
-    fontSize: 12,
     fontWeight: '600',
   },
   packagesContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
+    paddingHorizontal: isVerySmallScreen ? 12 : 16,
+    marginBottom: isVerySmallScreen ? 20 : 24,
   },
   packagesTitle: {
-    fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: isVerySmallScreen ? 16 : 20,
     letterSpacing: 0.5,
   },
   packagesGrid: {
-    gap: 16,
+    gap: isVerySmallScreen ? 12 : 16,
   },
   packageCard: {
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: isVerySmallScreen ? 16 : 20,
+    padding: isVerySmallScreen ? 16 : 20,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 2,
@@ -830,47 +1160,47 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
   popularPackage: {
     borderColor: '#FFD700',
-    borderWidth: 3,
+    borderWidth: isVerySmallScreen ? 2 : 3,
     ...Platform.select({
       ios: {
         shadowColor: '#FFD700',
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.2,
       },
       android: {
-        elevation: 12,
+        elevation: 8,
       },
       web: {
-        boxShadow: '0 8px 32px rgba(255, 215, 0, 0.3)',
+        boxShadow: '0 4px 16px rgba(255, 215, 0, 0.2)',
       },
     }),
   },
   bestValuePackage: {
     borderColor: '#9D4EDD',
-    borderWidth: 3,
+    borderWidth: isVerySmallScreen ? 2 : 3,
     ...Platform.select({
       ios: {
         shadowColor: '#9D4EDD',
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.2,
       },
       android: {
-        elevation: 12,
+        elevation: 8,
       },
       web: {
-        boxShadow: '0 8px 32px rgba(157, 78, 221, 0.3)',
+        boxShadow: '0 4px 16px rgba(157, 78, 221, 0.2)',
       },
     }),
   },
@@ -891,14 +1221,14 @@ const styles = StyleSheet.create({
   },
   packageBadge: {
     position: 'absolute',
-    top: -8,
-    right: 20,
+    top: isVerySmallScreen ? -6 : -8,
+    right: isVerySmallScreen ? 12 : 16,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
+    paddingHorizontal: isVerySmallScreen ? 8 : 10,
+    paddingVertical: isVerySmallScreen ? 4 : 6,
+    borderRadius: 12,
+    gap: 3,
     zIndex: 2,
   },
   popularBadge: {
@@ -909,25 +1239,23 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: 'white',
-    fontSize: 11,
     fontWeight: 'bold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   limitedTimeBadge: {
     position: 'absolute',
-    top: 16,
-    left: 16,
+    top: isVerySmallScreen ? 12 : 16,
+    left: isVerySmallScreen ? 12 : 16,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingHorizontal: isVerySmallScreen ? 6 : 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
     zIndex: 2,
   },
   limitedTimeText: {
     color: 'white',
-    fontSize: 10,
     fontWeight: 'bold',
   },
   packageContent: {
@@ -935,114 +1263,103 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   coinAmount: {
-    fontSize: 36,
     fontWeight: 'bold',
     textAlign: 'center',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   coinLabel: {
-    fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
-    letterSpacing: 2,
-    marginBottom: 12,
+    letterSpacing: 1,
+    marginBottom: isVerySmallScreen ? 8 : 10,
   },
   bonusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 12,
-    gap: 6,
+    paddingHorizontal: isVerySmallScreen ? 8 : 10,
+    paddingVertical: isVerySmallScreen ? 4 : 6,
+    borderRadius: 12,
+    marginBottom: isVerySmallScreen ? 8 : 10,
+    gap: 4,
   },
   bonusText: {
-    fontSize: 12,
     fontWeight: 'bold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   totalContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: isVerySmallScreen ? 10 : 12,
   },
   totalLabel: {
-    fontSize: 12,
-    marginBottom: 4,
+    marginBottom: 3,
+    fontWeight: '500',
   },
   totalValue: {
-    fontSize: 24,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   valueContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: isVerySmallScreen ? 10 : 12,
   },
   costPerThousand: {
-    fontSize: 12,
-    marginBottom: 4,
+    marginBottom: 3,
+    fontWeight: '500',
   },
   savingsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   originalPrice: {
-    fontSize: 14,
     textDecorationLine: 'line-through',
   },
   savings: {
-    fontSize: 12,
     fontWeight: 'bold',
   },
   priceSection: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: isVerySmallScreen ? 10 : 12,
   },
   currency: {
-    fontSize: 18,
     marginRight: 2,
   },
   price: {
-    fontSize: 32,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   priceLabel: {
-    fontSize: 12,
-    marginLeft: 4,
+    marginLeft: 3,
   },
   valueProps: {
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 6,
+    marginBottom: isVerySmallScreen ? 8 : 10,
+    gap: isVerySmallScreen ? 4 : 6,
   },
   valueProp: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   valuePropText: {
-    fontSize: 12,
     fontWeight: '500',
   },
   socialProof: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginBottom: 16,
-    gap: 6,
+    paddingHorizontal: isVerySmallScreen ? 8 : 10,
+    paddingVertical: isVerySmallScreen ? 4 : 6,
+    borderRadius: 10,
+    marginBottom: isVerySmallScreen ? 12 : 16,
+    gap: 4,
   },
   socialProofText: {
-    fontSize: 11,
     fontWeight: '600',
   },
   purchaseButton: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
     width: '100%',
   },
@@ -1050,15 +1367,15 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#FFD700',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 4px 16px rgba(255, 215, 0, 0.4)',
+        boxShadow: '0 3px 12px rgba(255, 215, 0, 0.3)',
       },
     }),
   },
@@ -1066,275 +1383,263 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#9D4EDD',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 4px 16px rgba(157, 78, 221, 0.4)',
+        boxShadow: '0 3px 12px rgba(157, 78, 221, 0.3)',
       },
     }),
   },
   selectedPurchaseButton: {
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.02 }],
   },
   purchaseButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: isVerySmallScreen ? 12 : 14,
+    paddingHorizontal: isVerySmallScreen ? 16 : 20,
     alignItems: 'center',
   },
   purchaseButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   purchaseButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   loadingSpinner: {
     // Add rotation animation here if needed
   },
   trustSection: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 24,
+    margin: isVerySmallScreen ? 12 : 16,
+    borderRadius: isVerySmallScreen ? 16 : 20,
+    padding: isVerySmallScreen ? 16 : 20,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  trustTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  trustSignals: {
-    gap: 16,
-  },
-  trustSignal: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-  },
-  trustSignalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  trustSignalText: {
-    fontSize: 12,
-    flex: 1,
-  },
-  successSection: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  successTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  successScroll: {
-    marginHorizontal: -24,
-    paddingHorizontal: 24,
-  },
-  successCard: {
-    width: 200,
-    padding: 16,
-    borderRadius: 16,
-    marginRight: 16,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
+        shadowRadius: 6,
       },
       android: {
         elevation: 4,
       },
       web: {
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 3px 12px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  trustTitle: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: isVerySmallScreen ? 12 : 16,
+  },
+  trustSignals: {
+    gap: isVerySmallScreen ? 10 : 12,
+  },
+  trustSignal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: isVerySmallScreen ? 12 : 14,
+    borderRadius: 10,
+    gap: isVerySmallScreen ? 8 : 10,
+  },
+  trustContent: {
+    flex: 1,
+  },
+  trustSignalTitle: {
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  trustSignalText: {
+    lineHeight: isVerySmallScreen ? 14 : 16,
+  },
+  successSection: {
+    margin: isVerySmallScreen ? 12 : 16,
+    borderRadius: isVerySmallScreen ? 16 : 20,
+    padding: isVerySmallScreen ? 16 : 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 3px 12px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  successTitle: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: isVerySmallScreen ? 12 : 16,
+  },
+  successScroll: {
+    marginHorizontal: isVerySmallScreen ? -16 : -20,
+    paddingHorizontal: isVerySmallScreen ? 16 : 20,
+  },
+  successCard: {
+    padding: isVerySmallScreen ? 12 : 14,
+    borderRadius: 12,
+    marginRight: isVerySmallScreen ? 10 : 12,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
     }),
   },
   successAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: isVerySmallScreen ? 36 : 40,
+    height: isVerySmallScreen ? 36 : 40,
+    borderRadius: isVerySmallScreen ? 18 : 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: isVerySmallScreen ? 8 : 10,
   },
   successAvatarText: {
-    fontSize: 20,
     fontWeight: 'bold',
   },
   successName: {
-    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   successGrowth: {
-    fontSize: 12,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: isVerySmallScreen ? 6 : 8,
   },
   successQuote: {
-    fontSize: 11,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: isVerySmallScreen ? 12 : 14,
     fontStyle: 'italic',
   },
   roiSection: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 24,
+    margin: isVerySmallScreen ? 12 : 16,
+    borderRadius: isVerySmallScreen ? 16 : 20,
+    padding: isVerySmallScreen ? 16 : 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 3px 12px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  roiTitle: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  roiSubtitle: {
+    textAlign: 'center',
+    marginBottom: isVerySmallScreen ? 12 : 16,
+    lineHeight: isVerySmallScreen ? 16 : 18,
+  },
+  roiCards: {
+    flexDirection: 'row',
+    gap: isVerySmallScreen ? 8 : 10,
+  },
+  roiCard: {
+    flex: 1,
+    padding: isVerySmallScreen ? 12 : 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  roiNumber: {
+    fontWeight: 'bold',
+    marginBottom: 3,
+  },
+  roiLabel: {
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  finalCTA: {
+    margin: isVerySmallScreen ? 12 : 16,
+    borderRadius: isVerySmallScreen ? 16 : 20,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
       },
       android: {
         elevation: 6,
       },
       web: {
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  roiTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  roiSubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  roiCards: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  roiCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  roiNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  roiLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  finalCTA: {
-    margin: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
       },
     }),
   },
   ctaGradient: {
-    padding: 24,
+    padding: isVerySmallScreen ? 16 : 20,
     alignItems: 'center',
   },
   ctaTitle: {
-    fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   ctaSubtitle: {
-    fontSize: 16,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 16,
+    lineHeight: isVerySmallScreen ? 16 : 18,
+    marginBottom: isVerySmallScreen ? 10 : 12,
   },
   urgencyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   urgencyText: {
-    fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
   },
   securityFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 20,
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
+    margin: isVerySmallScreen ? 12 : 16,
+    padding: isVerySmallScreen ? 12 : 14,
+    borderRadius: 10,
+    gap: 6,
   },
   securityText: {
-    fontSize: 12,
     fontWeight: '500',
     textAlign: 'center',
     flex: 1,
+    lineHeight: isVerySmallScreen ? 14 : 16,
   },
   confettiOverlay: {
     position: 'absolute',
