@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, User, Mail, Edit3, Save, Camera, Lock, Eye, EyeOff, Shield } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, CreditCard as Edit3, Save, Camera, Lock, Eye, EyeOff, Shield } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
