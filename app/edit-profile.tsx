@@ -522,7 +522,7 @@ export default function EditProfileScreen() {
               📊 Account Information
             </Text>
 
-            <View style={[styles.infoGrid, isTinyScreen && styles.infoGridTiny]}>
+            <View style={styles.infoGrid}>
               <View style={[styles.infoCard, { backgroundColor: isDark ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 215, 0, 0.1)' }]}>
                 <View style={styles.infoCardHeader}>
                   <Coins size={isTinyScreen ? 14 : 16} color="#FFD700" />
@@ -843,18 +843,20 @@ const styles = StyleSheet.create({
 
   // Account Information Grid
   infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: isTinyScreen ? 'column' : 'row',
+    flexWrap: isTinyScreen ? 'nowrap' : 'wrap',
     gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
   },
-  infoGridTiny: {
-    flexDirection: 'column',
-    gap: 8,
-  },
   infoCard: {
-    width: isTinyScreen ? '100%' : isVerySmallScreen ? (screenWidth - 56) / 2 : (screenWidth - 64) / 2,
+    width: isTinyScreen 
+      ? '100%' 
+      : isVerySmallScreen 
+        ? '100%'
+        : (screenWidth - 64) / 2,
+    minHeight: isTinyScreen ? 70 : isVerySmallScreen ? 75 : 80,
     borderRadius: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
     padding: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    justifyContent: 'space-between',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -873,18 +875,19 @@ const styles = StyleSheet.create({
   infoCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: isTinyScreen ? 'flex-start' : 'center',
     gap: 4,
     marginBottom: isTinyScreen ? 4 : 6,
   },
   infoLabel: {
     fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
     fontWeight: '500',
-    textAlign: 'center',
+    textAlign: isTinyScreen ? 'left' : 'center',
   },
   infoValue: {
     fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
     fontWeight: 'bold',
-    textAlign: 'center',
+    textAlign: isTinyScreen ? 'left' : 'center',
+    lineHeight: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18,
   },
 });
