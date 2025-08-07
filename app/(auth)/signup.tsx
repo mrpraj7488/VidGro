@@ -75,7 +75,7 @@ export default function SignupScreen() {
 
   return (
     <LinearGradient
-      colors={isDark ? ['#0A0E1A', '#1E293B', '#4A90E2'] : ['#800080', '#FF4757']}
+      colors={isDark ? ['#2D1B69', '#11998E'] : ['#800080', '#FF4757']}
       style={styles.container}
     >
       <KeyboardAvoidingView 
