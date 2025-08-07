@@ -1,10 +1,24 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput, Dimensions, Platform } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Trash2, TriangleAlert as AlertTriangle, Shield } from 'lucide-react-native';
+import { ArrowLeft, Trash2, TriangleAlert as AlertTriangle, Shield, User, Mail, Coins, Calendar } from 'lucide-react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 380;
+const isVerySmallScreen = screenWidth < 350;
+const isTinyScreen = screenWidth < 320;
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function DeleteAccountScreen() {
   const { user, profile, signOut } = useAuth();
@@ -12,7 +26,18 @@ export default function DeleteAccountScreen() {
   const router = useRouter();
   const [confirmText, setConfirmText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1);
+
+  // Animation values
+  const buttonScale = useSharedValue(1);
+  const warningPulse = useSharedValue(1);
+
+  React.useEffect(() => {
+    // Start warning pulse animation
+    warningPulse.value = withSequence(
+      withSpring(1.02, { damping: 15, stiffness: 200 }),
+      withSpring(1, { damping: 15, stiffness: 200 })
+    );
+  }, []);
 
   const handleDeleteAccount = async () => {
     if (confirmText !== 'DELETE') {
@@ -20,13 +45,22 @@ export default function DeleteAccountScreen() {
       return;
     }
 
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    }
+
+    buttonScale.value = withSequence(
+      withSpring(0.95, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
     setLoading(true);
     
     Alert.alert(
-      'Final Confirmation',
-      'This action cannot be undone. Are you absolutely sure you want to delete your account?',
+      '⚠️ Final Confirmation',
+      'This action cannot be undone. Are you absolutely sure you want to delete your account permanently?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => setLoading(false) },
         { 
           text: 'Delete Forever', 
           style: 'destructive',
@@ -34,7 +68,7 @@ export default function DeleteAccountScreen() {
             // Simulate account deletion process
             setTimeout(async () => {
               Alert.alert(
-                'Account Deleted',
+                '✅ Account Deleted',
                 'Your account has been permanently deleted. Thank you for using VidGro.',
                 [{ text: 'OK', onPress: async () => {
                   await signOut();
@@ -46,132 +80,338 @@ export default function DeleteAccountScreen() {
         }
       ]
     );
-    
-    setLoading(false);
   };
 
-  const dataToDelete = [
-    'Your profile information and username',
-    'All promoted videos and their analytics',
-    'Coin transaction history',
-    'Video viewing history',
-    'VIP subscription status',
-    'Referral codes and bonuses',
-    'Support tickets and communications',
-    'All personal preferences and settings'
-  ];
+  const warningAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: warningPulse.value }],
+  }));
 
-  if (step === 1) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
-          <View style={styles.headerContent}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <ArrowLeft size={24} color="white" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Delete Account</Text>
-            <Trash2 size={24} color="white" />
-          </View>
-        </View>
-
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={[styles.warningContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.2)', borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : 'rgba(239, 68, 68, 0.4)' }]}>
-            <AlertTriangle size={48} color="#E74C3C" />
-            <Text style={[styles.warningTitle, { color: colors.error }]}>Account Deletion Warning</Text>
-            <Text style={[styles.warningText, { color: colors.error }]}>
-              Deleting your account is permanent and cannot be undone. Please consider the consequences carefully.
-            </Text>
-          </View>
-
-          <View style={[styles.section, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>What will be deleted:</Text>
-            {dataToDelete.map((item, index) => (
-              <View key={index} style={styles.deleteItem}>
-                <Text style={[styles.bullet, { color: colors.error }]}>•</Text>
-                <Text style={[styles.deleteText, { color: colors.textSecondary }]}>{item}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={[styles.alternativesSection, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.alternativesTitle, { color: colors.text }]}>Consider these alternatives:</Text>
-            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: isDark ? colors.card : colors.card }]}>
-              <Shield size={20} color="#2ECC71" />
-              <Text style={[styles.alternativeText, { color: colors.text }]}>Temporarily deactivate account</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: isDark ? colors.card : colors.card }]}>
-              <Shield size={20} color="#3498DB" />
-              <Text style={[styles.alternativeText, { color: colors.text }]}>Contact support for help</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.continueButton, { backgroundColor: colors.error }]}
-            onPress={() => setStep(2)}
-          >
-            <Text style={[styles.continueButtonText, { color: 'white' }]}>Continue with Deletion</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    );
-  }
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => setStep(1)}>
+          <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Confirm Deletion</Text>
+          <Text style={styles.headerTitle}>Delete Account</Text>
           <Trash2 size={24} color="white" />
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={[styles.confirmationContainer, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.confirmationTitle, { color: colors.text }]}>Final Step</Text>
-          <Text style={[styles.confirmationText, { color: colors.textSecondary }]}>
-            To confirm account deletion, please type "DELETE" in the box below:
-          </Text>
-
-          <TextInput
-            style={[styles.confirmInput, { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border }]}
-            placeholder="Type DELETE here"
-            placeholderTextColor={colors.textSecondary}
-            value={confirmText}
-            onChangeText={setConfirmText}
-            autoCapitalize="characters"
-          />
-
-          <View style={[styles.accountInfo, { backgroundColor: colors.warning + '20' }]}>
-            <Text style={[styles.accountInfoTitle, { color: colors.text }]}>Account to be deleted:</Text>
-            <Text style={[styles.accountInfoText, { color: colors.textSecondary }]}>Username: {profile?.username}</Text>
-            <Text style={[styles.accountInfoText, { color: colors.textSecondary }]}>Email: {profile?.email}</Text>
-            <Text style={[styles.accountInfoText, { color: colors.textSecondary }]}>Coins: {profile?.coins}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.deleteButton,
-              { backgroundColor: colors.error },
-              (loading || confirmText !== 'DELETE') && styles.buttonDisabled
-            ]}
-            onPress={handleDeleteAccount}
-            disabled={loading || confirmText !== 'DELETE'}
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Warning Section */}
+        <Animated.View style={[
+          styles.warningContainer, 
+          { 
+            backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
+            borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)'
+          },
+          warningAnimatedStyle
+        ]}>
+          <LinearGradient
+            colors={isDark ? ['rgba(239, 68, 68, 0.2)', 'rgba(239, 68, 68, 0.1)'] : ['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.05)']}
+            style={styles.warningGradient}
           >
-            <Trash2 size={20} color="white" />
-            <Text style={styles.deleteButtonText}>
-              {loading ? 'Deleting Account...' : 'Delete Account Forever'}
+            <View style={[styles.warningIcon, { backgroundColor: colors.error + '20' }]}>
+              <AlertTriangle size={isTinyScreen ? 32 : isVerySmallScreen ? 40 : 48} color={colors.error} />
+            </View>
+            <Text style={[
+              styles.warningTitle, 
+              { 
+                color: colors.error,
+                fontSize: isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24
+              }
+            ]}>
+              Permanent Deletion
             </Text>
-          </TouchableOpacity>
+            <Text style={[
+              styles.warningText, 
+              { 
+                color: colors.error,
+                fontSize: isTinyScreen ? 13 : isVerySmallScreen ? 14 : 16
+              }
+            ]}>
+              This action cannot be undone. All your data will be permanently deleted.
+            </Text>
+          </LinearGradient>
+        </Animated.View>
 
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => router.back()}
+        {/* Account Summary */}
+        <View style={[styles.accountSummary, { backgroundColor: colors.surface }]}>
+          <LinearGradient
+            colors={isDark ? ['rgba(74, 144, 226, 0.1)', 'rgba(74, 144, 226, 0.05)'] : ['rgba(128, 0, 128, 0.1)', 'rgba(128, 0, 128, 0.05)']}
+            style={styles.summaryGradient}
           >
-            <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Cancel - Keep My Account</Text>
-          </TouchableOpacity>
+            <Text style={[
+              styles.summaryTitle, 
+              { 
+                color: colors.text,
+                fontSize: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20
+              }
+            ]}>
+              📊 Account Summary
+            </Text>
+            
+            <View style={styles.summaryGrid}>
+              <View style={[styles.summaryCard, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.15)' : 'rgba(128, 0, 128, 0.15)' }]}>
+                <User size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.primary} />
+                <Text style={[
+                  styles.summaryLabel, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 12
+                  }
+                ]}>
+                  Username
+                </Text>
+                <Text style={[
+                  styles.summaryValue, 
+                  { 
+                    color: colors.text,
+                    fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 14
+                  }
+                ]} numberOfLines={1}>
+                  {profile?.username || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: isDark ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 215, 0, 0.15)' }]}>
+                <Coins size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color="#FFD700" />
+                <Text style={[
+                  styles.summaryLabel, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 12
+                  }
+                ]}>
+                  Coins
+                </Text>
+                <Text style={[
+                  styles.summaryValue, 
+                  { 
+                    color: '#FFD700',
+                    fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 14
+                  }
+                ]}>
+                  🪙{profile?.coins?.toLocaleString() || '0'}
+                </Text>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.15)' }]}>
+                <Mail size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.success} />
+                <Text style={[
+                  styles.summaryLabel, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 12
+                  }
+                ]}>
+                  Email
+                </Text>
+                <Text style={[
+                  styles.summaryValue, 
+                  { 
+                    color: colors.text,
+                    fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 14
+                  }
+                ]} numberOfLines={1}>
+                  {profile?.email || 'N/A'}
+                </Text>
+              </View>
+
+              <View style={[styles.summaryCard, { backgroundColor: isDark ? 'rgba(52, 152, 219, 0.15)' : 'rgba(52, 152, 219, 0.15)' }]}>
+                <Calendar size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color="#3498DB" />
+                <Text style={[
+                  styles.summaryLabel, 
+                  { 
+                    color: colors.textSecondary,
+                    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 12
+                  }
+                ]}>
+                  Member Since
+                </Text>
+                <Text style={[
+                  styles.summaryValue, 
+                  { 
+                    color: colors.text,
+                    fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 14
+                  }
+                ]}>
+                  {profile?.created_at 
+                    ? new Date(profile.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        year: 'numeric'
+                      })
+                    : 'Unknown'
+                  }
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* Confirmation Section */}
+        <View style={[styles.confirmationSection, { backgroundColor: colors.surface }]}>
+          <LinearGradient
+            colors={isDark ? ['rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.05)'] : ['rgba(239, 68, 68, 0.08)', 'rgba(239, 68, 68, 0.03)']}
+            style={styles.confirmationGradient}
+          >
+            <Text style={[
+              styles.confirmationTitle, 
+              { 
+                color: colors.text,
+                fontSize: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20
+              }
+            ]}>
+              🔐 Confirm Deletion
+            </Text>
+            
+            <Text style={[
+              styles.confirmationText, 
+              { 
+                color: colors.textSecondary,
+                fontSize: isTinyScreen ? 13 : isVerySmallScreen ? 14 : 16
+              }
+            ]}>
+              Type "DELETE" below to confirm permanent account deletion:
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[
+                  styles.confirmInput,
+                  { 
+                    backgroundColor: colors.inputBackground,
+                    color: colors.text,
+                    borderColor: confirmText === 'DELETE' ? colors.success : colors.border,
+                    fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18
+                  }
+                ]}
+                placeholder="Type DELETE here"
+                placeholderTextColor={colors.textSecondary}
+                value={confirmText}
+                onChangeText={setConfirmText}
+                autoCapitalize="characters"
+                textAlign="center"
+                maxLength={6}
+              />
+              {confirmText === 'DELETE' && (
+                <View style={[styles.confirmCheck, { backgroundColor: colors.success }]}>
+                  <Shield size={isTinyScreen ? 12 : 14} color="white" />
+                </View>
+              )}
+            </View>
+
+            <AnimatedTouchableOpacity
+              style={[
+                styles.deleteButton,
+                { backgroundColor: colors.error },
+                (loading || confirmText !== 'DELETE') && styles.buttonDisabled,
+                buttonAnimatedStyle
+              ]}
+              onPress={handleDeleteAccount}
+              disabled={loading || confirmText !== 'DELETE'}
+            >
+              <LinearGradient
+                colors={['#E74C3C', '#C0392B']}
+                style={styles.deleteButtonGradient}
+              >
+                <Trash2 size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color="white" />
+                <Text style={[
+                  styles.deleteButtonText,
+                  { fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 15 : 16 }
+                ]}>
+                  {loading ? 'Deleting Account...' : 'Delete Account Forever'}
+                </Text>
+              </LinearGradient>
+            </AnimatedTouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => router.back()}
+            >
+              <Text style={[
+                styles.cancelButtonText, 
+                { 
+                  color: colors.textSecondary,
+                  fontSize: isTinyScreen ? 13 : isVerySmallScreen ? 14 : 15
+                }
+              ]}>
+                Cancel - Keep My Account
+              </Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+
+        {/* Data Loss Information */}
+        <View style={[styles.dataLossSection, { backgroundColor: colors.warning + '15' }]}>
+          <View style={styles.dataLossHeader}>
+            <AlertTriangle size={isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24} color={colors.warning} />
+            <Text style={[
+              styles.dataLossTitle, 
+              { 
+                color: colors.warning,
+                fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18
+              }
+            ]}>
+              📋 What Will Be Lost
+            </Text>
+          </View>
+          
+          <View style={styles.dataLossGrid}>
+            {[
+              { icon: User, label: 'Profile & Username', color: colors.primary },
+              { icon: Coins, label: 'Coin Balance', color: '#FFD700' },
+              { icon: Shield, label: 'VIP Status', color: '#9B59B6' },
+              { icon: Calendar, label: 'Account History', color: colors.success }
+            ].map((item, index) => (
+              <View key={index} style={[styles.dataLossItem, { backgroundColor: colors.warning + '10' }]}>
+                <item.icon size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={item.color} />
+                <Text style={[
+                  styles.dataLossText, 
+                  { 
+                    color: colors.warning,
+                    fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 12
+                  }
+                ]}>
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Security Notice */}
+        <View style={[styles.securityNotice, { backgroundColor: colors.primary + '15' }]}>
+          <Shield size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.primary} />
+          <View style={styles.securityContent}>
+            <Text style={[
+              styles.securityTitle, 
+              { 
+                color: colors.primary,
+                fontSize: isTinyScreen ? 13 : isVerySmallScreen ? 14 : 16
+              }
+            ]}>
+              🔒 Secure Deletion Process
+            </Text>
+            <Text style={[
+              styles.securityText, 
+              { 
+                color: colors.primary,
+                fontSize: isTinyScreen ? 11 : isVerySmallScreen ? 12 : 14
+              }
+            ]}>
+              Your data will be securely deleted from all our servers within 30 days as per our privacy policy.
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -206,150 +446,317 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
   },
+  scrollContent: {
+    padding: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    paddingBottom: 40,
+  },
+
+  // Warning Section
   warningContainer: {
-    backgroundColor: '#FFEBEE',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 24,
+    borderRadius: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20,
+    marginBottom: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
     borderWidth: 2,
-    borderColor: '#FFCDD2',
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#E74C3C',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(231, 76, 60, 0.2)',
+      },
+    }),
+  },
+  warningGradient: {
+    alignItems: 'center',
+    padding: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
+  },
+  warningIcon: {
+    width: isTinyScreen ? 64 : isVerySmallScreen ? 72 : 80,
+    height: isTinyScreen ? 64 : isVerySmallScreen ? 72 : 80,
+    borderRadius: isTinyScreen ? 32 : isVerySmallScreen ? 36 : 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#E74C3C',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 3px 12px rgba(231, 76, 60, 0.3)',
+      },
+    }),
   },
   warningTitle: {
-    fontSize: 20,
     fontWeight: 'bold',
-    color: '#E74C3C',
-    marginTop: 16,
-    marginBottom: 8,
+    marginBottom: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   warningText: {
-    fontSize: 16,
-    color: '#C62828',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24,
+    fontWeight: '500',
   },
-  section: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+
+  // Account Summary
+  accountSummary: {
+    borderRadius: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20,
+    marginBottom: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
-  sectionTitle: {
-    fontSize: 18,
+  summaryGradient: {
+    padding: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+  },
+  summaryTitle: {
     fontWeight: 'bold',
-    marginBottom: 16,
+    textAlign: 'center',
+    marginBottom: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+    letterSpacing: 0.5,
   },
-  deleteItem: {
+  summaryGrid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
   },
-  bullet: {
-    fontSize: 16,
-    marginRight: 8,
-    marginTop: 2,
-  },
-  deleteText: {
-    fontSize: 14,
-    flex: 1,
-    lineHeight: 20,
-  },
-  alternativesSection: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-  },
-  alternativesTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  alternativeButton: {
-    flexDirection: 'row',
+  summaryCard: {
+    width: isTinyScreen 
+      ? (screenWidth - 48) / 2 
+      : isVerySmallScreen 
+        ? (screenWidth - 52) / 2
+        : (screenWidth - 56) / 2,
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 12,
+    padding: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
-  alternativeText: {
-    fontSize: 16,
+  summaryLabel: {
+    fontWeight: '600',
+    textAlign: 'center',
   },
-  continueButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    fontSize: 16,
+  summaryValue: {
     fontWeight: 'bold',
+    textAlign: 'center',
   },
-  confirmationContainer: {
-    borderRadius: 16,
-    padding: 24,
+
+  // Confirmation Section
+  confirmationSection: {
+    borderRadius: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20,
+    marginBottom: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  confirmationGradient: {
+    padding: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
     alignItems: 'center',
   },
   confirmationTitle: {
-    fontSize: 24,
-    color: '#333',
-    marginBottom: 16,
+    fontWeight: 'bold',
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   confirmationText: {
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
+    marginBottom: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+    lineHeight: isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24,
+    fontWeight: '500',
+  },
+  inputContainer: {
+    position: 'relative',
+    width: '100%',
+    marginBottom: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
   },
   confirmInput: {
     width: '100%',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
+    paddingHorizontal: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+    paddingVertical: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16,
     borderWidth: 2,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  accountInfo: {
-    width: '100%',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
-  },
-  accountInfoTitle: {
-    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
+    letterSpacing: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
-  accountInfoText: {
-    fontSize: 14,
-    marginBottom: 4,
+  confirmCheck: {
+    position: 'absolute',
+    right: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    top: '50%',
+    transform: [{ translateY: isTinyScreen ? -10 : isVerySmallScreen ? -11 : -12 }],
+    width: isTinyScreen ? 20 : isVerySmallScreen ? 22 : 24,
+    height: isTinyScreen ? 20 : isVerySmallScreen ? 22 : 24,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   deleteButton: {
+    width: '100%',
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
+    overflow: 'hidden',
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#E74C3C',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(231, 76, 60, 0.3)',
+      },
+    }),
+  },
+  deleteButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-    marginBottom: 16,
-    width: '100%',
+    paddingVertical: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18,
+    paddingHorizontal: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   deleteButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
+    paddingHorizontal: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
   },
   cancelButtonText: {
-    fontSize: 16,
     textAlign: 'center',
+    fontWeight: '600',
+  },
+
+  // Data Loss Section
+  dataLossSection: {
+    borderRadius: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20,
+    padding: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+    marginBottom: isTinyScreen ? 20 : isVerySmallScreen ? 24 : 28,
+  },
+  dataLossHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
+  },
+  dataLossTitle: {
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  dataLossGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+  },
+  dataLossItem: {
+    width: isTinyScreen 
+      ? (screenWidth - 48) / 2 
+      : isVerySmallScreen 
+        ? (screenWidth - 52) / 2
+        : (screenWidth - 56) / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    borderRadius: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
+  },
+  dataLossText: {
+    flex: 1,
+    fontWeight: '600',
+    lineHeight: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18,
+  },
+
+  // Security Notice
+  securityNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20,
+    padding: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+    gap: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
+  },
+  securityContent: {
+    flex: 1,
+  },
+  securityTitle: {
+    fontWeight: 'bold',
+    marginBottom: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    letterSpacing: 0.3,
+  },
+  securityText: {
+    lineHeight: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20,
+    fontWeight: '500',
   },
 });
