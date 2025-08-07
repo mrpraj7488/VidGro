@@ -123,7 +123,7 @@ export default function RateUsScreen() {
         <View style={[styles.benefitsSection, { backgroundColor: colors.surface }]}>
           <Text style={[styles.benefitsTitle, { color: colors.text }]}>Why rate us?</Text>
           <View style={styles.benefitItem}>
-            <View key={index} style={[styles.benefitItem, { borderBottomColor: isDark ? colors.border : colors.border }]}>
+            <ThumbsUp size={20} color="#3498DB" />
             <Text style={[styles.benefitText, { color: colors.textSecondary }]}>Earn 100 coins instantly</Text>
           </View>
           <View style={styles.benefitItem}>
@@ -138,10 +138,10 @@ export default function RateUsScreen() {
 
         <View style={[styles.storeLinksSection, { backgroundColor: colors.surface }]}>
           <Text style={[styles.storeLinksTitle, { color: colors.text }]}>Love VidGro? Rate us on:</Text>
-          <TouchableOpacity style={[styles.storeButton, { backgroundColor: isDark ? colors.card : colors.card, borderColor: isDark ? colors.border : colors.border }]}>
+          <TouchableOpacity style={[styles.storeButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.storeButtonText, { color: colors.text }]}>📱 App Store</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.storeButton, { backgroundColor: isDark ? colors.card : colors.card, borderColor: isDark ? colors.border : colors.border }]}>
+          <TouchableOpacity style={[styles.storeButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.storeButtonText, { color: colors.text }]}>🤖 Google Play</Text>
           </TouchableOpacity>
         </View>
@@ -313,7 +313,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
   storeButtonText: {
     fontSize: 16,
