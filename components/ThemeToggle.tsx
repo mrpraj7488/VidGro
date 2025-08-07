@@ -115,7 +115,7 @@ export default function ThemeToggle() {
         { rotate: `${rotation.value}deg` }
       ],
       backgroundColor,
-      ...Platform.select({
+      ...(Platform.select({
         ios: {
           shadowColor,
           shadowOpacity: glowOpacity.value * 0.8,
@@ -128,7 +128,7 @@ export default function ThemeToggle() {
         web: {
           boxShadow: `0 0 ${8 * glowOpacity.value}px ${shadowColor}`,
         },
-      }),
+      }) || {}),
     };
   });
 
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     top: 2,
     left: 2,
-    ...Platform.select({
+    ...(Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
@@ -204,6 +204,6 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
       },
-    }),
+    }) || {}),
   },
 });
