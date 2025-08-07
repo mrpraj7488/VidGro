@@ -99,7 +99,7 @@ export default function BalanceSystemMonitor() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
-      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.surface : colors.surface }]}>
         <Database size={24} color={colors.primary} />
         <Text style={[styles.title, { color: colors.text }]}>System Monitor</Text>
         <TouchableOpacity onPress={fetchMetrics} disabled={loading}>
@@ -108,21 +108,21 @@ export default function BalanceSystemMonitor() {
       </View>
 
       {/* System Overview */}
-      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+      <View style={[styles.section, { backgroundColor: isDark ? colors.surface : colors.surface }]}>
         <View style={styles.sectionHeader}>
           <BarChart3 size={20} color={colors.secondary} />
           <Text style={[styles.sectionTitle, { color: colors.text }]}>System Overview</Text>
         </View>
         
         <View style={styles.metricsGrid}>
-          <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.metricCard, { backgroundColor: isDark ? colors.card : colors.card }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Total Users</Text>
             <Text style={[styles.metricValue, { color: colors.text }]}>
               {metrics.total_users.toLocaleString()}
             </Text>
           </View>
           
-          <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.metricCard, { backgroundColor: isDark ? colors.card : colors.card }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Total Transactions</Text>
             <Text style={[styles.metricValue, { color: colors.text }]}>
               {metrics.total_transactions.toLocaleString()}
@@ -130,7 +130,7 @@ export default function BalanceSystemMonitor() {
           </View>
         </View>
 
-        <View style={[styles.performanceCard, { backgroundColor: colors.warning + '20' }]}>
+        <View style={[styles.performanceCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
           <Text style={[styles.performanceLabel, { color: colors.warning }]}>Avg Transactions/User</Text>
           <Text style={[styles.performanceValue, { color: colors.warning }]}>
             {metrics.avg_transactions_per_user.toFixed(1)}
@@ -139,21 +139,21 @@ export default function BalanceSystemMonitor() {
       </View>
 
       {/* Video Statistics */}
-      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+      <View style={[styles.section, { backgroundColor: isDark ? colors.surface : colors.surface }]}>
         <View style={styles.sectionHeader}>
           <TrendingUp size={20} color={colors.success} />
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Video Statistics</Text>
         </View>
         
         <View style={styles.metricsGrid}>
-          <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.metricCard, { backgroundColor: isDark ? colors.card : colors.card }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Total Videos</Text>
             <Text style={[styles.metricValue, { color: colors.text }]}>
               {metrics.total_videos.toLocaleString()}
             </Text>
           </View>
           
-          <View style={[styles.metricCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.metricCard, { backgroundColor: isDark ? colors.card : colors.card }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Active Videos</Text>
             <Text style={[styles.metricValue, { color: colors.text }]}>
               {metrics.active_videos.toLocaleString()}
@@ -161,7 +161,7 @@ export default function BalanceSystemMonitor() {
           </View>
         </View>
 
-        <View style={[styles.reductionCard, { backgroundColor: colors.success + '20' }]}>
+        <View style={[styles.reductionCard, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.2)' }]}>
           <Text style={[styles.reductionLabel, { color: colors.success }]}>Completed Videos</Text>
           <Text style={[styles.reductionValue, { color: colors.success }]}>
             {metrics.completed_videos.toLocaleString()}
@@ -170,7 +170,7 @@ export default function BalanceSystemMonitor() {
       </View>
 
       {/* System Features */}
-      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+      <View style={[styles.section, { backgroundColor: isDark ? colors.surface : colors.surface }]}>
         <View style={styles.sectionHeader}>
           <Zap size={20} color={colors.warning} />
           <Text style={[styles.sectionTitle, { color: colors.text }]}>System Features</Text>

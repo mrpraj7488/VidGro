@@ -434,7 +434,7 @@ export default function Analytics() {
                     </View>
 
                     <View style={styles.progressContainer}>
-                      <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+                      <View style={[styles.progressBar, { backgroundColor: isDark ? colors.border : colors.border }]}>
                         <View 
                           style={[
                             styles.progressFill, 
@@ -453,7 +453,7 @@ export default function Analytics() {
                         Spent: 🪙{video.coin_cost}
                       </Text>
                       {video.completed && (
-                        <Text style={styles.completedText}>
+                        <Text style={[styles.completedText, { color: colors.success }]}>
                           ✅ Target Reached!
                         </Text>
                       )}
@@ -514,7 +514,7 @@ export default function Analytics() {
                     </View>
                     <Text style={[
                       styles.activityAmount,
-                      { color: activity.amount > 0 ? '#2ECC71' : '#E74C3C' }
+                      { color: activity.amount > 0 ? colors.success : colors.error }
                     ]}>
                       {activity.amount > 0 ? '+' : ''}{activity.amount} 🪙
                     </Text>

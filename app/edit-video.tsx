@@ -605,7 +605,7 @@ export default function EditVideoScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={handleNavigateBack}>
             <ArrowLeft size={24} color="white" />
@@ -628,7 +628,7 @@ export default function EditVideoScreen() {
 
         {/* Pending Status Timeline */}
         {videoData.status === 'on_hold' && holdTimer > 0 && (
-          <View style={[styles.pendingCard, { backgroundColor: colors.warning + '20' }]}>
+          <View style={[styles.pendingCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
             <View style={styles.pendingHeader}>
               <Timer color="#F39C12" size={24} />
               <Text style={[styles.pendingTitle, { color: colors.warning }]}>Pending Status</Text>
@@ -770,7 +770,7 @@ export default function EditVideoScreen() {
                 </View>
 
                 {/* Cost Display */}
-                <View style={[styles.costDisplay, { backgroundColor: colors.primary + '20' }]}>
+                <View style={[styles.costDisplay, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)' }]}>
                   <Text style={[styles.costText, { color: colors.primary }]}>
                     Cost: 🪙{calculateCoinCost(selectedViews, selectedDuration)} | Reward: 🪙{calculateCoinReward(selectedDuration)} per view
                   </Text>

@@ -75,7 +75,7 @@ export default function MoreTab() {
               ]}
               onPress={() => handleItemPress(item)}
             >
-              <View style={[styles.menuItemIcon, { backgroundColor: colors.primary + '20' }]}>
+              <View style={[styles.menuItemIcon, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)' }]}>
                 <item.icon size={24} color={colors.accent} />
               </View>
               <Text style={[styles.menuItemTitle, { color: colors.text }]}>{item.title}</Text>

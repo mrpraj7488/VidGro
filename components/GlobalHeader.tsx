@@ -77,7 +77,6 @@ export default function GlobalHeader({
             <X size={24} color="white" />
           </TouchableOpacity>
         </View>
-        <View style={styles.themeToggleRow}>
         <View style={[styles.themeToggleRow, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.15)' : 'rgba(255, 255, 255, 0.1)' }]}>
           <Text style={styles.themeLabel}>Dark Mode</Text>
           <ThemeToggle />
@@ -103,7 +102,6 @@ export default function GlobalHeader({
 
   return (
     <>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
       <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <View style={styles.leftSection}>

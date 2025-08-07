@@ -63,7 +63,7 @@ However, no method of transmission over the internet is 100% secure.`
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
@@ -153,7 +153,7 @@ However, no method of transmission over the internet is 100% secure.`
           </Text>
         </View>
 
-        <View style={[styles.changesSection, { backgroundColor: colors.warning + '20', borderLeftColor: colors.warning }]}>
+        <View style={[styles.changesSection, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.2)', borderLeftColor: colors.warning }]}>
           <Text style={[styles.changesTitle, { color: colors.warning }]}>Changes to This Policy</Text>
           <Text style={[styles.changesText, { color: colors.warning }]}>
             We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically for any changes.

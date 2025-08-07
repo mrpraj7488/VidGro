@@ -45,7 +45,7 @@ function ContactSupportScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
@@ -123,18 +123,20 @@ function ContactSupportScreen() {
         </TouchableOpacity>
 
         <View style={styles.contactInfo}>
-          <Text style={styles.contactTitle}>Other Ways to Reach Us</Text>
+          <View style={[styles.contactInfoContainer, { backgroundColor: isDark ? colors.surface : '#F8F9FA' }]}>
+          <Text style={[styles.contactTitle, { color: colors.text }]}>Other Ways to Reach Us</Text>
           <View style={styles.contactItem}>
-            <Mail size={20} color="#800080" />
-            <Text style={styles.contactText}>support@vidgro.com</Text>
+            <Mail size={20} color={isDark ? colors.primary : "#800080"} />
+            <Text style={[styles.contactText, { color: colors.textSecondary }]}>support@vidgro.com</Text>
           </View>
           <View style={styles.contactItem}>
-            <Phone size={20} color="#800080" />
-            <Text style={styles.contactText}>+1 (555) 123-4567</Text>
+            <Phone size={20} color={isDark ? colors.primary : "#800080"} />
+            <Text style={[styles.contactText, { color: colors.textSecondary }]}>+1 (555) 123-4567</Text>
           </View>
-          <Text style={styles.responseTime}>
+          <Text style={[styles.responseTime, { color: colors.textSecondary }]}>
             Average response time: 2-4 hours
           </Text>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -238,7 +240,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   contactInfo: {
-    backgroundColor: '#F8F9FA',
+  },
+  contactInfoContainer: {
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
@@ -246,7 +249,6 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333333',
     marginBottom: 16,
   },
   contactItem: {
@@ -257,11 +259,9 @@ const styles = StyleSheet.create({
   },
   contactText: {
     fontSize: 16,
-    color: '#666666',
   },
   responseTime: {
     fontSize: 14,
-    color: '#666666',
     marginTop: 16,
     textAlign: 'center',
   },

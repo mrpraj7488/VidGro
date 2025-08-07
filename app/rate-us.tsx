@@ -123,7 +123,7 @@ export default function RateUsScreen() {
         <View style={[styles.benefitsSection, { backgroundColor: colors.surface }]}>
           <Text style={[styles.benefitsTitle, { color: colors.text }]}>Why rate us?</Text>
           <View style={styles.benefitItem}>
-            <ThumbsUp size={20} color="#2ECC71" />
+            <View key={index} style={[styles.benefitItem, { borderBottomColor: isDark ? colors.border : colors.border }]}>
             <Text style={[styles.benefitText, { color: colors.textSecondary }]}>Earn 100 coins instantly</Text>
           </View>
           <View style={styles.benefitItem}>
@@ -138,15 +138,15 @@ export default function RateUsScreen() {
 
         <View style={[styles.storeLinksSection, { backgroundColor: colors.surface }]}>
           <Text style={[styles.storeLinksTitle, { color: colors.text }]}>Love VidGro? Rate us on:</Text>
-          <TouchableOpacity style={[styles.storeButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity style={[styles.storeButton, { backgroundColor: isDark ? colors.card : colors.card, borderColor: isDark ? colors.border : colors.border }]}>
             <Text style={[styles.storeButtonText, { color: colors.text }]}>📱 App Store</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.storeButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity style={[styles.storeButton, { backgroundColor: isDark ? colors.card : colors.card, borderColor: isDark ? colors.border : colors.border }]}>
             <Text style={[styles.storeButtonText, { color: colors.text }]}>🤖 Google Play</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.thankYouSection, { backgroundColor: colors.primary + '20', borderLeftColor: colors.primary }]}>
+        <View style={[styles.thankYouSection, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)', borderLeftColor: colors.primary }]}>
           <Text style={[styles.thankYouText, { color: colors.primary }]}>
             Thank you for being part of the VidGro community! Your support means everything to us. 💜
           </Text>

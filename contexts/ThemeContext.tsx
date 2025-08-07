@@ -55,7 +55,7 @@ const lightColors: ThemeColors = {
 const darkColors: ThemeColors = {
   background: '#0A0E1A',
   surface: '#1A1F2E',
-  card: '#252B3D',
+  card: '#1A1F2E',
   text: '#FFFFFF',
   textSecondary: '#B8C5D6',
   border: '#2D3748',
@@ -67,8 +67,8 @@ const darkColors: ThemeColors = {
   error: '#EF4444',
   overlay: 'rgba(10, 14, 26, 0.8)',
   headerBackground: '#1E293B',
-  tabBarBackground: '#0F172A',
-  inputBackground: '#1E293B',
+  tabBarBackground: '#0A0E1A',
+  inputBackground: '#1A1F2E',
   shadowColor: '#000000',
 };
 

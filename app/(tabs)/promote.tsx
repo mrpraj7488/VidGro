@@ -309,26 +309,26 @@ export default function PromoteTab() {
             )}
             {vipDiscount > 0 && (
               <View style={styles.costRow}>
-                <Text style={styles.costLabel}>👑 VIP Discount (10%):</Text>
-                <Text style={styles.vipDiscountValue}>-🪙{vipDiscount}</Text>
+                <Text style={[styles.costLabel, { color: colors.textSecondary }]}>👑 VIP Discount (10%):</Text>
+                <Text style={[styles.vipDiscountValue, { color: colors.success }]}>-🪙{vipDiscount}</Text>
               </View>
             )}
             <View style={styles.costRow}>
-              <Text style={styles.costLabel}>Final Cost:</Text>
-              <Text style={styles.costValue}>🪙{cost}</Text>
+              <Text style={[styles.costLabel, { color: colors.textSecondary }]}>Final Cost:</Text>
+              <Text style={[styles.costValue, { color: colors.text }]}>🪙{cost}</Text>
             </View>
             {profile?.is_vip && (
-              <View style={styles.vipDiscount}>
-                <Text style={styles.vipDiscountText}>👑 VIP 10% Discount Applied</Text>
+              <View style={[styles.vipDiscount, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FFF8E1' }]}>
+                <Text style={[styles.vipDiscountText, { color: isDark ? colors.warning : '#F57C00' }]}>👑 VIP 10% Discount Applied</Text>
               </View>
             )}
             {!profile?.is_vip && (
               <TouchableOpacity 
-                style={styles.vipUpgrade}
+                style={[styles.vipUpgrade, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FFF8E1' }]}
                 onPress={() => router.push('/become-vip')}
               >
                 <Crown size={16} color="#FFD700" />
-                <Text style={styles.vipUpgradeText}>
+                <Text style={[styles.vipUpgradeText, { color: isDark ? colors.warning : '#F57C00' }]}>
                   Upgrade to VIP and save 🪙{Math.ceil((targetViews * videoDuration) / 50 * 8 * 0.1)} on this promotion
                 </Text>
               </TouchableOpacity>

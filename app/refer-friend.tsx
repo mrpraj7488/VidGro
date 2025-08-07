@@ -66,9 +66,9 @@ function ReferFriendScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity style={[styles.copyButton, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)' }]} onPress={handleCopyLink}>
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Refer Friends</Text>
@@ -89,7 +89,7 @@ function ReferFriendScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Referral Benefits</Text>
           {benefits.map((benefit, index) => (
             <View key={index} style={[styles.benefitCard, { backgroundColor: colors.surface }]}>
-              <View style={[styles.benefitIcon, { backgroundColor: `${benefit.color}20` }]}>
+              <View style={[styles.benefitIcon, { backgroundColor: isDark ? `rgba(${benefit.color === '#FFD700' ? '255, 215, 0' : benefit.color === '#2ECC71' ? '46, 204, 113' : '52, 152, 219'}, 0.2)` : `${benefit.color}20` }]}>
                 <benefit.icon size={24} color={benefit.color} />
               </View>
               <View style={styles.benefitContent}>

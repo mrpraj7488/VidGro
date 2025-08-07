@@ -64,7 +64,7 @@ export default function DeleteAccountScreen() {
   if (step === 1) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: '#800080' }]}>
+        <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()}>
               <ArrowLeft size={24} color="white" />
@@ -75,7 +75,7 @@ export default function DeleteAccountScreen() {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={[styles.warningContainer, { backgroundColor: colors.error + '20', borderColor: colors.error + '40' }]}>
+          <View style={[styles.warningContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.2)', borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : 'rgba(239, 68, 68, 0.4)' }]}>
             <AlertTriangle size={48} color="#E74C3C" />
             <Text style={[styles.warningTitle, { color: colors.error }]}>Account Deletion Warning</Text>
             <Text style={[styles.warningText, { color: colors.error }]}>
@@ -95,11 +95,11 @@ export default function DeleteAccountScreen() {
 
           <View style={[styles.alternativesSection, { backgroundColor: colors.surface }]}>
             <Text style={[styles.alternativesTitle, { color: colors.text }]}>Consider these alternatives:</Text>
-            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: colors.card }]}>
+            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: isDark ? colors.card : colors.card }]}>
               <Shield size={20} color="#2ECC71" />
               <Text style={[styles.alternativeText, { color: colors.text }]}>Temporarily deactivate account</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: colors.card }]}>
+            <TouchableOpacity style={[styles.alternativeButton, { backgroundColor: isDark ? colors.card : colors.card }]}>
               <Shield size={20} color="#3498DB" />
               <Text style={[styles.alternativeText, { color: colors.text }]}>Contact support for help</Text>
             </TouchableOpacity>
@@ -118,7 +118,7 @@ export default function DeleteAccountScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => setStep(1)}>
             <ArrowLeft size={24} color="white" />

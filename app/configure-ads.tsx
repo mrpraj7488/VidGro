@@ -55,7 +55,7 @@ export default function ConfigureAdsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
@@ -68,7 +68,7 @@ export default function ConfigureAdsScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {isAdFreeActive ? (
           <View style={[styles.activeContainer, { backgroundColor: colors.surface }]}>
-            <View style={[styles.activeIcon, { backgroundColor: colors.success + '20' }]}>
+            <View style={[styles.activeIcon, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.2)' }]}>
               <ShieldOff size={48} color="#2ECC71" />
             </View>
             <Text style={[styles.activeTitle, { color: colors.text }]}>Ad-Free Active</Text>
@@ -95,7 +95,7 @@ export default function ConfigureAdsScreen() {
                 >
                   <View style={styles.optionHeader}>
                     <Text style={[styles.optionHours, { color: colors.text }]}>{option.hours} Hours</Text>
-                    <View style={[styles.adCount, { backgroundColor: colors.primary + '20' }]}>
+                    <View style={[styles.adCount, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)' }]}>
                       <Play size={16} color={colors.primary} />
                       <Text style={[styles.adCountText, { color: colors.primary }]}>{option.watchAds} ads</Text>
                     </View>

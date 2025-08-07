@@ -641,16 +641,16 @@ export default function VideoPreview({ youtubeUrl, onValidation, onTitleDetected
   return (
     <View style={styles.container}>
       {error && (
-        <View style={[styles.errorContainer, { backgroundColor: colors.error + '20' }]}>
+        <View style={[styles.errorContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]}>
           <AlertCircle size={20} color={colors.error} />
           <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
         </View>
       )}
 
       {videoData && (
-        <View style={[styles.previewContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.previewContainer, { backgroundColor: isDark ? colors.surface : colors.surface }]}>
           <View style={styles.thumbnailContainer}>
-            <Image source={{ uri: videoData.thumbnail }} style={[styles.thumbnail, { backgroundColor: colors.card }]} />
+            <Image source={{ uri: videoData.thumbnail }} style={[styles.thumbnail, { backgroundColor: isDark ? colors.card : colors.card }]} />
             {showIframe && (
               <View style={styles.webViewContainer}>
                 <WebView
@@ -683,18 +683,18 @@ export default function VideoPreview({ youtubeUrl, onValidation, onTitleDetected
             <View style={styles.statusRow}>
               {embedabilityTested ? (
                 videoData.embeddable ? (
-                  <View style={[styles.statusBadge, { backgroundColor: colors.success + '20' }]}>
+                  <View style={[styles.statusBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.2)' }]}>
                     <CheckCircle size={16} color="#2ECC71" />
                     <Text style={[styles.statusText, { color: colors.success }]}>Ready for promotion</Text>
                   </View>
                 ) : (
-                  <View style={[styles.statusBadge, { backgroundColor: colors.error + '20' }]}>
+                  <View style={[styles.statusBadge, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.2)' }]}>
                     <AlertCircle size={16} color="#E74C3C" />
                     <Text style={[styles.statusText, { color: colors.error }]}>Not embeddable</Text>
                   </View>
                 )
               ) : (
-                <View style={[styles.statusBadge, { backgroundColor: colors.warning + '20' }]}>
+                <View style={[styles.statusBadge, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
                   <Clock size={16} color="#F39C12" />
                   <Text style={[styles.statusText, { color: colors.warning }]}>Testing...</Text>
                 </View>

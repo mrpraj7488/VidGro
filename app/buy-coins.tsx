@@ -56,7 +56,7 @@ export default function BuyCoinsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: '#800080' }]}>
+      <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
@@ -130,7 +130,7 @@ export default function BuyCoinsScreen() {
           </Text>
         </View>
 
-        <View style={[styles.securityContainer, { backgroundColor: colors.success + '20' }]}>
+        <View style={[styles.securityContainer, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.2)' }]}>
           <Text style={[styles.securityTitle, { color: colors.success }]}>🔒 Secure Payment</Text>
           <Text style={[styles.securityText, { color: colors.success }]}>
             Your payment information is protected with bank-level security
