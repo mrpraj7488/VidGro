@@ -3,20 +3,33 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Dimensions
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
-import { DollarSign, Crown, ShieldOff, Star, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, User, X, Bug, Gift, Play, Clock, Coins } from 'lucide-react-native';
+import { DollarSign, Crown, ShieldOff, Star, Bug, Gift, Play, Clock, Coins, Sparkles, Zap } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withRepeat,
+  withTiming,
+  withSequence,
+  interpolate,
+  Easing,
+} from 'react-native-reanimated';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 380;
 const isVerySmallScreen = screenWidth < 350;
 const isTablet = screenWidth >= 768;
 
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
 export default function MoreTab() {
-  const { user, profile, signOut, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -24,13 +37,60 @@ export default function MoreTab() {
   const [timeRemaining, setTimeRemaining] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Animation values for free coins card
+  const shimmerAnimation = useSharedValue(0);
+  const pulseAnimation = useSharedValue(1);
+  const sparkleRotation = useSharedValue(0);
+  const coinBounce = useSharedValue(1);
+  const glowOpacity = useSharedValue(0);
+
   useEffect(() => {
     checkFreeCoinsAvailability();
     
     // Update timer every minute
     const interval = setInterval(checkFreeCoinsAvailability, 60000);
+    
+    // Start animations
+    startAnimations();
+    
     return () => clearInterval(interval);
   }, []);
+
+  const startAnimations = () => {
+    // Shimmer effect
+    shimmerAnimation.value = withRepeat(
+      withTiming(1, { duration: 2500, easing: Easing.linear }),
+      -1,
+      false
+    );
+
+    // Pulse animation
+    pulseAnimation.value = withRepeat(
+      withSequence(
+        withTiming(1.02, { duration: 2000, easing: Easing.bezier(0.4, 0, 0.2, 1) }),
+        withTiming(1, { duration: 2000, easing: Easing.bezier(0.4, 0, 0.2, 1) })
+      ),
+      -1,
+      true
+    );
+
+    // Sparkle rotation
+    sparkleRotation.value = withRepeat(
+      withTiming(360, { duration: 4000, easing: Easing.linear }),
+      -1,
+      false
+    );
+
+    // Glow effect
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.8, { duration: 1500 }),
+        withTiming(0.3, { duration: 1500 })
+      ),
+      -1,
+      true
+    );
+  };
 
   const checkFreeCoinsAvailability = async () => {
     try {
@@ -68,10 +128,16 @@ export default function MoreTab() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
+    // Animate coin bounce
+    coinBounce.value = withSequence(
+      withSpring(1.2, { damping: 15, stiffness: 400 }),
+      withSpring(0.9, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
     setLoading(true);
 
     try {
-      // Simulate AdMob rewarded ad
       Alert.alert(
         '🎬 Watch Ad for Free Coins',
         'Watch a 30-second ad to earn 100 free coins. Continue?',
@@ -158,34 +224,39 @@ export default function MoreTab() {
     { icon: Bug, title: 'Report Problem', subtitle: 'Technical Issues', route: '/report-problem' },
   ];
 
-  const sideMenuItems = [
-    { icon: Share2, title: 'Refer a Friend', route: '/refer-friend' },
-    { icon: Shield, title: 'Privacy Policy', route: '/privacy-policy' },
-    { icon: FileText, title: 'Terms of Service', route: '/terms' },
-    { icon: Globe, title: 'Languages', route: '/languages' },
-    { icon: Settings, title: 'Configure Ads', route: '/configure-ads' },
-    { icon: MessageCircle, title: 'Contact Support', route: '/contact-support' },
-    { icon: LogOut, title: 'Log Out', action: 'logout', color: '#E74C3C' },
-    { icon: Trash2, title: 'Delete Account', route: '/delete-account', color: '#E74C3C' },
-  ];
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    
-    router.replace('/(auth)/login');
-  };
-
   const handleItemPress = (item: any) => {
-    if (item.action === 'logout') {
-      handleLogout();
-    } else if (item.route) {
+    if (item.route) {
       router.push(item.route);
     }
   };
+
+  // Animated styles
+  const shimmerAnimatedStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(
+      shimmerAnimation.value,
+      [0, 1],
+      [-screenWidth, screenWidth]
+    );
+    return {
+      transform: [{ translateX }],
+    };
+  });
+
+  const pulseAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnimation.value }],
+  }));
+
+  const sparkleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${sparkleRotation.value}deg` }],
+  }));
+
+  const coinBounceStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: coinBounce.value }],
+  }));
+
+  const glowAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -201,6 +272,172 @@ export default function MoreTab() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
       >
+        {/* Enhanced Free Coins Section */}
+        <View style={[styles.freeCoinsSection, isTablet && styles.freeCoinsSectionTablet]}>
+          <Text style={[
+            styles.freeCoinsSectionTitle, 
+            { 
+              color: colors.text,
+              fontSize: isVerySmallScreen ? 20 : 22
+            }
+          ]}>
+            🎁 Free Coins Available
+          </Text>
+          
+          <AnimatedTouchableOpacity
+            style={[
+              styles.freeCoinsCard,
+              { 
+                backgroundColor: colors.surface,
+                shadowColor: colors.shadowColor,
+                borderColor: freeCoinsAvailable ? colors.success : colors.border,
+                opacity: freeCoinsAvailable ? 1 : 0.8
+              },
+              !freeCoinsAvailable && styles.freeCoinsCardDisabled,
+              isTablet && styles.freeCoinsCardTablet,
+              pulseAnimatedStyle
+            ]}
+            onPress={handleFreeCoinsClick}
+            disabled={!freeCoinsAvailable || loading}
+            activeOpacity={0.9}
+          >
+            {/* Shimmer effect for available state */}
+            {freeCoinsAvailable && (
+              <Animated.View style={[styles.shimmerOverlay, shimmerAnimatedStyle]}>
+                <LinearGradient
+                  colors={['transparent', 'rgba(255, 215, 0, 0.4)', 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.shimmerGradient}
+                />
+              </Animated.View>
+            )}
+
+            {/* Glow effect */}
+            {freeCoinsAvailable && (
+              <Animated.View style={[styles.glowEffect, glowAnimatedStyle]} />
+            )}
+
+            <LinearGradient
+              colors={
+                freeCoinsAvailable
+                  ? isDark 
+                    ? ['rgba(16, 185, 129, 0.25)', 'rgba(16, 185, 129, 0.1)', 'rgba(255, 215, 0, 0.15)']
+                    : ['rgba(16, 185, 129, 0.2)', 'rgba(16, 185, 129, 0.1)', 'rgba(255, 215, 0, 0.2)']
+                  : isDark
+                    ? ['rgba(107, 114, 128, 0.15)', 'rgba(107, 114, 128, 0.05)']
+                    : ['rgba(156, 163, 175, 0.15)', 'rgba(156, 163, 175, 0.05)']
+              }
+              style={styles.freeCoinsGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.freeCoinsHeader}>
+                <View style={[
+                  styles.freeCoinsIcon,
+                  { 
+                    backgroundColor: freeCoinsAvailable 
+                      ? (isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.25)')
+                      : (isDark ? 'rgba(107, 114, 128, 0.2)' : 'rgba(156, 163, 175, 0.2)')
+                  }
+                ]}>
+                  {freeCoinsAvailable ? (
+                    <View style={styles.iconContainer}>
+                      <Gift size={isVerySmallScreen ? 28 : 32} color={colors.success} />
+                      <Animated.View style={[styles.sparkleIcon, sparkleAnimatedStyle]}>
+                        <Sparkles size={isVerySmallScreen ? 12 : 14} color="#FFD700" />
+                      </Animated.View>
+                    </View>
+                  ) : (
+                    <Clock size={isVerySmallScreen ? 28 : 32} color={colors.textSecondary} />
+                  )}
+                </View>
+                
+                <View style={styles.freeCoinsContent}>
+                  <Text style={[
+                    styles.freeCoinsTitle,
+                    { 
+                      color: freeCoinsAvailable ? colors.text : colors.textSecondary,
+                      fontSize: isVerySmallScreen ? 18 : 20
+                    }
+                  ]}>
+                    {freeCoinsAvailable ? '🎬 Watch & Earn' : '⏰ Cooldown Active'}
+                  </Text>
+                  <Text style={[
+                    styles.freeCoinsSubtitle,
+                    { 
+                      color: freeCoinsAvailable ? colors.textSecondary : colors.textSecondary,
+                      fontSize: isVerySmallScreen ? 13 : 15
+                    }
+                  ]}>
+                    {freeCoinsAvailable 
+                      ? '30-second ad = 100 coins' 
+                      : `Next reward in ${timeRemaining}`
+                    }
+                  </Text>
+                </View>
+
+                <Animated.View style={[styles.freeCoinsReward, coinBounceStyle]}>
+                  <View style={[
+                    styles.coinsBadge,
+                    { 
+                      backgroundColor: freeCoinsAvailable 
+                        ? (isDark ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 215, 0, 0.2)')
+                        : (isDark ? 'rgba(107, 114, 128, 0.2)' : 'rgba(156, 163, 175, 0.15)')
+                    }
+                  ]}>
+                    <Coins size={isVerySmallScreen ? 16 : 18} color={freeCoinsAvailable ? '#FFD700' : colors.textSecondary} />
+                    <Text style={[
+                      styles.coinsAmount,
+                      { 
+                        color: freeCoinsAvailable ? '#FFD700' : colors.textSecondary,
+                        fontSize: isVerySmallScreen ? 16 : 18
+                      }
+                    ]}>
+                      100
+                    </Text>
+                  </View>
+                </Animated.View>
+              </View>
+
+              {freeCoinsAvailable && (
+                <View style={styles.freeCoinsAction}>
+                  <View style={[styles.adPreview, { backgroundColor: colors.primary + '20' }]}>
+                    <Play size={isVerySmallScreen ? 14 : 16} color={colors.primary} />
+                    <Text style={[
+                      styles.adPreviewText,
+                      { 
+                        color: colors.primary,
+                        fontSize: isVerySmallScreen ? 12 : 14
+                      }
+                    ]}>
+                      {loading ? 'Loading Ad...' : 'Tap to watch 30s ad'}
+                    </Text>
+                    <Zap size={isVerySmallScreen ? 12 : 14} color={colors.primary} />
+                  </View>
+                </View>
+              )}
+
+              {!freeCoinsAvailable && timeRemaining && (
+                <View style={styles.cooldownInfo}>
+                  <View style={[styles.cooldownBadge, { backgroundColor: colors.warning + '20' }]}>
+                    <Clock size={isVerySmallScreen ? 14 : 16} color={colors.warning} />
+                    <Text style={[
+                      styles.cooldownText,
+                      { 
+                        color: colors.warning,
+                        fontSize: isVerySmallScreen ? 12 : 14
+                      }
+                    ]}>
+                      Next free coins in {timeRemaining}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </LinearGradient>
+          </AnimatedTouchableOpacity>
+        </View>
+
         {/* Main Menu Grid */}
         <View style={[styles.menuGrid, isTablet && styles.menuGridTablet]}>
           {menuItems.map((item, index) => (
@@ -255,331 +492,6 @@ export default function MoreTab() {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Free Coins Section */}
-        <View style={[styles.freeCoinsSection, isTablet && styles.freeCoinsSectionTablet]}>
-          <Text style={[
-            styles.freeCoinsSectionTitle, 
-            { 
-              color: colors.text,
-              fontSize: isVerySmallScreen ? 18 : 20
-            }
-          ]}>
-            🎁 Free Coins
-          </Text>
-          
-          <TouchableOpacity
-            style={[
-              styles.freeCoinsCard,
-              { 
-                backgroundColor: colors.surface,
-                shadowColor: colors.shadowColor,
-                borderColor: freeCoinsAvailable ? colors.success : colors.border,
-                opacity: freeCoinsAvailable ? 1 : 0.7
-              },
-              !freeCoinsAvailable && styles.freeCoinsCardDisabled,
-              isTablet && styles.freeCoinsCardTablet
-            ]}
-            onPress={handleFreeCoinsClick}
-            disabled={!freeCoinsAvailable || loading}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={
-                freeCoinsAvailable
-                  ? isDark 
-                    ? ['rgba(16, 185, 129, 0.2)', 'rgba(16, 185, 129, 0.05)']
-                    : ['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']
-                  : isDark
-                    ? ['rgba(107, 114, 128, 0.1)', 'rgba(107, 114, 128, 0.05)']
-                    : ['rgba(156, 163, 175, 0.1)', 'rgba(156, 163, 175, 0.05)']
-              }
-              style={styles.freeCoinsGradient}
-            >
-              <View style={styles.freeCoinsHeader}>
-                <View style={[
-                  styles.freeCoinsIcon,
-                  { 
-                    backgroundColor: freeCoinsAvailable 
-                      ? (isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.2)')
-                      : (isDark ? 'rgba(107, 114, 128, 0.2)' : 'rgba(156, 163, 175, 0.2)')
-                  }
-                ]}>
-                  {freeCoinsAvailable ? (
-                    <Gift size={isVerySmallScreen ? 24 : 28} color={colors.success} />
-                  ) : (
-                    <Clock size={isVerySmallScreen ? 24 : 28} color={colors.textSecondary} />
-                  )}
-                </View>
-                
-                <View style={styles.freeCoinsContent}>
-                  <Text style={[
-                    styles.freeCoinsTitle,
-                    { 
-                      color: freeCoinsAvailable ? colors.text : colors.textSecondary,
-                      fontSize: isVerySmallScreen ? 16 : 18
-                    }
-                  ]}>
-                    {freeCoinsAvailable ? 'Watch Ad & Earn' : 'Free Coins Cooldown'}
-                  </Text>
-                  <Text style={[
-                    styles.freeCoinsSubtitle,
-                    { 
-                      color: freeCoinsAvailable ? colors.textSecondary : colors.textSecondary,
-                      fontSize: isVerySmallScreen ? 12 : 14
-                    }
-                  ]}>
-                    {freeCoinsAvailable 
-                      ? '30s Ad = 100 Coins' 
-                      : `Available in ${timeRemaining}`
-                    }
-                  </Text>
-                </View>
-
-                <View style={styles.freeCoinsReward}>
-                  <View style={[
-                    styles.coinsBadge,
-                    { 
-                      backgroundColor: freeCoinsAvailable 
-                        ? (isDark ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 215, 0, 0.15)')
-                        : (isDark ? 'rgba(107, 114, 128, 0.2)' : 'rgba(156, 163, 175, 0.15)')
-                    }
-                  ]}>
-                    <Coins size={isVerySmallScreen ? 14 : 16} color={freeCoinsAvailable ? '#FFD700' : colors.textSecondary} />
-                    <Text style={[
-                      styles.coinsAmount,
-                      { 
-                        color: freeCoinsAvailable ? '#FFD700' : colors.textSecondary,
-                        fontSize: isVerySmallScreen ? 14 : 16
-                      }
-                    ]}>
-                      100
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {freeCoinsAvailable && (
-                <View style={styles.freeCoinsAction}>
-                  <View style={[styles.adPreview, { backgroundColor: colors.primary + '15' }]}>
-                    <Play size={isVerySmallScreen ? 12 : 14} color={colors.primary} />
-                    <Text style={[
-                      styles.adPreviewText,
-                      { 
-                        color: colors.primary,
-                        fontSize: isVerySmallScreen ? 11 : 12
-                      }
-                    ]}>
-                      {loading ? 'Loading Ad...' : 'Tap to watch 30s ad'}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {!freeCoinsAvailable && timeRemaining && (
-                <View style={styles.cooldownInfo}>
-                  <View style={[styles.cooldownBadge, { backgroundColor: colors.warning + '15' }]}>
-                    <Clock size={isVerySmallScreen ? 12 : 14} color={colors.warning} />
-                    <Text style={[
-                      styles.cooldownText,
-                      { 
-                        color: colors.warning,
-                        fontSize: isVerySmallScreen ? 11 : 12
-                      }
-                    ]}>
-                      Next free coins in {timeRemaining}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Enhanced Menu Items with Better Spacing */}
-        <View style={[styles.additionalMenuSection, isTablet && styles.additionalMenuSectionTablet]}>
-          <Text style={[
-            styles.additionalMenuTitle,
-            { 
-              color: colors.text,
-              fontSize: isVerySmallScreen ? 16 : 18
-            }
-          ]}>
-            ⚙️ Settings & Support
-          </Text>
-          
-          <View style={[styles.additionalMenuGrid, isTablet && styles.additionalMenuGridTablet]}>
-            {[
-              { icon: Share2, title: 'Refer Friends', subtitle: 'Earn 500 Coins', route: '/refer-friend', color: colors.success },
-              { icon: MessageCircle, title: 'Get Help', subtitle: 'Contact Support', route: '/contact-support', color: colors.primary },
-              { icon: Shield, title: 'Privacy', subtitle: 'Your Data Safety', route: '/privacy-policy', color: colors.warning },
-              { icon: Globe, title: 'Language', subtitle: 'Change App Language', route: '/languages', color: colors.accent },
-            ].map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.additionalMenuItem,
-                  { 
-                    backgroundColor: colors.surface,
-                    shadowColor: colors.shadowColor,
-                    borderColor: colors.border
-                  },
-                  isTablet && styles.additionalMenuItemTablet
-                ]}
-                onPress={() => handleItemPress(item)}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={isDark 
-                    ? [`${item.color}20`, `${item.color}05`]
-                    : [`${item.color}15`, `${item.color}05`]
-                  }
-                  style={styles.additionalMenuItemGradient}
-                >
-                  <View style={[styles.additionalMenuIcon, { backgroundColor: item.color + '20' }]}>
-                    <item.icon size={isVerySmallScreen ? 18 : 20} color={item.color} />
-                  </View>
-                  <View style={styles.additionalMenuContent}>
-                    <Text style={[
-                      styles.additionalMenuItemTitle,
-                      { 
-                        color: colors.text,
-                        fontSize: isVerySmallScreen ? 14 : 16
-                      }
-                    ]}>
-                      {item.title}
-                    </Text>
-                    <Text style={[
-                      styles.additionalMenuItemSubtitle,
-                      { 
-                        color: colors.textSecondary,
-                        fontSize: isVerySmallScreen ? 11 : 12
-                      }
-                    ]}>
-                      {item.subtitle}
-                    </Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Account Actions Section */}
-        <View style={[styles.accountSection, isTablet && styles.accountSectionTablet]}>
-          <Text style={[
-            styles.accountSectionTitle,
-            { 
-              color: colors.text,
-              fontSize: isVerySmallScreen ? 16 : 18
-            }
-          ]}>
-            👤 Account Actions
-          </Text>
-          
-          <View style={[styles.accountActions, isTablet && styles.accountActionsTablet]}>
-            <TouchableOpacity
-              style={[
-                styles.accountAction,
-                { 
-                  backgroundColor: colors.surface,
-                  shadowColor: colors.shadowColor,
-                  borderColor: colors.border
-                },
-                isTablet && styles.accountActionTablet
-              ]}
-              onPress={handleLogout}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={isDark 
-                  ? ['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.05)']
-                  : ['rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.05)']
-                }
-                style={styles.accountActionGradient}
-              >
-                <View style={[styles.accountActionIcon, { backgroundColor: colors.error + '20' }]}>
-                  <LogOut size={isVerySmallScreen ? 18 : 20} color={colors.error} />
-                </View>
-                <View style={styles.accountActionContent}>
-                  <Text style={[
-                    styles.accountActionTitle,
-                    { 
-                      color: colors.error,
-                      fontSize: isVerySmallScreen ? 14 : 16
-                    }
-                  ]}>
-                    Sign Out
-                  </Text>
-                  <Text style={[
-                    styles.accountActionSubtitle,
-                    { 
-                      color: colors.textSecondary,
-                      fontSize: isVerySmallScreen ? 11 : 12
-                    }
-                  ]}>
-                    Log out of your account
-                  </Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.accountAction,
-                { 
-                  backgroundColor: colors.surface,
-                  shadowColor: colors.shadowColor,
-                  borderColor: colors.border
-                },
-                isTablet && styles.accountActionTablet
-              ]}
-              onPress={() => router.push('/delete-account')}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={isDark 
-                  ? ['rgba(239, 68, 68, 0.15)', 'rgba(239, 68, 68, 0.05)']
-                  : ['rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.05)']
-                }
-                style={styles.accountActionGradient}
-              >
-                <View style={[styles.accountActionIcon, { backgroundColor: colors.error + '20' }]}>
-                  <Trash2 size={isVerySmallScreen ? 18 : 20} color={colors.error} />
-                </View>
-                <View style={styles.accountActionContent}>
-                  <Text style={[
-                    styles.accountActionTitle,
-                    { 
-                      color: colors.error,
-                      fontSize: isVerySmallScreen ? 14 : 16
-                    }
-                  ]}>
-                    Delete Account
-                  </Text>
-                  <Text style={[
-                    styles.accountActionSubtitle,
-                    { 
-                      color: colors.textSecondary,
-                      fontSize: isVerySmallScreen ? 11 : 12
-                    }
-                  ]}>
-                    Permanently remove account
-                  </Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* App Info Footer */}
-        <View style={[styles.appInfoSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.appName, { color: colors.text }]}>VidGro</Text>
-          <Text style={[styles.appVersion, { color: colors.textSecondary }]}>Version 1.0.0</Text>
-          <Text style={[styles.appDescription, { color: colors.textSecondary }]}>
-            Watch videos, earn coins, promote content
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -594,13 +506,212 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: isVerySmallScreen ? 16 : 20,
-    paddingVertical: isVerySmallScreen ? 16 : 20,
+    paddingVertical: isVerySmallScreen ? 20 : 24,
     paddingBottom: 40,
   },
   scrollContentTablet: {
     paddingHorizontal: 40,
     paddingVertical: 32,
     paddingBottom: 60,
+  },
+
+  // Enhanced Free Coins Section
+  freeCoinsSection: {
+    marginBottom: isVerySmallScreen ? 32 : 40,
+  },
+  freeCoinsSectionTablet: {
+    marginBottom: 48,
+  },
+  freeCoinsSectionTitle: {
+    fontWeight: 'bold',
+    marginBottom: isVerySmallScreen ? 16 : 20,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  freeCoinsCard: {
+    borderRadius: isVerySmallScreen ? 20 : 24,
+    overflow: 'hidden',
+    borderWidth: 2,
+    position: 'relative',
+    ...Platform.select({
+      ios: {
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+      },
+    }),
+  },
+  freeCoinsCardTablet: {
+    alignSelf: 'center',
+    maxWidth: 500,
+  },
+  freeCoinsCardDisabled: {
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0.1,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  shimmerGradient: {
+    flex: 1,
+    width: screenWidth,
+  },
+  glowEffect: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: isVerySmallScreen ? 24 : 28,
+    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+    zIndex: 0,
+  },
+  freeCoinsGradient: {
+    padding: isVerySmallScreen ? 24 : 28,
+    zIndex: 2,
+  },
+  freeCoinsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: isVerySmallScreen ? 16 : 20,
+  },
+  freeCoinsIcon: {
+    width: isVerySmallScreen ? 64 : 72,
+    height: isVerySmallScreen ? 64 : 72,
+    borderRadius: isVerySmallScreen ? 32 : 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: isVerySmallScreen ? 16 : 20,
+    position: 'relative',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      },
+    }),
+  },
+  iconContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sparkleIcon: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+  },
+  freeCoinsContent: {
+    flex: 1,
+  },
+  freeCoinsTitle: {
+    fontWeight: 'bold',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  freeCoinsSubtitle: {
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  freeCoinsReward: {
+    alignItems: 'center',
+  },
+  coinsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: isVerySmallScreen ? 12 : 16,
+    paddingVertical: isVerySmallScreen ? 8 : 10,
+    borderRadius: 20,
+    gap: isVerySmallScreen ? 6 : 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.2)',
+      },
+    }),
+  },
+  coinsAmount: {
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  freeCoinsAction: {
+    alignItems: 'center',
+  },
+  adPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: isVerySmallScreen ? 16 : 20,
+    paddingVertical: isVerySmallScreen ? 10 : 12,
+    borderRadius: 16,
+    gap: isVerySmallScreen ? 8 : 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  adPreviewText: {
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  cooldownInfo: {
+    alignItems: 'center',
+  },
+  cooldownBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: isVerySmallScreen ? 16 : 20,
+    paddingVertical: isVerySmallScreen ? 10 : 12,
+    borderRadius: 16,
+    gap: isVerySmallScreen ? 8 : 10,
+  },
+  cooldownText: {
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
 
   // Main Menu Grid
@@ -637,27 +748,27 @@ const styles = StyleSheet.create({
   menuItemGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: isVerySmallScreen ? 16 : 20,
+    padding: isVerySmallScreen ? 20 : 24,
   },
   menuItemIcon: {
-    width: isVerySmallScreen ? 44 : 48,
-    height: isVerySmallScreen ? 44 : 48,
-    borderRadius: isVerySmallScreen ? 22 : 24,
+    width: isVerySmallScreen ? 48 : 52,
+    height: isVerySmallScreen ? 48 : 52,
+    borderRadius: isVerySmallScreen ? 24 : 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: isVerySmallScreen ? 12 : 16,
+    marginRight: isVerySmallScreen ? 16 : 20,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
       },
       android: {
-        elevation: 2,
+        elevation: 3,
       },
       web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.15)',
       },
     }),
   },
@@ -666,329 +777,11 @@ const styles = StyleSheet.create({
   },
   menuItemTitle: {
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
     letterSpacing: 0.3,
   },
   menuItemSubtitle: {
-    lineHeight: 18,
-  },
-
-  // Free Coins Section
-  freeCoinsSection: {
-    marginBottom: isVerySmallScreen ? 24 : 32,
-  },
-  freeCoinsSectionTablet: {
-    marginBottom: 40,
-  },
-  freeCoinsSectionTitle: {
-    fontWeight: 'bold',
-    marginBottom: isVerySmallScreen ? 12 : 16,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  freeCoinsCard: {
-    borderRadius: isVerySmallScreen ? 16 : 20,
-    overflow: 'hidden',
-    borderWidth: 2,
-    ...Platform.select({
-      ios: {
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.15)',
-      },
-    }),
-  },
-  freeCoinsCardTablet: {
-    alignSelf: 'center',
-    maxWidth: 400,
-  },
-  freeCoinsCardDisabled: {
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0.05,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  freeCoinsGradient: {
-    padding: isVerySmallScreen ? 18 : 24,
-  },
-  freeCoinsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: isVerySmallScreen ? 12 : 16,
-  },
-  freeCoinsIcon: {
-    width: isVerySmallScreen ? 56 : 64,
-    height: isVerySmallScreen ? 56 : 64,
-    borderRadius: isVerySmallScreen ? 28 : 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: isVerySmallScreen ? 12 : 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.2)',
-      },
-    }),
-  },
-  freeCoinsContent: {
-    flex: 1,
-  },
-  freeCoinsTitle: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    letterSpacing: 0.3,
-  },
-  freeCoinsSubtitle: {
-    lineHeight: 18,
-  },
-  freeCoinsReward: {
-    alignItems: 'center',
-  },
-  coinsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: isVerySmallScreen ? 10 : 12,
-    paddingVertical: isVerySmallScreen ? 6 : 8,
-    borderRadius: 16,
-    gap: isVerySmallScreen ? 4 : 6,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  coinsAmount: {
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  freeCoinsAction: {
-    alignItems: 'center',
-  },
-  adPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: isVerySmallScreen ? 12 : 16,
-    paddingVertical: isVerySmallScreen ? 8 : 10,
-    borderRadius: 12,
-    gap: isVerySmallScreen ? 6 : 8,
-  },
-  adPreviewText: {
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  cooldownInfo: {
-    alignItems: 'center',
-  },
-  cooldownBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: isVerySmallScreen ? 12 : 16,
-    paddingVertical: isVerySmallScreen ? 8 : 10,
-    borderRadius: 12,
-    gap: isVerySmallScreen ? 6 : 8,
-  },
-  cooldownText: {
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-
-  // Additional Menu Section
-  additionalMenuSection: {
-    marginBottom: isVerySmallScreen ? 24 : 32,
-  },
-  additionalMenuSectionTablet: {
-    marginBottom: 40,
-  },
-  additionalMenuTitle: {
-    fontWeight: 'bold',
-    marginBottom: isVerySmallScreen ? 12 : 16,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  additionalMenuGrid: {
-    gap: isVerySmallScreen ? 10 : 12,
-  },
-  additionalMenuGridTablet: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  additionalMenuItem: {
-    borderRadius: isVerySmallScreen ? 12 : 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.08)',
-      },
-    }),
-  },
-  additionalMenuItemTablet: {
-    width: (screenWidth - 112) / 2,
-  },
-  additionalMenuItemGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: isVerySmallScreen ? 14 : 16,
-  },
-  additionalMenuIcon: {
-    width: isVerySmallScreen ? 36 : 40,
-    height: isVerySmallScreen ? 36 : 40,
-    borderRadius: isVerySmallScreen ? 18 : 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: isVerySmallScreen ? 10 : 12,
-  },
-  additionalMenuContent: {
-    flex: 1,
-  },
-  additionalMenuItemTitle: {
-    fontWeight: '600',
-    marginBottom: 2,
-    letterSpacing: 0.2,
-  },
-  additionalMenuItemSubtitle: {
-    lineHeight: 16,
-  },
-
-  // Account Section
-  accountSection: {
-    marginBottom: isVerySmallScreen ? 24 : 32,
-  },
-  accountSectionTablet: {
-    marginBottom: 40,
-  },
-  accountSectionTitle: {
-    fontWeight: 'bold',
-    marginBottom: isVerySmallScreen ? 12 : 16,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  accountActions: {
-    gap: isVerySmallScreen ? 10 : 12,
-  },
-  accountActionsTablet: {
-    flexDirection: 'row',
-    gap: 16,
-    justifyContent: 'center',
-  },
-  accountAction: {
-    borderRadius: isVerySmallScreen ? 12 : 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.08)',
-      },
-    }),
-  },
-  accountActionTablet: {
-    width: 200,
-  },
-  accountActionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: isVerySmallScreen ? 14 : 16,
-  },
-  accountActionIcon: {
-    width: isVerySmallScreen ? 36 : 40,
-    height: isVerySmallScreen ? 36 : 40,
-    borderRadius: isVerySmallScreen ? 18 : 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: isVerySmallScreen ? 10 : 12,
-  },
-  accountActionContent: {
-    flex: 1,
-  },
-  accountActionTitle: {
-    fontWeight: '600',
-    marginBottom: 2,
-    letterSpacing: 0.2,
-  },
-  accountActionSubtitle: {
-    lineHeight: 16,
-  },
-
-  // App Info Footer
-  appInfoSection: {
-    borderRadius: isVerySmallScreen ? 12 : 16,
-    padding: isVerySmallScreen ? 20 : 24,
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      },
-    }),
-  },
-  appName: {
-    fontSize: isVerySmallScreen ? 20 : 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    letterSpacing: 1,
-  },
-  appVersion: {
-    fontSize: isVerySmallScreen ? 12 : 14,
-    marginBottom: 8,
-  },
-  appDescription: {
-    fontSize: isVerySmallScreen ? 12 : 14,
-    textAlign: 'center',
     lineHeight: 20,
+    fontWeight: '500',
   },
 });

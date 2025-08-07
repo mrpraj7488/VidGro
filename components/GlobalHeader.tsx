@@ -30,7 +30,6 @@ export default function GlobalHeader({
     { icon: Shield, title: 'Privacy Policy', route: '/privacy-policy' },
     { icon: FileText, title: 'Terms of Service', route: '/terms' },
     { icon: Globe, title: 'Languages', route: '/languages' },
-    { icon: Settings, title: 'Configure Ads', route: '/configure-ads' },
     { icon: MessageCircle, title: 'Contact Support', route: '/contact-support' },
     { icon: LogOut, title: 'Log Out', action: 'logout', color: '#E74C3C' },
     { icon: Trash2, title: 'Delete Account', route: '/delete-account', color: '#E74C3C' },
@@ -96,6 +95,15 @@ export default function GlobalHeader({
             </Text>
           </TouchableOpacity>
         ))}
+        
+        {/* App Version at the bottom */}
+        <View style={[styles.versionSection, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+          <Text style={[styles.appName, { color: colors.text }]}>VidGro</Text>
+          <Text style={[styles.appVersion, { color: colors.textSecondary }]}>Version 1.0.0</Text>
+          <Text style={[styles.appDescription, { color: colors.textSecondary }]}>
+            Watch videos, earn coins, promote content
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -309,6 +317,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 16,
     fontWeight: '500',
+  },
+  versionSection: {
+    marginTop: 'auto',
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    alignItems: 'center',
+  },
+  appName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    letterSpacing: 1,
+  },
+  appVersion: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  appDescription: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   overlay: {
     position: 'absolute',
