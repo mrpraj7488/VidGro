@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Coins, Crown, Star, Shield, Zap, TrendingUp, Clock, Users, CheckCircle, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, Coins, Crown, Star, Shield, Zap, TrendingUp, Clock, Users, CircleCheck as CheckCircle, Sparkles } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
