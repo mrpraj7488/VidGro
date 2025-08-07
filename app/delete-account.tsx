@@ -91,9 +91,7 @@ export default function DeleteAccountScreen() {
                 <Text style={[styles.deleteText, { color: colors.textSecondary }]}>{item}</Text>
               </View>
             ))}
-          </View>
-
-      
+          </View>      
           <TouchableOpacity
             style={[styles.continueButton, { backgroundColor: colors.error }]}
             onPress={() => setStep(2)}
