@@ -57,14 +57,6 @@ export default function BuyCoinsScreen() {
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  // Animation values
-  const headerScale = useSharedValue(0.8);
-  const headerOpacity = useSharedValue(0);
-  const cardAnimations = useRef<{ [key: string]: Animated.Value }>({});
-  const pulseAnimation = useSharedValue(1);
-  const shimmerAnimation = useSharedValue(0);
-  const floatingCoins = useSharedValue(0);
-
   const coinPackages: CoinPackage[] = [
     {
       id: 'starter',
@@ -151,12 +143,20 @@ export default function BuyCoinsScreen() {
     },
   ];
 
-  useEffect(() => {
-    // Initialize card animations
-    coinPackages.forEach(pkg => {
-      cardAnimations.current[pkg.id] = new RNAnimated.Value(0);
-    });
+  // Animation values
+  const headerScale = useSharedValue(0.8);
+  const headerOpacity = useSharedValue(0);
+  const cardAnimations = useRef<{ [key: string]: RNAnimated.Value }>(
+    coinPackages.reduce((acc, pkg) => {
+      acc[pkg.id] = new RNAnimated.Value(0);
+      return acc;
+    }, {} as { [key: string]: RNAnimated.Value })
+  );
+  const pulseAnimation = useSharedValue(1);
+  const shimmerAnimation = useSharedValue(0);
+  const floatingCoins = useSharedValue(0);
 
+  useEffect(() => {
     // Entrance animations
     headerScale.value = withSpring(1, { damping: 20, stiffness: 100 });
     headerOpacity.value = withTiming(1, { duration: 800 });
