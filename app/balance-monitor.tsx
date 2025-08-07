@@ -31,6 +31,8 @@ export default function BalanceMonitorScreen() {
 }
 
 const styles = StyleSheet.create({
+    }
+  )
   container: {
     flex: 1,
   },
