@@ -102,12 +102,6 @@ export default function ThemeToggle() {
       ['#FFD700', '#4A90E2']
     );
 
-    const shadowColor = interpolateColor(
-      colorProgress.value,
-      [0, 1],
-      ['rgba(255, 215, 0, 0.6)', 'rgba(74, 144, 226, 0.8)']
-    );
-
     return {
       transform: [
         { translateX: slideX.value },
@@ -115,20 +109,6 @@ export default function ThemeToggle() {
         { rotate: `${rotation.value}deg` }
       ],
       backgroundColor,
-      ...(Platform.select({
-        ios: {
-          shadowColor,
-          shadowOpacity: glowOpacity.value * 0.8,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 0 },
-        },
-        android: {
-          elevation: glowOpacity.value * 8,
-        },
-        web: {
-          boxShadow: `0 0 ${8 * glowOpacity.value}px ${shadowColor}`,
-        },
-      }) || {}),
     };
   });
 
@@ -138,6 +118,7 @@ export default function ThemeToggle() {
       transform: [{ scale: 1 + glowOpacity.value * 0.1 }],
     };
   });
+
   const iconColor = isDark ? '#4A90E2' : '#FFD700';
 
   return (
@@ -191,7 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     top: 2,
     left: 2,
-    ...(Platform.select({
+    ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
@@ -204,6 +185,6 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)',
       },
-    }) || {}),
+    }),
   },
 });
