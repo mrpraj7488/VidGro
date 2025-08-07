@@ -52,7 +52,6 @@ export default function BecomeVIPScreen() {
   const buttonScale = useSharedValue(1);
   const shimmerAnimation = useSharedValue(0);
   const pulseAnimation = useSharedValue(1);
-  const offerBounce = useSharedValue(1);
 
   // Plan animations
   const monthlyCardAnimation = useRef(new RNAnimated.Value(0)).current;
@@ -70,6 +69,11 @@ export default function BecomeVIPScreen() {
       limitedOffer: true,
       offerText: '33% OFF',
       productId: 'com.vidgro.vip.weekly',
+      benefits: [
+        { icon: Shield, title: 'Ad-Free Experience', color: '#2ECC71' },
+        { icon: Zap, title: '10% Promotion Discount', color: '#FFD700' },
+        { icon: Crown, title: 'VIP Badge', color: '#9D4EDD' },
+      ]
     },
     {
       id: 'monthly',
@@ -82,33 +86,12 @@ export default function BecomeVIPScreen() {
       limitedOffer: false,
       offerText: '25% OFF',
       productId: 'com.vidgro.vip.monthly',
-    },
-  ];
-
-  const vipBenefits = [
-    { 
-      icon: Shield, 
-      title: 'Ad-Free Experience', 
-      description: 'No interruptions while earning coins',
-      color: '#2ECC71'
-    },
-    { 
-      icon: Zap, 
-      title: '10% Instant Discount', 
-      description: 'On every video promotion',
-      color: '#FFD700'
-    },
-    { 
-      icon: Crown, 
-      title: 'VIP Badge', 
-      description: 'Show your premium status',
-      color: '#9D4EDD'
-    },
-    { 
-      icon: Headphones, 
-      title: 'Priority Support', 
-      description: '24/7 dedicated customer support',
-      color: '#3498DB'
+      benefits: [
+        { icon: Shield, title: 'Ad-Free Experience', color: '#2ECC71' },
+        { icon: Zap, title: '10% Promotion Discount', color: '#FFD700' },
+        { icon: Crown, title: 'VIP Badge', color: '#9D4EDD' },
+        { icon: Headphones, title: 'Priority Support', color: '#3498DB' },
+      ]
     },
   ];
 
@@ -161,16 +144,6 @@ export default function BecomeVIPScreen() {
       withSequence(
         withTiming(1.05, { duration: 1000 }),
         withTiming(1, { duration: 1000 })
-      ),
-      -1,
-      true
-    );
-
-    // Offer bounce
-    offerBounce.value = withRepeat(
-      withSequence(
-        withTiming(1.1, { duration: 800 }),
-        withTiming(1, { duration: 800 })
       ),
       -1,
       true
@@ -353,11 +326,7 @@ export default function BecomeVIPScreen() {
     transform: [{ scale: pulseAnimation.value }],
   }));
 
-  const offerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: offerBounce.value }],
-  }));
-
-  // If user is already VIP, show VIP status screen
+  // If user is already VIP, show VIP status screen with timer
   if (profile?.is_vip) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -374,12 +343,12 @@ export default function BecomeVIPScreen() {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* VIP Active Status */}
+          {/* VIP Active Status with Timer */}
           <View style={[styles.vipActiveContainer, { backgroundColor: colors.surface }]}>
             <Animated.View style={[styles.vipIcon, { backgroundColor: colors.accent + '20' }, pulseAnimatedStyle]}>
-              <Crown size={64} color="#FFD700" />
+              <Crown size={isTablet ? 64 : isSmallScreen ? 48 : 56} color="#FFD700" />
               <Animated.View style={[styles.sparkleOverlay, sparkleAnimatedStyle]}>
-                <Sparkles size={32} color="#FFD700" />
+                <Sparkles size={isTablet ? 28 : isSmallScreen ? 20 : 24} color="#FFD700" />
               </Animated.View>
             </Animated.View>
             
@@ -391,30 +360,13 @@ export default function BecomeVIPScreen() {
             {/* Expiry Timer */}
             {vipExpiry && (
               <View style={[styles.expiryContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
-                <Timer size={20} color={colors.warning} />
+                <Timer size={isSmallScreen ? 18 : 20} color={colors.warning} />
                 <View style={styles.expiryInfo}>
                   <Text style={[styles.expiryLabel, { color: colors.warning }]}>VIP Expires In</Text>
                   <Text style={[styles.expiryTime, { color: colors.warning }]}>{timeRemaining}</Text>
                 </View>
               </View>
             )}
-          </View>
-
-          {/* Active Benefits */}
-          <View style={[styles.benefitsContainer, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.benefitsTitle, { color: colors.text }]}>🎯 Your Active Benefits</Text>
-            {vipBenefits.map((benefit, index) => (
-              <View key={index} style={[styles.benefitItem, { borderBottomColor: colors.border }]}>
-                <View style={[styles.benefitIconContainer, { backgroundColor: benefit.color + '20' }]}>
-                  <benefit.icon size={20} color={benefit.color} />
-                </View>
-                <View style={styles.benefitContent}>
-                  <Text style={[styles.benefitTitle, { color: colors.text }]}>{benefit.title}</Text>
-                  <Text style={[styles.benefitDescription, { color: colors.textSecondary }]}>{benefit.description}</Text>
-                </View>
-                <Check size={20} color={colors.success} />
-              </View>
-            ))}
           </View>
 
           {/* Renewal Section */}
@@ -457,47 +409,9 @@ export default function BecomeVIPScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <View style={[styles.heroSection, { backgroundColor: colors.surface }]}>
-          <Animated.View style={[styles.heroIcon, { backgroundColor: colors.accent + '20' }, pulseAnimatedStyle]}>
-            <Crown size={isTablet ? 72 : 64} color="#FFD700" />
-            <Animated.View style={[styles.sparkleOverlay, sparkleAnimatedStyle]}>
-              <Sparkles size={isTablet ? 36 : 32} color="#FFD700" />
-            </Animated.View>
-          </Animated.View>
-          
-          <Text style={[styles.heroTitle, { color: colors.text }]}>
-            👑 Unlock VIP Premium
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Join thousands of creators maximizing their earnings with exclusive VIP benefits
-          </Text>
-
-          {/* Limited Time Offer Banner */}
-          <Animated.View style={[styles.offerBanner, { backgroundColor: colors.error }, offerAnimatedStyle]}>
-            <Text style={styles.offerText}>🔥 LIMITED TIME: Up to 33% OFF</Text>
-          </Animated.View>
-        </View>
-
-        {/* Benefits Section */}
-        <View style={[styles.benefitsContainer, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.benefitsTitle, { color: colors.text }]}>✨ Premium Benefits</Text>
-          {vipBenefits.map((benefit, index) => (
-            <View key={index} style={[styles.benefitItem, { borderBottomColor: colors.border }]}>
-              <View style={[styles.benefitIconContainer, { backgroundColor: benefit.color + '20' }]}>
-                <benefit.icon size={24} color={benefit.color} />
-              </View>
-              <View style={styles.benefitContent}>
-                <Text style={[styles.benefitTitle, { color: colors.text }]}>{benefit.title}</Text>
-                <Text style={[styles.benefitDescription, { color: colors.textSecondary }]}>{benefit.description}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Plans Section */}
+        {/* Plans Section - Main Focus */}
         <View style={styles.plansContainer}>
-          <Text style={[styles.plansTitle, { color: colors.text }]}>🎯 Choose Your Plan</Text>
+          <Text style={[styles.plansTitle, { color: colors.text }]}>👑 Choose Your VIP Plan</Text>
           
           {vipPlans.map((plan, index) => {
             const cardAnimation = plan.id === 'weekly' ? weeklyCardAnimation : monthlyCardAnimation;
@@ -528,7 +442,6 @@ export default function BecomeVIPScreen() {
                     { backgroundColor: colors.surface },
                     plan.popular && styles.popularPlan,
                     selectedPlan === plan.id && styles.selectedPlan,
-                    isTablet && styles.planCardTablet
                   ]}
                   onPress={() => setSelectedPlan(plan.id)}
                   activeOpacity={0.9}
@@ -548,18 +461,18 @@ export default function BecomeVIPScreen() {
                   {/* Badges */}
                   {plan.popular && (
                     <View style={styles.popularBadge}>
-                      <Star size={12} color="white" />
+                      <Star size={10} color="white" />
                       <Text style={styles.badgeText}>MOST POPULAR</Text>
                     </View>
                   )}
 
                   {plan.limitedOffer && (
-                    <Animated.View style={[styles.offerBadge, { backgroundColor: colors.error }, offerAnimatedStyle]}>
+                    <View style={[styles.offerBadge, { backgroundColor: colors.error }]}>
                       <Text style={styles.offerBadgeText}>{plan.offerText}</Text>
-                    </Animated.View>
+                    </View>
                   )}
 
-                  {/* Plan Content */}
+                  {/* Plan Header */}
                   <View style={styles.planHeader}>
                     <View style={styles.planTitleSection}>
                       <Text style={[styles.planDuration, { color: colors.text }]}>{plan.duration}</Text>
@@ -585,14 +498,19 @@ export default function BecomeVIPScreen() {
                     </View>
                   </View>
 
-                  {/* Value Proposition */}
-                  <View style={[styles.valueProposition, { backgroundColor: colors.primary + '10' }]}>
-                    <Text style={[styles.valueText, { color: colors.primary }]}>
-                      {plan.id === 'weekly' 
-                        ? '🚀 Perfect for trying VIP benefits'
-                        : '💎 Best value for serious creators'
-                      }
-                    </Text>
+                  {/* Benefits in Plan Card */}
+                  <View style={styles.planBenefits}>
+                    {plan.benefits.map((benefit, benefitIndex) => (
+                      <View key={benefitIndex} style={styles.planBenefit}>
+                        <View style={[styles.planBenefitIcon, { backgroundColor: benefit.color + '20' }]}>
+                          <benefit.icon size={isSmallScreen ? 14 : 16} color={benefit.color} />
+                        </View>
+                        <Text style={[styles.planBenefitText, { color: colors.textSecondary }]}>
+                          {benefit.title}
+                        </Text>
+                        <Check size={isSmallScreen ? 12 : 14} color={colors.success} />
+                      </View>
+                    ))}
                   </View>
 
                   {/* Subscribe Button */}
@@ -641,72 +559,22 @@ export default function BecomeVIPScreen() {
           })}
         </View>
 
-        {/* Trust Elements */}
-        <View style={[styles.trustSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.trustTitle, { color: colors.text }]}>🛡️ Why Choose VIP?</Text>
-          
-          <View style={styles.trustElements}>
-            <View style={[styles.trustElement, { backgroundColor: colors.success + '15' }]}>
-              <Shield size={20} color={colors.success} />
-              <View style={styles.trustContent}>
-                <Text style={[styles.trustElementTitle, { color: colors.text }]}>Secure Payments</Text>
-                <Text style={[styles.trustElementText, { color: colors.textSecondary }]}>256-bit SSL encryption</Text>
-              </View>
-            </View>
-            
-            <View style={[styles.trustElement, { backgroundColor: colors.primary + '15' }]}>
-              <Check size={20} color={colors.primary} />
-              <View style={styles.trustContent}>
-                <Text style={[styles.trustElementTitle, { color: colors.text }]}>Instant Activation</Text>
-                <Text style={[styles.trustElementText, { color: colors.textSecondary }]}>Benefits active immediately</Text>
-              </View>
-            </View>
-            
-            <View style={[styles.trustElement, { backgroundColor: colors.warning + '15' }]}>
-              <Star size={20} color={colors.warning} />
-              <View style={styles.trustContent}>
-                <Text style={[styles.trustElementTitle, { color: colors.text }]}>50K+ Happy VIPs</Text>
-                <Text style={[styles.trustElementText, { color: colors.textSecondary }]}>Join the premium community</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Guarantee Section */}
+        {/* 3-Day Money Back Guarantee */}
         <View style={[styles.guaranteeContainer, { backgroundColor: colors.success + '20' }]}>
-          <Gift size={24} color={colors.success} />
-          <Text style={[styles.guaranteeTitle, { color: colors.success }]}>💎 VIP Guarantee</Text>
-          <Text style={[styles.guaranteeText, { color: colors.success }]}>
-            Not satisfied with VIP? Cancel anytime within 7 days for a full refund. No questions asked!
-          </Text>
-        </View>
-
-        {/* Social Proof */}
-        <View style={[styles.socialProofSection, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.socialProofTitle, { color: colors.text }]}>💬 What VIP Members Say</Text>
-          
-          <View style={styles.testimonials}>
-            <View style={[styles.testimonial, { backgroundColor: colors.card }]}>
-              <Text style={[styles.testimonialText, { color: colors.textSecondary }]}>
-                "VIP discount saved me hundreds of coins on promotions!"
-              </Text>
-              <Text style={[styles.testimonialAuthor, { color: colors.primary }]}>- Sarah K., Content Creator</Text>
-            </View>
-            
-            <View style={[styles.testimonial, { backgroundColor: colors.card }]}>
-              <Text style={[styles.testimonialText, { color: colors.textSecondary }]}>
-                "Ad-free experience makes earning so much smoother."
-              </Text>
-              <Text style={[styles.testimonialAuthor, { color: colors.primary }]}>- Mike R., YouTuber</Text>
-            </View>
+          <Shield size={isSmallScreen ? 20 : 24} color={colors.success} />
+          <View style={styles.guaranteeContent}>
+            <Text style={[styles.guaranteeTitle, { color: colors.success }]}>💎 3-Day Money Back Guarantee</Text>
+            <Text style={[styles.guaranteeText, { color: colors.success }]}>
+              Not satisfied with VIP? Get a full refund within 3 days of purchase. No questions asked!
+            </Text>
           </View>
         </View>
 
         {/* Security Footer */}
         <View style={[styles.securityFooter, { backgroundColor: colors.success + '10' }]}>
-          <Shield size={16} color={colors.success} />
+          <Shield size={14} color={colors.success} />
           <Text style={[styles.securityText, { color: colors.success }]}>
-            🔒 Secured by Google Play • Trusted by 50,000+ creators
+            🔒 Secured by encryption • Trusted by 50,000+ creators
           </Text>
         </View>
       </ScrollView>
@@ -751,135 +619,22 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  
-  // Hero Section
-  heroSection: {
-    alignItems: 'center',
-    padding: isTablet ? 40 : 32,
-    margin: 16,
-    borderRadius: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  heroIcon: {
-    width: isTablet ? 120 : 96,
-    height: isTablet ? 120 : 96,
-    borderRadius: isTablet ? 60 : 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    position: 'relative',
-  },
-  sparkleOverlay: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-  },
-  heroTitle: {
-    fontSize: isTablet ? 32 : isVerySmallScreen ? 24 : 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 12,
-    letterSpacing: 0.5,
-  },
-  heroSubtitle: {
-    fontSize: isTablet ? 18 : isVerySmallScreen ? 14 : 16,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  offerBanner: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 8,
-  },
-  offerText: {
-    color: 'white',
-    fontSize: isVerySmallScreen ? 12 : 14,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
 
-  // Benefits Section
-  benefitsContainer: {
-    borderRadius: 20,
-    padding: isTablet ? 32 : 24,
-    margin: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 16px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  benefitsTitle: {
-    fontSize: isTablet ? 24 : isVerySmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  benefitIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  benefitContent: {
-    flex: 1,
-  },
-  benefitTitle: {
-    fontSize: isTablet ? 18 : 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  benefitDescription: {
-    fontSize: isTablet ? 16 : 14,
-    lineHeight: 20,
-  },
-
-  // Plans Section
+  // Plans Section - Main Focus
   plansContainer: {
-    margin: 16,
+    margin: isSmallScreen ? 12 : 16,
   },
   plansTitle: {
-    fontSize: isTablet ? 24 : isVerySmallScreen ? 18 : 20,
+    fontSize: isVerySmallScreen ? 20 : isSmallScreen ? 22 : 24,
     fontWeight: 'bold',
-    marginBottom: 20,
     textAlign: 'center',
+    marginBottom: isSmallScreen ? 16 : 20,
+    letterSpacing: 0.5,
   },
   planCard: {
-    borderRadius: 20,
-    padding: isTablet ? 28 : 20,
-    marginBottom: 16,
+    borderRadius: isSmallScreen ? 16 : 20,
+    padding: isSmallScreen ? 16 : 20,
+    marginBottom: isSmallScreen ? 12 : 16,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 2,
@@ -898,9 +653,6 @@ const styles = StyleSheet.create({
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
       },
     }),
-  },
-  planCardTablet: {
-    padding: 32,
   },
   popularPlan: {
     borderColor: '#FFD700',
@@ -940,8 +692,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFD700',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: isSmallScreen ? 8 : 12,
+    paddingVertical: isSmallScreen ? 4 : 6,
     borderRadius: 16,
     gap: 4,
     zIndex: 2,
@@ -957,12 +709,12 @@ const styles = StyleSheet.create({
   },
   offerBadgeText: {
     color: 'white',
-    fontSize: 10,
+    fontSize: isSmallScreen ? 9 : 10,
     fontWeight: 'bold',
   },
   badgeText: {
     color: 'white',
-    fontSize: 10,
+    fontSize: isSmallScreen ? 9 : 10,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
@@ -970,19 +722,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: isSmallScreen ? 12 : 16,
     zIndex: 2,
   },
   planTitleSection: {
     flex: 1,
   },
   planDuration: {
-    fontSize: isTablet ? 24 : isVerySmallScreen ? 18 : 20,
+    fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 22,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   planSubtitle: {
-    fontSize: isTablet ? 16 : 12,
+    fontSize: isSmallScreen ? 11 : 12,
     fontWeight: '500',
   },
   planPricing: {
@@ -994,40 +746,53 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   currency: {
-    fontSize: isTablet ? 18 : 14,
+    fontSize: isSmallScreen ? 12 : 14,
     marginRight: 2,
   },
   planPrice: {
-    fontSize: isTablet ? 32 : isVerySmallScreen ? 24 : 28,
+    fontSize: isVerySmallScreen ? 22 : isSmallScreen ? 24 : 28,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   savingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   originalPrice: {
-    fontSize: isTablet ? 16 : 12,
+    fontSize: isSmallScreen ? 11 : 12,
     textDecorationLine: 'line-through',
   },
   savings: {
-    fontSize: isTablet ? 16 : 12,
+    fontSize: isSmallScreen ? 11 : 12,
     fontWeight: 'bold',
   },
-  valueProposition: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+
+  // Plan Benefits - Integrated into cards
+  planBenefits: {
+    marginBottom: isSmallScreen ? 12 : 16,
+    gap: isSmallScreen ? 8 : 10,
+  },
+  planBenefit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isSmallScreen ? 8 : 10,
+  },
+  planBenefitIcon: {
+    width: isSmallScreen ? 24 : 28,
+    height: isSmallScreen ? 24 : 28,
+    borderRadius: isSmallScreen ? 12 : 14,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  valueText: {
-    fontSize: isTablet ? 16 : 14,
-    fontWeight: '600',
-    textAlign: 'center',
+  planBenefitText: {
+    flex: 1,
+    fontSize: isSmallScreen ? 13 : 14,
+    fontWeight: '500',
   },
+
   subscribeButton: {
-    borderRadius: 16,
+    borderRadius: isSmallScreen ? 12 : 16,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
@@ -1059,8 +824,8 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.02 }],
   },
   subscribeButtonGradient: {
-    paddingVertical: isTablet ? 18 : 16,
-    paddingHorizontal: isTablet ? 32 : 24,
+    paddingVertical: isSmallScreen ? 14 : 16,
+    paddingHorizontal: isSmallScreen ? 20 : 24,
     alignItems: 'center',
   },
   subscribeButtonContent: {
@@ -1070,7 +835,7 @@ const styles = StyleSheet.create({
   },
   subscribeButtonText: {
     color: 'white',
-    fontSize: isTablet ? 18 : 16,
+    fontSize: isSmallScreen ? 15 : 16,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
@@ -1083,118 +848,26 @@ const styles = StyleSheet.create({
     // Add rotation animation if needed
   },
 
-  // Trust Section
-  trustSection: {
-    borderRadius: 20,
-    padding: isTablet ? 32 : 24,
-    margin: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 16px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  trustTitle: {
-    fontSize: isTablet ? 22 : isVerySmallScreen ? 16 : 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  trustElements: {
-    gap: 16,
-  },
-  trustElement: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-  },
-  trustContent: {
-    flex: 1,
-  },
-  trustElementTitle: {
-    fontSize: isTablet ? 16 : 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  trustElementText: {
-    fontSize: isTablet ? 14 : 12,
-  },
-
-  // Guarantee Section
+  // Guarantee Section - Improved
   guaranteeContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 20,
-    margin: 16,
-    gap: 12,
+    alignItems: 'flex-start',
+    borderRadius: isSmallScreen ? 12 : 16,
+    padding: isSmallScreen ? 16 : 20,
+    margin: isSmallScreen ? 12 : 16,
+    gap: isSmallScreen ? 10 : 12,
   },
-  guaranteeTitle: {
-    fontSize: isTablet ? 18 : 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  guaranteeText: {
-    fontSize: isTablet ? 14 : 12,
-    lineHeight: 18,
+  guaranteeContent: {
     flex: 1,
   },
-
-  // Social Proof Section
-  socialProofSection: {
-    borderRadius: 20,
-    padding: isTablet ? 32 : 24,
-    margin: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 16px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  socialProofTitle: {
-    fontSize: isTablet ? 22 : isVerySmallScreen ? 16 : 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  testimonials: {
-    gap: 16,
-  },
-  testimonial: {
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFD700',
-  },
-  testimonialText: {
-    fontSize: isTablet ? 16 : 14,
-    lineHeight: 20,
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  testimonialAuthor: {
-    fontSize: isTablet ? 14 : 12,
+  guaranteeTitle: {
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
+    marginBottom: 6,
+  },
+  guaranteeText: {
+    fontSize: isSmallScreen ? 13 : 14,
+    lineHeight: isSmallScreen ? 18 : 20,
   },
 
   // Security Footer
@@ -1202,13 +875,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 16,
-    padding: 16,
+    margin: isSmallScreen ? 12 : 16,
+    padding: isSmallScreen ? 12 : 16,
     borderRadius: 12,
     gap: 8,
   },
   securityText: {
-    fontSize: isTablet ? 14 : isVerySmallScreen ? 10 : 12,
+    fontSize: isVerySmallScreen ? 10 : isSmallScreen ? 11 : 12,
     fontWeight: '500',
     textAlign: 'center',
     flex: 1,
@@ -1217,9 +890,9 @@ const styles = StyleSheet.create({
   // VIP Active Status
   vipActiveContainer: {
     alignItems: 'center',
-    borderRadius: 20,
-    padding: isTablet ? 40 : 32,
-    margin: 16,
+    borderRadius: isSmallScreen ? 16 : 20,
+    padding: isSmallScreen ? 24 : 32,
+    margin: isSmallScreen ? 12 : 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1236,24 +909,29 @@ const styles = StyleSheet.create({
     }),
   },
   vipIcon: {
-    width: isTablet ? 120 : 96,
-    height: isTablet ? 120 : 96,
-    borderRadius: isTablet ? 60 : 48,
+    width: isTablet ? 96 : isSmallScreen ? 72 : 80,
+    height: isTablet ? 96 : isSmallScreen ? 72 : 80,
+    borderRadius: isTablet ? 48 : isSmallScreen ? 36 : 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: isSmallScreen ? 16 : 24,
     position: 'relative',
   },
+  sparkleOverlay: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+  },
   vipActiveTitle: {
-    fontSize: isTablet ? 32 : isVerySmallScreen ? 20 : 24,
+    fontSize: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
     fontWeight: 'bold',
     marginBottom: 8,
     textAlign: 'center',
   },
   vipActiveSubtitle: {
-    fontSize: isTablet ? 18 : isVerySmallScreen ? 14 : 16,
+    fontSize: isVerySmallScreen ? 14 : isSmallScreen ? 15 : 16,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: isSmallScreen ? 16 : 24,
     lineHeight: 22,
   },
 
@@ -1262,29 +940,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
-    padding: 16,
-    gap: 12,
+    padding: isSmallScreen ? 12 : 16,
+    gap: isSmallScreen ? 8 : 12,
     marginTop: 8,
   },
   expiryInfo: {
     alignItems: 'center',
   },
   expiryLabel: {
-    fontSize: isTablet ? 14 : 12,
+    fontSize: isSmallScreen ? 11 : 12,
     fontWeight: '600',
     marginBottom: 4,
   },
   expiryTime: {
-    fontSize: isTablet ? 20 : 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 
   // Renewal Section
   renewalSection: {
-    borderRadius: 20,
-    padding: isTablet ? 32 : 24,
-    margin: 16,
+    borderRadius: isSmallScreen ? 16 : 20,
+    padding: isSmallScreen ? 20 : 24,
+    margin: isSmallScreen ? 12 : 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1301,16 +979,16 @@ const styles = StyleSheet.create({
     }),
   },
   renewalTitle: {
-    fontSize: isTablet ? 22 : isVerySmallScreen ? 16 : 18,
+    fontSize: isVerySmallScreen ? 16 : isSmallScreen ? 18 : 20,
     fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',
   },
   renewalText: {
-    fontSize: isTablet ? 16 : 14,
+    fontSize: isSmallScreen ? 13 : 14,
     lineHeight: 20,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: isSmallScreen ? 16 : 20,
   },
   renewalPlans: {
     flexDirection: 'row',
@@ -1319,17 +997,17 @@ const styles = StyleSheet.create({
   renewalPlan: {
     flex: 1,
     borderRadius: 12,
-    padding: 16,
+    padding: isSmallScreen ? 12 : 16,
     alignItems: 'center',
     borderWidth: 1,
   },
   renewalPlanDuration: {
-    fontSize: isTablet ? 16 : 14,
+    fontSize: isSmallScreen ? 13 : 14,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   renewalPlanPrice: {
-    fontSize: isTablet ? 20 : 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: 'bold',
   },
 });
