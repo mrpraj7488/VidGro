@@ -56,7 +56,12 @@ export default function MoreTab() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <GlobalHeader menuVisible={menuVisible} setMenuVisible={setMenuVisible} />
+      <GlobalHeader 
+        title="More" 
+        showCoinDisplay={true}
+        menuVisible={menuVisible} 
+        setMenuVisible={setMenuVisible} 
+      />
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.menuGrid}>

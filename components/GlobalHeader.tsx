@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ThemeToggle from './ThemeToggle';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -60,14 +59,11 @@ export default function GlobalHeader({
 
   const renderSideMenu = () => (
     <View style={[styles.sideMenu, { left: menuVisible ? 0 : -300, backgroundColor: colors.surface }]}>
-      <LinearGradient
-        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
-        style={styles.sideMenuHeader}
-      >
+      <View style={[styles.sideMenuHeader, { backgroundColor: '#800080' }]}>
         <View style={styles.sideMenuHeaderContent}>
           <View style={styles.profileSection}>
             <View style={[styles.profileAvatar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <User size={32} color="white" />
+              <User size={28} color="white" />
             </View>
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: 'white' }]}>{profile?.username || 'User'}</Text>
@@ -82,10 +78,10 @@ export default function GlobalHeader({
           </TouchableOpacity>
         </View>
         <View style={styles.themeToggleRow}>
-          <Text style={styles.themeLabel}>Theme</Text>
+          <Text style={styles.themeLabel}>Dark Mode</Text>
           <ThemeToggle />
         </View>
-      </LinearGradient>
+      </View>
       
       <View style={[styles.sideMenuContent, { backgroundColor: colors.surface }]}>
         {sideMenuItems.map((item, index) => (
@@ -106,10 +102,7 @@ export default function GlobalHeader({
 
   return (
     <>
-      <LinearGradient
-        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
-        style={styles.header}
-      >
+      <View style={[styles.header, { backgroundColor: '#800080' }]}>
         <View style={styles.headerContent}>
           <View style={styles.leftSection}>
             <TouchableOpacity 
@@ -122,24 +115,21 @@ export default function GlobalHeader({
                 <Menu size={24} color="white" />
               )}
             </TouchableOpacity>
-            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+            <Text style={styles.brandTitle}>VidGro</Text>
           </View>
           
           <View style={styles.rightSection}>
             {showCoinDisplay && profile && (
               <View style={styles.coinDisplay}>
-                <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+                <View style={[styles.coinBadge, { backgroundColor: 'rgba(255, 255, 255, 0.15)' }]}>
                   <Text style={styles.coinIcon}>🪙</Text>
                   <Text style={styles.coinText}>{profile.coins.toLocaleString()}</Text>
                 </View>
               </View>
             )}
-            <View style={styles.themeToggleContainer}>
-              <ThemeToggle />
-            </View>
           </View>
         </View>
-      </LinearGradient>
+      </View>
       
       {renderSideMenu()}
       
@@ -156,42 +146,45 @@ export default function GlobalHeader({
 const styles = StyleSheet.create({
   header: {
     paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 12,
     paddingHorizontal: 20,
-    minHeight: 90, // Fixed minimum height
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: 44, // Fixed height for content
+    height: 40,
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    minWidth: 0, // Allow shrinking
+    minWidth: 0,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8, // Reduced gap for smaller screens
-    flexShrink: 0, // Prevent shrinking
+    flexShrink: 0,
   },
   menuButton: {
-    marginRight: 12, // Reduced margin
+    marginRight: 16,
     padding: 4,
     width: 32,
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: {
-    fontSize: Math.min(20, screenWidth * 0.05), // Responsive font size
+  brandTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
+    letterSpacing: 0.5,
     flex: 1,
-    marginRight: 8, // Add margin to prevent overlap
   },
   coinDisplay: {
     flexShrink: 0,
@@ -199,28 +192,29 @@ const styles = StyleSheet.create({
   coinBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: screenWidth < 380 ? 8 : 12, // Responsive padding
-    paddingVertical: 6,
-    borderRadius: 16,
-    minWidth: screenWidth < 380 ? 50 : 60, // Responsive min width
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 70,
+    justifyContent: 'center',
   },
   coinIcon: {
-    fontSize: 12,
-    marginRight: 4,
+    fontSize: 14,
+    marginRight: 6,
   },
   coinText: {
     color: 'white',
-    fontSize: screenWidth < 380 ? 12 : 14, // Responsive font size
-    fontWeight: '600',
-  },
-  themeToggleContainer: {
-    flexShrink: 0,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   sideMenu: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    width: Math.min(300, screenWidth * 0.8), // Responsive width
+    width: Math.min(300, screenWidth * 0.8),
     zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
@@ -230,20 +224,23 @@ const styles = StyleSheet.create({
   },
   sideMenuHeader: {
     paddingTop: 50,
-    paddingBottom: 16,
+    paddingBottom: 20,
     paddingHorizontal: 20,
   },
   sideMenuHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   themeToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
   },
   themeLabel: {
     color: 'white',
@@ -256,9 +253,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -269,12 +266,15 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 2,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: 13,
   },
   closeButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   sideMenuContent: {
     flex: 1,
@@ -289,6 +289,7 @@ const styles = StyleSheet.create({
   sideMenuText: {
     fontSize: 16,
     marginLeft: 16,
+    fontWeight: '500',
   },
   overlay: {
     position: 'absolute',

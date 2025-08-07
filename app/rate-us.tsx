@@ -66,10 +66,7 @@ export default function RateUsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? ['#9D4EDD', '#FF6B7A'] : ['#800080', '#FF4757']}
-        style={styles.header}
-      >
+      <View style={[styles.header, { backgroundColor: '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
@@ -77,7 +74,7 @@ export default function RateUsScreen() {
           <Text style={styles.headerTitle}>Rate VidGro</Text>
           <Star size={24} color="white" />
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.ratingSection, { backgroundColor: colors.surface }]}>
@@ -165,17 +162,24 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 12,
     paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    height: 40,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
     color: 'white',
   },
   content: {

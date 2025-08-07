@@ -81,10 +81,7 @@ export default function BecomeVIPScreen() {
   if (profile?.is_vip) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient
-          colors={isDark ? ['#F7B731', '#FF6B7A'] : ['#FFD700', '#FF4757']}
-          style={styles.header}
-        >
+        <View style={[styles.header, { backgroundColor: '#800080' }]}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()}>
               <ArrowLeft size={24} color="white" />
@@ -92,7 +89,7 @@ export default function BecomeVIPScreen() {
             <Text style={[styles.headerTitle, { color: 'white' }]}>VIP Status</Text>
             <Crown size={24} color="white" />
           </View>
-        </LinearGradient>
+        </View>
 
         <View style={[styles.vipActiveContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.vipIcon, { backgroundColor: colors.accent + '20' }]}>
@@ -122,10 +119,7 @@ export default function BecomeVIPScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={isDark ? ['#F7B731', '#FF6B7A'] : ['#FFD700', '#FF4757']}
-        style={styles.header}
-      >
+      <View style={[styles.header, { backgroundColor: '#800080' }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft size={24} color="white" />
@@ -133,7 +127,7 @@ export default function BecomeVIPScreen() {
           <Text style={[styles.headerTitle, { color: 'white' }]}>Become VIP</Text>
           <Crown size={24} color="white" />
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -208,17 +202,24 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 12,
     paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    height: 40,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   content: {
     flex: 1,
