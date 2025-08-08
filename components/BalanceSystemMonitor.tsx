@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { useSecurityMonitor } from '../hooks/useSecurityMonitor';
 import { useTheme } from '../contexts/ThemeContext';
-import { Shield, AlertTriangle, CheckCircle, Eye, EyeOff } from 'lucide-react-native';
+import { Shield, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Eye, EyeOff } from 'lucide-react-native';
 
 interface SystemStatus {
   configLoaded: boolean;
