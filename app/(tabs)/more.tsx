@@ -133,6 +133,30 @@ export default function MoreTab() {
       return;
     }
 
+    // Check for ad blocking before showing ad
+    const adService = AdService.getInstance();
+    const adBlockStatus = adService.getAdBlockStatus();
+    
+    if (adBlockStatus.detected) {
+      Alert.alert(
+        'Ad Blocker Detected',
+        'Please disable ad blocking software to earn free coins through ads.',
+        [
+          { text: 'Cancel' },
+          { 
+            text: 'Reset & Try Again', 
+            onPress: () => {
+              adService.resetAdBlockDetection();
+              // Retry the ad
+              setTimeout(() => handleFreeCoinsClick(), 1000);
+            }
+          }
+        ]
+      );
+      setLoading(false);
+      return;
+    }
+
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }

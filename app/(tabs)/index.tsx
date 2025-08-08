@@ -18,6 +18,7 @@ import { useVideoStore } from '../../store/videoStore';
 import { watchVideo } from '../../lib/supabase';
 import { useRealtimeVideoUpdates } from '../../hooks/useRealtimeVideoUpdates';
 import GlobalHeader from '@/components/GlobalHeader';
+import BalanceSystemMonitor from '@/components/BalanceSystemMonitor';
 import { Play, SkipForward, RefreshCw, Coins, Eye, Clock, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -479,6 +480,7 @@ export default function ViewTab() {
         menuVisible={menuVisible} 
         setMenuVisible={setMenuVisible} 
       />
+      <BalanceSystemMonitor />
       
       <View style={styles.content}>
         {/* Video Player */}

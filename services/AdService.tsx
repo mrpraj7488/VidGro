@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import { useConfig } from '../contexts/ConfigContext';
 
 interface AdConfig {
   appId: string;
@@ -14,6 +13,9 @@ class AdService {
   private isInitialized = false;
   private config: AdConfig | null = null;
   private adBlockDetected = false;
+  private consecutiveFailures = 0;
+  private readonly maxFailures = 3;
+  private adBlockCallback: ((detected: boolean) => void) | null = null;
 
   static getInstance(): AdService {
     if (!AdService.instance) {
@@ -22,7 +24,7 @@ class AdService {
     return AdService.instance;
   }
 
-  async initialize(config: AdConfig, enableAdBlockDetection = true): Promise<boolean> {
+  async initialize(config: AdConfig, enableAdBlockDetection = true, onAdBlockDetected?: (detected: boolean) => void): Promise<boolean> {
     if (this.isInitialized) {
       console.log('📱 AdMob already initialized');
       return true;
@@ -30,6 +32,7 @@ class AdService {
 
     try {
       this.config = config;
+      this.adBlockCallback = onAdBlockDetected || null;
 
       // Only initialize on native platforms
       if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -61,34 +64,34 @@ class AdService {
   }
 
   private setupAdBlockDetection() {
-    // Basic ad block detection
-    // In production, you'd implement more sophisticated detection
     console.log('📱 Setting up ad block detection');
-    
-    // Monitor ad load failures
-    this.monitorAdFailures();
+    // Detection is now handled in individual ad methods
   }
 
-  private monitorAdFailures() {
-    // Track consecutive ad failures
-    let consecutiveFailures = 0;
-    const maxFailures = 3;
-
-    // This would be called when ads fail to load
-    const onAdFailure = () => {
-      consecutiveFailures++;
-      if (consecutiveFailures >= maxFailures) {
-        this.adBlockDetected = true;
-        console.warn('🚫 Potential ad blocking detected');
-        // You can implement user notification or app restrictions here
+  private onAdFailure() {
+    this.consecutiveFailures++;
+    console.warn(`🚫 Ad failure ${this.consecutiveFailures}/${this.maxFailures}`);
+    
+    if (this.consecutiveFailures >= this.maxFailures) {
+      this.adBlockDetected = true;
+      console.warn('🚫 Ad blocking detected - consecutive failures exceeded threshold');
+      
+      if (this.adBlockCallback) {
+        this.adBlockCallback(true);
       }
-    };
+    }
+  }
 
-    // Reset on successful ad load
-    const onAdSuccess = () => {
-      consecutiveFailures = 0;
-      this.adBlockDetected = false;
-    };
+  private onAdSuccess() {
+    if (this.consecutiveFailures > 0) {
+      console.log('✅ Ad loaded successfully - resetting failure count');
+    }
+    this.consecutiveFailures = 0;
+    this.adBlockDetected = false;
+    
+    if (this.adBlockCallback) {
+      this.adBlockCallback(false);
+    }
   }
 
   async showRewardedAd(): Promise<{ success: boolean; reward?: number }> {
@@ -108,7 +111,8 @@ class AdService {
 
     try {
       if (!this.admobModule) {
-        throw new Error('AdMob module not loaded');
+        this.onAdFailure();
+        return { success: false };
       }
 
       // Load and show rewarded ad
@@ -116,9 +120,11 @@ class AdService {
       await this.admobModule.AdMobRewarded.requestAdAsync();
       await this.admobModule.AdMobRewarded.showAdAsync();
 
+      this.onAdSuccess();
       return { success: true, reward: 100 };
     } catch (error) {
       console.error('Rewarded ad error:', error);
+      this.onAdFailure();
       return { success: false };
     }
   }
@@ -136,16 +142,19 @@ class AdService {
 
     try {
       if (!this.admobModule) {
-        throw new Error('AdMob module not loaded');
+        this.onAdFailure();
+        return false;
       }
 
       await this.admobModule.AdMobInterstitial.setAdUnitID(this.config.interstitialId);
       await this.admobModule.AdMobInterstitial.requestAdAsync();
       await this.admobModule.AdMobInterstitial.showAdAsync();
 
+      this.onAdSuccess();
       return true;
     } catch (error) {
       console.error('Interstitial ad error:', error);
+      this.onAdFailure();
       return false;
     }
   }
@@ -156,6 +165,19 @@ class AdService {
 
   getConfig(): AdConfig | null {
     return this.config;
+  }
+
+  getAdBlockStatus(): { detected: boolean; failureCount: number } {
+    return {
+      detected: this.adBlockDetected,
+      failureCount: this.consecutiveFailures
+    };
+  }
+
+  resetAdBlockDetection() {
+    this.consecutiveFailures = 0;
+    this.adBlockDetected = false;
+    console.log('🔄 Ad block detection reset');
   }
 }
 

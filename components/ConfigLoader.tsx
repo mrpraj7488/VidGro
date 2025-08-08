@@ -12,9 +12,10 @@ interface ConfigLoaderProps {
 }
 
 export default function ConfigLoader({ children }: ConfigLoaderProps) {
-  const { config, loading, error, isConfigValid, refreshConfig, validateSecurity } = useConfig();
+  const { config, loading, error, isConfigValid, refreshConfig, validateSecurity, securityReport } = useConfig();
   const [initializationStep, setInitializationStep] = useState('Checking security...');
   const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
+  const [adBlockStatus, setAdBlockStatus] = useState<{ detected: boolean; failureCount: number }>({ detected: false, failureCount: 0 });
 
   useEffect(() => {
     if (config && isConfigValid) {
@@ -59,7 +60,13 @@ export default function ConfigLoader({ children }: ConfigLoaderProps) {
         const adService = AdService.getInstance();
         const adInitSuccess = await adService.initialize(
           config.admob,
-          config.security.adBlockDetection
+          config.security.adBlockDetection,
+          (detected: boolean) => {
+            setAdBlockStatus(adService.getAdBlockStatus());
+            if (detected) {
+              console.warn('🚫 Ad blocking detected in ConfigLoader');
+            }
+          }
         );
         
         if (!adInitSuccess) {
@@ -123,7 +130,16 @@ export default function ConfigLoader({ children }: ConfigLoaderProps) {
               <View style={styles.warningsContainer}>
                 <AlertTriangle size={16} color="#F59E0B" />
                 <Text style={styles.warningText}>
-                  Security checks completed with warnings
+                  Security: {securityWarnings.length} warning(s)
+                </Text>
+              </View>
+            )}
+            
+            {adBlockStatus.detected && (
+              <View style={styles.adBlockContainer}>
+                <Shield size={16} color="#EF4444" />
+                <Text style={styles.adBlockText}>
+                  Ad blocking detected ({adBlockStatus.failureCount} failures)
                 </Text>
               </View>
             )}
@@ -216,6 +232,21 @@ const styles = StyleSheet.create({
   },
   warningText: {
     color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  adBlockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderRadius: 8,
+    gap: 8,
+  },
+  adBlockText: {
+    color: '#EF4444',
     fontSize: 12,
     fontWeight: '500',
   },

@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
-import RootCheck from 'react-native-root-check';
+import SecurityService from '../services/SecurityService';
+import AdService from '../services/AdService';
 
 export interface RuntimeConfig {
   supabase: {
@@ -48,8 +49,10 @@ interface ConfigContextType {
   loading: boolean;
   error: string | null;
   isConfigValid: boolean;
+  securityReport: any;
   refreshConfig: () => Promise<void>;
   validateSecurity: () => Promise<boolean>;
+  handleAdBlockDetection: (detected: boolean) => void;
 }
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
@@ -71,6 +74,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isConfigValid, setIsConfigValid] = useState(false);
+  const [securityReport, setSecurityReport] = useState<any>(null);
 
   useEffect(() => {
     initializeConfig();
@@ -84,9 +88,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       // First, perform security checks
       const securityValid = await validateSecurity();
       if (!securityValid) {
-        setError('Security validation failed. App cannot continue.');
+        setError('Security validation failed. Some features may be restricted.');
         setLoading(false);
-        return;
+        // Continue with limited functionality
       }
 
       // Try to load cached config first
@@ -156,6 +160,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           'User-Agent': `VidGro-Mobile/${Platform.OS}`,
           'X-App-Version': '1.0.0',
           'X-Platform': Platform.OS,
+          'X-Device-Fingerprint': await SecurityService.getInstance().generateDeviceFingerprint(),
+          'X-App-Hash': await SecurityService.getInstance().generateAppHash(),
         },
       });
 
@@ -166,11 +172,18 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const freshConfig = response.data as RuntimeConfig;
       
       // Validate config integrity (optional HMAC check)
-      const configHash = await generateConfigHash(freshConfig);
+      const configHash = await this.generateConfigHash(freshConfig);
+      const integrityValid = await SecurityService.getInstance().validateConfigIntegrity(
+        freshConfig, 
+        response.headers['x-config-hash']
+      );
+      
+      if (!integrityValid) {
+        console.warn('⚠️ Config integrity validation failed');
+      }
       
       // Cache the fresh config
-      await AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(freshConfig));
-      await AsyncStorage.setItem(CONFIG_HASH_KEY, configHash);
+      await this.cacheConfig(freshConfig, configHash);
 
       setConfig(freshConfig);
       setIsConfigValid(true);
@@ -178,6 +191,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
       console.log('📱 Runtime config loaded successfully');
       console.log('📱 Features enabled:', freshConfig.features);
+      
+      // Initialize services with runtime config
+      await this.initializeServicesWithConfig(freshConfig);
+      
     } catch (err: any) {
       console.error('Error fetching fresh config:', err);
       
@@ -197,40 +214,119 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  private async cacheConfig(config: RuntimeConfig, hash: string) {
+    try {
+      // Encrypt config before caching
+      const encryptedConfig = await this.encryptConfig(config);
+      await AsyncStorage.setItem(CONFIG_CACHE_KEY, encryptedConfig);
+      await AsyncStorage.setItem(CONFIG_HASH_KEY, hash);
+    } catch (error) {
+      console.error('Error caching config:', error);
+      // Fallback to unencrypted storage
+      await AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
+      await AsyncStorage.setItem(CONFIG_HASH_KEY, hash);
+    }
+  }
+
+  private async encryptConfig(config: RuntimeConfig): Promise<string> {
+    try {
+      // Simple encryption using device-specific key
+      const deviceKey = await SecurityService.getInstance().generateDeviceFingerprint();
+      const configString = JSON.stringify(config);
+      
+      // In production, use proper encryption library
+      // For now, just base64 encode with device key
+      const combined = `${deviceKey}:${configString}`;
+      return Buffer.from(combined).toString('base64');
+    } catch (error) {
+      console.error('Config encryption error:', error);
+      return JSON.stringify(config);
+    }
+  }
+
+  private async decryptConfig(encryptedConfig: string): Promise<RuntimeConfig | null> {
+    try {
+      const deviceKey = await SecurityService.getInstance().generateDeviceFingerprint();
+      const decoded = Buffer.from(encryptedConfig, 'base64').toString();
+      const [storedKey, configString] = decoded.split(':');
+      
+      if (storedKey !== deviceKey) {
+        console.warn('⚠️ Device key mismatch, config may be from different device');
+        return null;
+      }
+      
+      return JSON.parse(configString);
+    } catch (error) {
+      console.error('Config decryption error:', error);
+      // Try to parse as unencrypted JSON
+      try {
+        return JSON.parse(encryptedConfig);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  private async initializeServicesWithConfig(config: RuntimeConfig) {
+    try {
+      // Initialize AdMob with ad block detection callback
+      if (config.features.adsEnabled) {
+        const adService = AdService.getInstance();
+        await adService.initialize(
+          config.admob,
+          config.security.adBlockDetection,
+          this.handleAdBlockDetection
+        );
+      }
+      
+      console.log('📱 All services initialized with runtime config');
+    } catch (error) {
+      console.error('Service initialization error:', error);
+    }
+  }
+
   const validateSecurity = async (): Promise<boolean> => {
     try {
-      // Check for rooted/jailbroken devices
-      if (Platform.OS !== 'web') {
-        const isRooted = await RootCheck.isDeviceRooted();
-        if (isRooted) {
-          console.warn('🔒 Rooted/jailbroken device detected');
-          // For now, just log - you can decide to block or allow
-          // return false;
+      const securityService = SecurityService.getInstance();
+      const securityResult = await securityService.performSecurityChecks({
+        security: {
+          allowRooted: false,
+          allowEmulators: true,
+          requireSignatureValidation: false,
+          adBlockDetection: true,
         }
-      }
-
-      // Check for emulator (basic detection)
-      if (Platform.OS === 'android') {
-        // Basic emulator detection - you can enhance this
-        const isEmulator = Platform.constants?.Brand === 'google' && 
-                          Platform.constants?.Model?.includes('sdk');
-        if (isEmulator) {
-          console.warn('🔒 Emulator detected');
-          // For now, just log - you can decide to block or allow
-        }
-      }
-
-      // App signature validation (placeholder)
-      // In production, you'd validate the app's signature here
+      });
       
-      return true;
+      setSecurityReport(securityService.getSecurityReport());
+      
+      if (securityResult.warnings.length > 0) {
+        console.warn('🔒 Security warnings:', securityResult.warnings);
+      }
+      
+      if (securityResult.errors.length > 0) {
+        console.error('🔒 Security errors:', securityResult.errors);
+        return false;
+      }
+      
+      return securityResult.isValid;
     } catch (error) {
       console.error('Security validation error:', error);
-      return false;
+      return true; // Don't block app if security check fails
     }
   };
 
-  const generateConfigHash = async (config: RuntimeConfig): Promise<string> => {
+  const handleAdBlockDetection = (detected: boolean) => {
+    if (detected) {
+      console.warn('🚫 Ad blocking detected by AdService');
+      // You can implement user notification or feature restrictions here
+      // For example:
+      // Alert.alert('Ad Blocker Detected', 'Please disable ad blocking to earn coins');
+    } else {
+      console.log('✅ Ads working normally');
+    }
+  };
+
+  private generateConfigHash = async (config: RuntimeConfig): Promise<string> => {
     try {
       const configString = JSON.stringify(config);
       const hash = await Crypto.digestStringAsync(
@@ -267,8 +363,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     isConfigValid,
+    securityReport,
     refreshConfig,
     validateSecurity,
+    handleAdBlockDetection,
   };
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
