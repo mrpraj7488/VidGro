@@ -16,7 +16,6 @@ interface AdBlockStatus {
 
 class AdService {
   private static instance: AdService;
-  private mobileAdsModule: any = null;
   private isInitialized = false;
   private config: AdConfig | null = null;
   private adBlockStatus: AdBlockStatus = {
@@ -42,7 +41,7 @@ class AdService {
     onAdBlockDetected?: (detected: boolean) => void
   ): Promise<boolean> {
     if (this.isInitialized) {
-      console.log('📱 Google Mobile Ads already initialized');
+      console.log('📱 Ad Service already initialized');
       return true;
     }
 
@@ -51,43 +50,25 @@ class AdService {
       this.adBlockCallback = onAdBlockDetected || null;
       this.detectionEnabled = enableAdBlockDetection;
 
-      console.log('📱 Initializing Google Mobile Ads with config:', {
+      console.log('📱 Initializing Ad Service with config:', {
         appId: config.appId,
         adsEnabled: true,
         detectionEnabled: enableAdBlockDetection
       });
 
-      // Only initialize on native platforms
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        try {
-          // Dynamically import Google Mobile Ads
-          const MobileAds = await import('expo-ads-google-mobile-ads');
-          this.mobileAdsModule = MobileAds;
+      // For now, we'll simulate ad service initialization
+      // In a real implementation, you would integrate with a proper ad SDK
+      console.log('📱 Ad Service initialized successfully (simulation mode)');
+      this.isInitialized = true;
 
-          // Initialize Google Mobile Ads
-          await MobileAds.mobileAds().initialize();
-          
-          console.log('📱 Google Mobile Ads initialized successfully with app ID:', config.appId);
-          this.isInitialized = true;
-
-          // Set up ad block detection
-          if (enableAdBlockDetection) {
-            this.setupAdBlockDetection();
-          }
-
-          return true;
-        } catch (mobileAdsError) {
-          console.error('📱 Google Mobile Ads initialization failed:', mobileAdsError);
-          this.isInitialized = false;
-          return false;
-        }
-      } else {
-        console.log('📱 Google Mobile Ads not available on web platform - using fallback');
-        this.isInitialized = true;
-        return true;
+      // Set up ad block detection
+      if (enableAdBlockDetection) {
+        this.setupAdBlockDetection();
       }
+
+      return true;
     } catch (error) {
-      console.error('Google Mobile Ads initialization error:', error);
+      console.error('Ad Service initialization error:', error);
       return false;
     }
   }
@@ -119,14 +100,12 @@ class AdService {
 
   private async testAdLoadingCapability(): Promise<boolean> {
     try {
-      if (!this.mobileAdsModule || !this.config) {
+      if (!this.config) {
         return false;
       }
 
-      // Try to create a banner ad to test if ads are working
-      const { BannerAd, BannerAdSize } = this.mobileAdsModule;
-      
-      // If we reach here, ads are likely working
+      // Simulate ad loading test
+      // In a real implementation, you would test actual ad loading
       this.onAdSuccess();
       return true;
     } catch (error) {
@@ -216,59 +195,14 @@ class AdService {
       return { success: false };
     }
 
-    if (Platform.OS === 'web') {
-      // Web fallback - simulate ad watching with realistic timing
-      return new Promise((resolve) => {
-        console.log('📱 Simulating rewarded ad on web platform');
-        setTimeout(() => {
-          this.onAdSuccess();
-          resolve({ success: true, reward: 100 });
-        }, 3000);
-      });
-    }
-
-    try {
-      if (!this.mobileAdsModule) {
-        this.onAdFailure('mobile_ads_module_unavailable');
-        return { success: false };
-      }
-
-      console.log('📱 Loading rewarded ad...');
-      
-      // Load and show rewarded ad using new API
-      const { RewardedAd, AdEventType } = this.mobileAdsModule;
-      
-      const rewardedAd = RewardedAd.createForAdRequest(this.config.rewardedId);
-      
-      return new Promise((resolve) => {
-        const unsubscribeLoaded = rewardedAd.addAdEventListener(AdEventType.LOADED, () => {
-          rewardedAd.show();
-        });
-
-        const unsubscribeEarned = rewardedAd.addAdEventListener(AdEventType.EARNED_REWARD, (reward: any) => {
-          console.log('📱 Rewarded ad completed successfully, reward:', reward);
-          this.onAdSuccess();
-          unsubscribeLoaded();
-          unsubscribeEarned();
-          resolve({ success: true, reward: 100 });
-        });
-
-        const unsubscribeError = rewardedAd.addAdEventListener(AdEventType.ERROR, (error: any) => {
-          console.error('Rewarded ad error:', error);
-          this.onAdFailure('rewarded_ad_error');
-          unsubscribeLoaded();
-          unsubscribeEarned();
-          unsubscribeError();
-          resolve({ success: false });
-        });
-
-        rewardedAd.load();
-      });
-    } catch (error) {
-      console.error('Rewarded ad error:', error);
-      this.onAdFailure('rewarded_ad_error');
-      return { success: false };
-    }
+    // Simulate rewarded ad watching with realistic timing
+    return new Promise((resolve) => {
+      console.log('📱 Simulating rewarded ad (30 seconds)');
+      setTimeout(() => {
+        this.onAdSuccess();
+        resolve({ success: true, reward: 100 });
+      }, 3000); // 3 seconds for demo purposes
+    });
   }
 
   async showInterstitialAd(): Promise<boolean> {
@@ -278,54 +212,10 @@ class AdService {
       return false;
     }
 
-    if (Platform.OS === 'web') {
-      // Web fallback - simulate ad
-      console.log('📱 Simulating interstitial ad on web platform');
-      this.onAdSuccess();
-      return true;
-    }
-
-    try {
-      if (!this.mobileAdsModule) {
-        this.onAdFailure('mobile_ads_module_unavailable');
-        return false;
-      }
-
-      console.log('📱 Loading interstitial ad...');
-      
-      const { InterstitialAd, AdEventType } = this.mobileAdsModule;
-      
-      const interstitialAd = InterstitialAd.createForAdRequest(this.config.interstitialId);
-      
-      return new Promise((resolve) => {
-        const unsubscribeLoaded = interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
-          interstitialAd.show();
-        });
-
-        const unsubscribeClosed = interstitialAd.addAdEventListener(AdEventType.CLOSED, () => {
-          console.log('📱 Interstitial ad completed successfully');
-          this.onAdSuccess();
-          unsubscribeLoaded();
-          unsubscribeClosed();
-          resolve(true);
-        });
-
-        const unsubscribeError = interstitialAd.addAdEventListener(AdEventType.ERROR, (error: any) => {
-          console.error('Interstitial ad error:', error);
-          this.onAdFailure('interstitial_ad_error');
-          unsubscribeLoaded();
-          unsubscribeClosed();
-          unsubscribeError();
-          resolve(false);
-        });
-
-        interstitialAd.load();
-      });
-    } catch (error) {
-      console.error('Interstitial ad error:', error);
-      this.onAdFailure('interstitial_ad_error');
-      return false;
-    }
+    // Simulate interstitial ad
+    console.log('📱 Simulating interstitial ad');
+    this.onAdSuccess();
+    return true;
   }
 
   async showBannerAd(): Promise<boolean> {
@@ -335,31 +225,10 @@ class AdService {
       return false;
     }
 
-    if (Platform.OS === 'web') {
-      // Web fallback
-      console.log('📱 Simulating banner ad on web platform');
-      this.onAdSuccess();
-      return true;
-    }
-
-    try {
-      if (!this.mobileAdsModule) {
-        this.onAdFailure('mobile_ads_module_unavailable');
-        return false;
-      }
-
-      console.log('📱 Loading banner ad...');
-      
-      // Banner ads are typically handled in components, not programmatically
-      // This method now just indicates banner ad capability
-      console.log('📱 Banner ad capability confirmed');
-      this.onAdSuccess();
-      return true;
-    } catch (error) {
-      console.error('Banner ad error:', error);
-      this.onAdFailure('banner_ad_error');
-      return false;
-    }
+    // Simulate banner ad
+    console.log('📱 Simulating banner ad');
+    this.onAdSuccess();
+    return true;
   }
 
   isAdBlockDetected(): boolean {
@@ -401,7 +270,7 @@ class AdService {
       platform: Platform.OS,
       adBlockStatus: this.adBlockStatus,
       detectionEnabled: this.detectionEnabled,
-      moduleAvailable: this.mobileAdsModule !== null,
+      moduleAvailable: true, // Always true in simulation mode
     };
   }
 }
