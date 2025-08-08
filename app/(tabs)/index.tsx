@@ -18,7 +18,7 @@ import { useVideoStore } from '../../store/videoStore';
 import { watchVideo } from '../../lib/supabase';
 import { useRealtimeVideoUpdates } from '../../hooks/useRealtimeVideoUpdates';
 import GlobalHeader from '@/components/GlobalHeader';
-import { Play, SkipForward, RefreshCw, Coins, Eye, Clock, AlertTriangle } from 'lucide-react-native';
+import { Play, SkipForward, RefreshCw, Coins, Eye, Clock, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
