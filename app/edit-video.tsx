@@ -18,7 +18,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useVideoStore } from '../store/videoStore';
-import { supabase } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
 import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown, Check, MoveVertical as MoreVertical, CreditCard as Edit3 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -223,6 +223,7 @@ export default function EditVideoScreen() {
 
     try {
       // Enhanced query to get engagement metrics with new schema
+      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('videos')
         .select(`
@@ -286,6 +287,7 @@ export default function EditVideoScreen() {
     intervalRef.current = setInterval(async () => {
       if (!video || !videoId) return;
       try {
+        const supabase = getSupabase();
         const { data: freshData, error: statusError } = await supabase
           .from('videos')
           .select(`
@@ -425,6 +427,7 @@ export default function EditVideoScreen() {
                });
                
                // Use the new delete function with proper refund handling
+               const supabase = getSupabase();
                const { data: deleteResult, error: deleteError } = await supabase
                  .rpc('delete_video_with_refund', {
                    video_uuid: videoData.id || videoData.video_id,
@@ -525,6 +528,7 @@ export default function EditVideoScreen() {
       const coinReward = calculateCoinReward(selectedDuration);
       
              // Use the repromote function from the current schema
+       const supabase = getSupabase();
        const result = await supabase.rpc('repromote_video', {
          video_uuid: videoData.id || videoData.video_id,
          user_uuid: user.id,

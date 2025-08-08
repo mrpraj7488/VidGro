@@ -28,7 +28,9 @@ import Animated, {
   Easing as ReanimatedEasing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { supabase } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
+import { useConfig } from '../contexts/ConfigContext';
+import { useFeatureFlag } from '../hooks/useFeatureFlags';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 380;
@@ -57,6 +59,8 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 export default function BuyCoinsScreen() {
   const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { config } = useConfig();
+  const coinsEnabled = useFeatureFlag('coinsEnabled');
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
@@ -238,6 +242,7 @@ export default function BuyCoinsScreen() {
     if (!user) return;
 
     try {
+      const supabase = getSupabase();
       const { error } = await supabase
         .from('coin_transactions')
         .insert({

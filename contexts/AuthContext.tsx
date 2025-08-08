@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase, getUserProfile } from '../lib/supabase';
+import { getSupabase, getUserProfile } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
+import { useConfig } from './ConfigContext';
 
 interface Profile {
   id: string;
@@ -42,7 +43,146 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    const initializeAuth = async () => {
+      try {
+        const supabase = getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await loadProfile(session.user.id);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const setupAuthListener = () => {
+      try {
+        const supabase = getSupabase();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            setUser(session?.user ?? null);
+            if (session?.user) {
+              await loadProfile(session.user.id);
+            } else {
+              setProfile(null);
+            }
+            setLoading(false);
+          }
+        );
+        return subscription;
+      } catch (error) {
+        console.error('Error setting up auth listener:', error);
+        return null;
+      }
+    };
+
+    const subscription = setupAuthListener();
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      return { error };
+    } catch (error) {
+      console.error('SignIn error:', error);
+      return { error };
+    }
+  };
+
+  const signUp = async (email: string, password: string, username: string) => {
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: undefined,
+          data: {
+            username,
+          },
+        },
+      });
+      
+      // If signup successful, ensure profile is created
+      if (data?.user && !error) {
+        try {
+          // Wait a moment for the trigger to execute
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check if profile was created, if not create it manually
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', data.user.id)
+            .single();
+          
+          if (profileError && profileError.code === 'PGRST116') {
+            // Profile doesn't exist, create it manually
+            console.log('Profile not found, creating manually...');
+            
+            const { data: createResult, error: createError } = await supabase
+              .rpc('create_missing_profile', {
+                user_id: data.user.id,
+                user_email: email,
+                user_username: username
+              });
+            
+            if (createError) {
+              console.error('Failed to create profile manually:', createError);
+            } else {
+              console.log('Profile created manually:', createResult);
+            }
+          }
+        } catch (profileCreationError) {
+          console.error('Error ensuring profile creation:', profileCreationError);
+        }
+      }
+      
+      // If signup successful but no session, try to sign in immediately
+      if (data?.user && !data?.session && !error) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        return { error: signInError };
+      }
+      
+      return { error };
+    } catch (error) {
+      console.error('SignUp error:', error);
+      return { error };
+    }
+  };
+
+  const signOut = async () => {
+    setProfile(null);
+    setUser(null);
+    
+    try {
+      const supabase = getSupabase();
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('SignOut error:', error);
+    }
+  };
       setUser(session?.user ?? null);
       if (session?.user) {
         await loadProfile(session.user.id);

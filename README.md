@@ -1,6 +1,6 @@
 # VidGro - Watch & Earn Video Platform
 
-A React Native Expo application that allows users to watch videos and earn virtual coins, while also enabling content creators to promote their YouTube videos through a coin-based system.
+A secure React Native Expo application that allows users to watch videos and earn virtual coins, while also enabling content creators to promote their YouTube videos through a coin-based system. Features runtime configuration management and advanced security measures.
 
 ## 🎯 App Overview
 
@@ -23,8 +23,17 @@ VidGro is a video monetization platform where users can:
 ### Backend & Database
 - **Supabase** as the primary backend service
 - **PostgreSQL** database with Row Level Security (RLS)
+- **Runtime Configuration API** for secure, dynamic app configuration
 - **Real-time subscriptions** for live updates
 - **Edge functions** for serverless operations
+- **Feature flags** for backend-controlled functionality
+
+### Security & Configuration
+- **Dynamic Runtime Config** - All sensitive values fetched from backend
+- **Anti-Tamper Protection** - Root/jailbreak detection and app integrity checks
+- **Ad Block Detection** - Monitors and responds to ad blocking attempts
+- **Secure Caching** - Encrypted local config storage with TTL
+- **Code Obfuscation** - Production builds use advanced JS obfuscation
 
 ## 📱 App Structure
 
@@ -256,24 +265,48 @@ All tables have RLS enabled with policies ensuring:
 - **Web**: Browser-compatible with feature adaptations
 
 ### Environment Variables
+The app now uses minimal environment variables for security:
+
 ```env
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+ENV=production
+API_BASE_URL=https://admin.vidgro.com/api
 ```
+
+All sensitive configuration (API keys, database URLs, AdMob IDs) is fetched dynamically from the backend at runtime.
+
+### Runtime Configuration Flow
+1. **App Launch**: Show secure loading screen
+2. **Security Checks**: Validate device integrity and app signature
+3. **Config Fetch**: Request runtime configuration from backend API
+4. **Service Initialization**: Initialize Supabase, AdMob, and other services
+5. **App Ready**: Render main application once all services are configured
+
+### Backend API Requirements
+The app requires a backend endpoint that provides runtime configuration:
+
+```
+GET https://admin.vidgro.com/api/client-runtime-config
+```
+
+See `docs/BACKEND_API_SPEC.md` for complete API specification.
 
 ### Build Configuration
 - **Expo managed workflow** for simplified deployment
+- **EAS Build** with production obfuscation
 - **TypeScript** for type safety
+- **Metro Obfuscator** for code protection
 - **ESLint** for code quality
 - **Prettier** for code formatting
+- **Security validation** in build pipeline
 
 ## 🔧 Development Setup
 
 ### Prerequisites
 - Node.js 18+
 - Expo CLI
+- EAS CLI for production builds
 - Supabase account
+- Backend API for runtime configuration
 - YouTube Data API access (for enhanced features)
 
 ### Installation
@@ -286,12 +319,21 @@ npm install
 
 # Start development server
 npm run dev
+
+# Build production version with obfuscation
+eas build --platform all --profile production-obfuscated
 ```
 
-### Database Setup
+### Backend Setup
+1. Implement runtime configuration API endpoint
+2. Set up feature flag management system
+3. Configure security policies and validation rules
+4. Set up monitoring and analytics for config requests
+
+### Database Setup  
 1. Create Supabase project
 2. Run migrations in `/supabase/migrations/`
-3. Set up environment variables
+3. Configure runtime API to serve database credentials
 4. Enable RLS policies
 
 ## 📈 Scalability Considerations
@@ -317,10 +359,16 @@ npm run dev
 ## 🛡️ Security Best Practices
 
 ### Data Protection
+- **Runtime Configuration** - No sensitive data in app bundle
+- **Dynamic Key Management** - API keys rotated without app updates
+- **Device Integrity Checks** - Root/jailbreak detection
+- **App Signature Validation** - Prevents modified app usage
+- **Ad Block Detection** - Monitors advertising system integrity
 - **Encrypted connections** (SSL/TLS)
 - **Secure token storage** using AsyncStorage
 - **Input sanitization** for all user inputs
 - **SQL injection prevention** via parameterized queries
+- **Code Obfuscation** - Production builds are heavily obfuscated
 
 ### Privacy Compliance
 - **GDPR compliance** with data export/deletion
@@ -331,6 +379,10 @@ npm run dev
 ## 🔮 Future Enhancements
 
 ### Planned Features
+- **Enhanced Security** - Certificate pinning and request signing
+- **Advanced Obfuscation** - Runtime code encryption
+- **Biometric Authentication** - Fingerprint/Face ID support
+- **Fraud Detection** - ML-based anomaly detection
 - **Push notifications** for video completion
 - **Social features** with user interactions
 - **Advanced analytics** with charts and graphs
@@ -338,6 +390,9 @@ npm run dev
 - **Multi-language support**
 
 ### Technical Improvements
+- **Zero-Trust Architecture** - All requests validated and signed
+- **Runtime Code Protection** - Dynamic code loading and validation
+- **Advanced Monitoring** - Real-time security event tracking
 - **Offline support** for core features
 - **Background processing** for video queue
 - **Advanced caching** strategies
@@ -359,6 +414,11 @@ npm run dev
 
 ## 🏆 Key Achievements
 
+- **Enterprise-grade security** with runtime configuration management
+- **Zero sensitive data** in client application bundle
+- **Dynamic feature control** without app store updates
+- **Advanced anti-tamper protection** and integrity validation
+- **Production-ready obfuscation** for code protection
 - **Seamless user experience** with smooth animations
 - **Robust coin economy** with secure transactions
 - **Real-time updates** for engaging user experience
@@ -366,6 +426,29 @@ npm run dev
 - **Cross-platform compatibility** with platform-specific optimizations
 - **Professional UI/UX** with gaming aesthetic
 - **Comprehensive analytics** for data-driven decisions
+
+## 🔐 Security Architecture
+
+### Configuration Security
+- **Backend-Controlled**: All sensitive configuration served from secure backend
+- **Encrypted Transit**: All config requests use HTTPS with certificate validation
+- **Local Encryption**: Cached configuration encrypted with device-specific keys
+- **Integrity Validation**: Config responses validated with HMAC signatures
+- **TTL Management**: Automatic config refresh with configurable time-to-live
+
+### Runtime Protection
+- **Device Validation**: Root/jailbreak detection with configurable policies
+- **App Integrity**: Signature validation and tamper detection
+- **Emulator Detection**: Identifies and optionally blocks emulator usage
+- **Debug Protection**: Prevents debugging and reverse engineering attempts
+- **Ad Block Monitoring**: Detects and responds to ad blocking software
+
+### Code Protection
+- **Advanced Obfuscation**: Production builds use metro-obfuscator
+- **Dead Code Elimination**: Removes debug code and console statements
+- **Symbol Mangling**: Obfuscates function and variable names
+- **Control Flow Flattening**: Makes code analysis more difficult
+- **String Encryption**: Encrypts sensitive strings in the bundle
 
 ---
 

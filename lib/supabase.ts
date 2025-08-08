@@ -1,28 +1,50 @@
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useConfig } from '../contexts/ConfigContext';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+// Dynamic Supabase client that will be initialized with runtime config
+let supabaseClient: any = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+export const initializeSupabase = (url: string, anonKey: string) => {
+  if (supabaseClient) {
+    console.log('📱 Supabase already initialized');
+    return supabaseClient;
+  }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-    flowType: 'implicit',
-  },
+  console.log('📱 Initializing Supabase with runtime config');
+  supabaseClient = createClient(url, anonKey, {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+      flowType: 'implicit',
+    },
+  });
+
+  return supabaseClient;
+};
+
+export const getSupabase = () => {
+  if (!supabaseClient) {
+    throw new Error('Supabase not initialized. Call initializeSupabase first.');
+  }
+  return supabaseClient;
+};
+
+// For backward compatibility, export as supabase
+export const supabase = new Proxy({} as any, {
+  get(target, prop) {
+    const client = getSupabase();
+    return client[prop];
+  }
 });
 
 // Remove old awardCoinsForVideo function and replace with new watchVideo
 export const watchVideo = async (userId, videoId, watchDuration, fullyWatched = false) => {
   try {
-    const { data, error } = await supabase.rpc('watch_video_and_earn_coins', {
+    const { data, error } = await getSupabase().rpc('watch_video_and_earn_coins', {
       user_uuid: userId,
       video_uuid: videoId,
       watch_duration: watchDuration,
@@ -46,7 +68,7 @@ export async function getUserProfile(userId: string) {
   if (!userId) return null;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -69,7 +91,7 @@ export async function getVideoQueue(userId: string) {
   if (!userId) return null;
 
   try {
-    const { data, error } = await supabase.rpc('get_video_queue_for_user', {
+    const { data, error } = await getSupabase().rpc('get_video_queue_for_user', {
       user_uuid: userId
     });
 
@@ -87,7 +109,7 @@ export async function getVideoQueue(userId: string) {
 
 // Create video promotion
 export const createVideoPromotion = async (coinCost, coinReward, duration, targetViews, title, userId, youtubeUrl) => {
-  const { data, error } = await supabase.rpc('create_video_promotion', {
+  const { data, error } = await getSupabase().rpc('create_video_promotion', {
     coin_cost_param: coinCost,
     coin_reward_param: coinReward,
     duration_seconds_param: duration,
@@ -101,7 +123,7 @@ export const createVideoPromotion = async (coinCost, coinReward, duration, targe
 
 // Repromote video
 export const repromoteVideo = async (videoId, userId, additionalCost = 0) => {
-  const { data, error } = await supabase.rpc('repromote_video', {
+  const { data, error } = await getSupabase().rpc('repromote_video', {
     video_uuid: videoId,
     user_uuid: userId,
     additional_coin_cost: additionalCost
@@ -111,7 +133,7 @@ export const repromoteVideo = async (videoId, userId, additionalCost = 0) => {
 
 // Delete video
 export const deleteVideo = async (videoId, userId) => {
-  const { data, error } = await supabase.rpc('delete_video_with_refund', {
+  const { data, error } = await getSupabase().rpc('delete_video_with_refund', {
     video_uuid: videoId,
     user_uuid: userId
   });
@@ -121,7 +143,7 @@ export const deleteVideo = async (videoId, userId) => {
 // Get user comprehensive analytics
 export const getUserComprehensiveAnalytics = async (userId: string) => {
   try {
-    const { data, error } = await supabase.rpc('get_user_comprehensive_analytics', {
+    const { data, error } = await getSupabase().rpc('get_user_comprehensive_analytics', {
       user_uuid: userId
     });
 
@@ -140,7 +162,7 @@ export const getUserComprehensiveAnalytics = async (userId: string) => {
 // Get user videos with analytics
 export const getUserVideosWithAnalytics = async (userId: string) => {
   try {
-    const { data, error } = await supabase.rpc('get_user_videos_with_analytics', {
+    const { data, error } = await getSupabase().rpc('get_user_videos_with_analytics', {
       user_uuid: userId
     });
 
@@ -157,7 +179,7 @@ export const getUserVideosWithAnalytics = async (userId: string) => {
 };
 
 export const getUserRecentActivity = async (userId: string) => {
-  const { data, error } = await supabase.rpc('get_user_recent_activity', {
+  const { data, error } = await getSupabase().rpc('get_user_recent_activity', {
     user_uuid: userId
   });
   return { data, error };
@@ -174,7 +196,7 @@ export const recordCoinPurchase = async (
   platform: string = 'unknown'
 ) => {
   try {
-    const { data, error } = await supabase.rpc('record_coin_purchase', {
+    const { data, error } = await getSupabase().rpc('record_coin_purchase', {
       user_uuid: userId,
       package_id: packageId,
       coins_amount: coinsAmount,
@@ -199,7 +221,7 @@ export const recordCoinPurchase = async (
 // Get user transaction history
 export const getUserTransactionHistory = async (userId: string, limit: number = 50) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('coin_transactions')
       .select(`
         id,

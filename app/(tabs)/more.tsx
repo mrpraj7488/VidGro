@@ -5,9 +5,11 @@ import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
 import { DollarSign, Crown, ShieldOff, Star, Bug, Gift, Play, Clock, Coins, Sparkles, Zap } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useConfig } from '@/contexts/ConfigContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
+import AdService from '@/services/AdService';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
@@ -31,6 +33,7 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 export default function MoreTab() {
   const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { config } = useConfig();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   const [freeCoinsAvailable, setFreeCoinsAvailable] = useState(true);
@@ -124,6 +127,12 @@ export default function MoreTab() {
   const handleFreeCoinsClick = async () => {
     if (!freeCoinsAvailable || loading) return;
 
+    // Check if ads are enabled in runtime config
+    if (!config?.features.adsEnabled) {
+      Alert.alert('Feature Unavailable', 'Free coins through ads are currently disabled.');
+      return;
+    }
+
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
@@ -150,16 +159,20 @@ export default function MoreTab() {
           { 
             text: '▶️ Watch Ad', 
             onPress: async () => {
-              // Simulate ad watching process
-              setTimeout(async () => {
+              // Use AdService to show rewarded ad
+              const adService = AdService.getInstance();
+              const adResult = await adService.showRewardedAd();
+              
+              if (adResult.success) {
                 try {
                   // Award coins to user
                   if (user) {
+                    const supabase = getSupabase();
                     const { error } = await supabase
                       .from('coin_transactions')
                       .insert({
                         user_id: user.id,
-                        amount: 100,
+                        amount: adResult.reward || 100,
                         transaction_type: 'ad_reward',
                         description: 'Free coins earned by watching 30-second ad',
                         reference_id: `ad_${Date.now()}`,
@@ -174,7 +187,7 @@ export default function MoreTab() {
                       await supabase
                         .from('profiles')
                         .update({ 
-                          coins: (profile?.coins || 0) + 100 
+                          coins: (profile?.coins || 0) + (adResult.reward || 100)
                         })
                         .eq('id', user.id);
 
@@ -191,7 +204,7 @@ export default function MoreTab() {
 
                       Alert.alert(
                         '🎉 Coins Earned!',
-                        '100 coins have been added to your account! Come back in 2 hours for more free coins.',
+                        `${adResult.reward || 100} coins have been added to your account! Come back in 2 hours for more free coins.`,
                         [{ text: '🚀 Awesome!' }]
                       );
                     } else {
@@ -204,7 +217,10 @@ export default function MoreTab() {
                 } finally {
                   setLoading(false);
                 }
-              }, 3000); // Simulate 30-second ad
+              } else {
+                Alert.alert('Ad Failed', 'Unable to show ad. Please try again later.');
+                setLoading(false);
+              }
             }
           }
         ]

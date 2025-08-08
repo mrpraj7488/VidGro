@@ -10,7 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { getSupabase } from '../../lib/supabase';
+import { useConfig } from '@/contexts/ConfigContext';
+import { useFeatureFlag } from '@/hooks/useFeatureFlags';
 import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
 import { ChartBar as BarChart3, Eye, Coins, Play, Pause, CircleCheck as CheckCircle, Timer, CreditCard as Edit3, Activity, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react-native';
@@ -54,6 +56,8 @@ interface VideoAnalytics {
 export default function Analytics() {
   const { user, profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { config } = useConfig();
+  const analyticsEnabled = useFeatureFlag('analyticsEnabled');
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -66,12 +70,19 @@ export default function Analytics() {
 
   useEffect(() => {
     if (user && user.id) {
+      // Check if analytics are enabled
+      if (!analyticsEnabled) {
+        setLoading(false);
+        return;
+      }
+      
       fetchAnalytics();
       
       // Set up periodic status checking for hold videos and real-time updates
       const statusCheckInterval = setInterval(async () => {
         try {
           // Check for expired holds and update video metrics every 5 seconds
+          const supabase = getSupabase();
           const { data: updatedCount, error: holdsError } = await supabase.rpc('check_and_update_expired_holds');
           if (holdsError) {
             console.error('Error checking expired holds:', holdsError);

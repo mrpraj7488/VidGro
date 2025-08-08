@@ -13,7 +13,9 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { supabase, createVideoPromotion } from '@/lib/supabase';
+import { getSupabase, createVideoPromotion } from '@/lib/supabase';
+import { useConfig } from '@/contexts/ConfigContext';
+import { useFeatureFlag } from '@/hooks/useFeatureFlags';
 import { validateYouTubeUrl, validateVideoTitle, extractYouTubeVideoId } from '../../utils/validation';
 import VideoPreview from '@/components/VideoPreview';
 import GlobalHeader from '@/components/GlobalHeader';
@@ -23,6 +25,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { config } = useConfig();
+  const coinsEnabled = useFeatureFlag('coinsEnabled');
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   
@@ -82,6 +86,12 @@ export default function PromoteTab() {
   const handlePromoteVideo = async () => {
     if (!user || !profile) {
       Alert.alert('Error', 'Please log in to promote videos');
+      return;
+    }
+
+    // Check if coins feature is enabled
+    if (!coinsEnabled) {
+      Alert.alert('Feature Unavailable', 'Video promotion is currently disabled.');
       return;
     }
 

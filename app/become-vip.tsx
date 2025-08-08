@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useConfig } from '../contexts/ConfigContext';
+import { useFeatureFlag } from '../hooks/useFeatureFlags';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Crown, Check, Zap, Shield, Headphones, Star, Clock, Sparkles, Gift, Timer } from 'lucide-react-native';
@@ -40,6 +42,8 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 export default function BecomeVIPScreen() {
   const { profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { config } = useConfig();
+  const vipEnabled = useFeatureFlag('vipEnabled');
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('monthly');
@@ -191,6 +195,12 @@ export default function BecomeVIPScreen() {
   };
 
   const handleSubscribe = async (plan: any) => {
+    // Check if VIP feature is enabled
+    if (!vipEnabled) {
+      Alert.alert('Feature Unavailable', 'VIP subscriptions are currently disabled.');
+      return;
+    }
+
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
