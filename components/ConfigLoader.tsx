@@ -5,7 +5,7 @@ import { useConfig } from '../contexts/ConfigContext';
 import { initializeSupabase } from '../lib/supabase';
 import AdService from '../services/AdService';
 import SecurityService from '../services/SecurityService';
-import { Shield, AlertTriangle, RefreshCw } from 'lucide-react-native';
+import { Shield, TriangleAlert as AlertTriangle, RefreshCw } from 'lucide-react-native';
 
 interface ConfigLoaderProps {
   children: React.ReactNode;
