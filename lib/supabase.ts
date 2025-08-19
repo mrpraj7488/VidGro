@@ -367,21 +367,7 @@ export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
   try {
     console.log('📱 Fetching runtime config from secure endpoint');
     
-    const deviceId = await getDeviceId();
-    const clientId = process.env.EXPO_PUBLIC_MOBILE_CLIENT_ID || 'vidgro_mobile_2024';
-    const clientSecret = process.env.EXPO_PUBLIC_MOBILE_CLIENT_SECRET || 'vidgro_secret_key_2024';
-    
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config/secure`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        clientId,
-        clientSecret,
-        deviceId
-      })
-    });
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config`);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -397,27 +383,6 @@ export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
     return result.data;
   } catch (error) {
     console.error('📱 Failed to fetch runtime config:', error);
-    
-    // Fallback to public endpoint for backward compatibility
-    try {
-      console.log('📱 Falling back to public endpoint');
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log('📱 Public endpoint response:', result);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result.data;
-    } catch (fallbackError) {
-      console.error('📱 Fallback also failed:', fallbackError);
-      return null;
-    }
+    return null;
   }
 };
