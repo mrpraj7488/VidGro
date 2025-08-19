@@ -9,16 +9,32 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  // Animation for blur effect
-  const blurOpacity = useSharedValue(1);
 
-  const blurAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: blurOpacity.value,
-  }));
+
+  // Authentication guard
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/(auth)/login');
+    }
+  }, [user, loading, router]);
+
+  // Don't render tabs if user is not authenticated
+  if (loading) {
+    return null; // Let the ConfigLoader handle the loading state
+  }
+
+  if (!user) {
+    return null; // Will redirect to login
+  }
 
   return (
     <View style={{ flex: 1 }}>
