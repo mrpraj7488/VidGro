@@ -10,6 +10,8 @@ import ConfigLoader from '../components/ConfigLoader';
 export default function RootLayout() {
   useFrameworkReady();
 
+
+
   return (
     <ConfigProvider>
       <ThemeProvider>
