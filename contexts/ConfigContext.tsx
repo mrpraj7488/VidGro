@@ -77,7 +77,26 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [securityReport, setSecurityReport] = useState<any>(null);
 
   useEffect(() => {
-    initializeConfig();
+    // Clear any potentially corrupted cache on startup in development
+    const clearCorruptedCache = async () => {
+      try {
+        const cachedData = await AsyncStorage.getItem(CONFIG_CACHE_KEY);
+        if (cachedData && !cachedData.startsWith('{')) {
+          // If cached data doesn't look like JSON, it's likely corrupted encrypted data
+          console.log('📱 Clearing potentially corrupted cache on startup');
+          await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+          await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+        }
+      } catch (error) {
+        console.log('📱 Cache check failed, clearing cache');
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+      }
+    };
+    
+    clearCorruptedCache().then(() => {
+      initializeConfig();
+    });
   }, []);
 
   const initializeConfig = async () => {
@@ -89,23 +108,31 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const securityValid = await validateSecurity();
       if (!securityValid) {
         setError('Security validation failed. Some features may be restricted.');
+        setLoading(false);
         // Continue with limited functionality
       }
 
       // Try to load cached config first
       const cachedConfig = await loadCachedConfig();
       if (cachedConfig && isCacheValid(cachedConfig)) {
-        console.log('📱 Using cached runtime config');
         setConfig(cachedConfig);
         setIsConfigValid(true);
+        
+        // Don't set loading to false yet, wait for services to initialize
+        // Initialize services with cached config first
+        await initializeServicesWithConfig(cachedConfig);
+        
+        // Now set loading to false
         setLoading(false);
         
-        // Fetch fresh config in background
-        fetchFreshConfig();
+        // Fetch fresh config in background (don't await)
+        fetchFreshConfig().catch(error => {
+          console.warn('📱 Background config refresh failed:', error);
+        });
         return;
       }
 
-      // Fetch fresh config
+      // No valid cached config, fetch fresh config
       await fetchFreshConfig();
     } catch (err) {
       console.error('Config initialization error:', err);
@@ -119,22 +146,43 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const cachedData = await AsyncStorage.getItem(CONFIG_CACHE_KEY);
       if (!cachedData) return null;
 
-      // Try to decrypt config
-      const decryptedConfig = await decryptConfig(cachedData);
-      if (!decryptedConfig) {
-        console.log('📱 Failed to decrypt cached config, fetching fresh');
+      let parsedConfig;
+      try {
+        // Check if data looks like JSON (starts with {)
+        if (cachedData.startsWith('{')) {
+          // Direct JSON, parse it
+          parsedConfig = JSON.parse(cachedData);
+        } else {
+          // Encrypted data, try to decrypt
+          parsedConfig = await decryptConfig(cachedData);
+        }
+      } catch (parseError) {
+        console.warn('📱 Cache parse/decrypt failed, clearing corrupted cache');
+        // Clear corrupted cache immediately
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
         return null;
       }
       
       // Validate config structure
-      if (!isValidConfigStructure(decryptedConfig)) {
-        console.log('📱 Cached config has invalid structure, ignoring');
+      if (!isValidConfigStructure(parsedConfig)) {
+        console.log('📱 Cached config has invalid structure, clearing cache');
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
         return null;
       }
 
-      return decryptedConfig;
+      return parsedConfig;
     } catch (error) {
       console.error('Error loading cached config:', error);
+      // Clear corrupted cache
+      try {
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+        console.log('📱 Cleared corrupted cache data');
+      } catch (clearError) {
+        console.error('Error clearing cache:', clearError);
+      }
       return null;
     }
   };
@@ -153,15 +201,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const fetchFreshConfig = async () => {
     try {
-      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin.vidgro.com/api';
-      const configUrl = `${apiBaseUrl}/client-runtime-config`;
+      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin-vidgro.netlify.app';
+      const configUrl = `${apiBaseUrl}/api/client-runtime-config`;
 
       console.log('📱 Fetching runtime config from:', configUrl);
-
-      // Generate security headers
-      const securityService = SecurityService.getInstance();
-      const deviceFingerprint = await securityService.generateDeviceFingerprint();
-      const appHash = await securityService.generateAppHash();
 
       const response = await axios.get(configUrl, {
         timeout: 10000,
@@ -169,22 +212,33 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           'User-Agent': `VidGro-Mobile/${Platform.OS}`,
           'X-App-Version': '1.0.0',
           'X-Platform': Platform.OS,
-          'X-Device-Fingerprint': deviceFingerprint,
-          'X-App-Hash': appHash,
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache',
+          'X-Device-Fingerprint': await SecurityService.getInstance().generateDeviceFingerprint(),
+          'X-App-Hash': await SecurityService.getInstance().generateAppHash(),
         },
       });
 
-      if (!response.data || !isValidConfigStructure(response.data)) {
-        throw new Error('Invalid config structure received from server');
-      }
+      console.log('📱 Server response received:', JSON.stringify(response.data, null, 2));
 
-      const freshConfig = response.data as RuntimeConfig;
+      // Handle server response format: { data: config, cached: boolean, ... }
+      const freshConfig = response.data.data || response.data as RuntimeConfig;
+      
+      console.log('📱 Extracted config:', JSON.stringify(freshConfig, null, 2));
+      
+      if (!isValidConfigStructure(freshConfig)) {
+        console.error('📱 Invalid config structure. Expected fields:', {
+          supabase: !!freshConfig?.supabase,
+          admob: !!freshConfig?.admob,
+          features: !!freshConfig?.features,
+          app: !!freshConfig?.app,
+          security: !!freshConfig?.security,
+          metadata: !!freshConfig?.metadata
+        });
+        throw new Error('Invalid config structure in response data');
+      }
       
       // Validate config integrity (optional HMAC check)
       const configHash = await generateConfigHash(freshConfig);
-      const integrityValid = await securityService.validateConfigIntegrity(
+      const integrityValid = await SecurityService.getInstance().validateConfigIntegrity(
         freshConfig, 
         response.headers['x-config-hash']
       );
@@ -209,19 +263,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       console.error('Error fetching fresh config:', err);
       
-      // Handle specific error cases
-      if (err.response?.status === 426) {
-        // Force update required
-        setError('App update required');
-        return;
-      }
-      
-      if (err.response?.status === 503) {
-        // Maintenance mode
-        setError('Service temporarily unavailable');
-        return;
-      }
-      
       // Try to use cached config as fallback
       const cachedConfig = await loadCachedConfig();
       if (cachedConfig) {
@@ -240,41 +281,26 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const cacheConfig = async (config: RuntimeConfig, hash: string) => {
     try {
-      // Encrypt config before caching
-      const encryptedConfig = await encryptConfig(config);
-      await AsyncStorage.setItem(CONFIG_CACHE_KEY, encryptedConfig);
+      // Use unencrypted storage for development to prevent corruption
+      await AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
       await AsyncStorage.setItem(CONFIG_HASH_KEY, hash);
-      console.log('📱 Config cached successfully');
+      console.log('📱 Config cached successfully (unencrypted for development)');
     } catch (error) {
       console.error('Error caching config:', error);
-      // Fallback to unencrypted storage
-      try {
-        await AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
-        await AsyncStorage.setItem(CONFIG_HASH_KEY, hash);
-      } catch (fallbackError) {
-        console.error('Fallback caching also failed:', fallbackError);
-      }
     }
   };
 
   const encryptConfig = async (config: RuntimeConfig): Promise<string> => {
     try {
-      // Enhanced encryption using device-specific key
-      const securityService = SecurityService.getInstance();
-      const deviceKey = await securityService.generateDeviceFingerprint();
+      // Simple encryption using device-specific key
+      const deviceKey = await SecurityService.getInstance().generateDeviceFingerprint();
       const configString = JSON.stringify(config);
       
-      // Create a more secure encryption key
-      const encryptionKey = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        `${deviceKey}:${Platform.OS}:VidGro:${config.metadata.configVersion}`
-      );
-      
-      // Simple XOR encryption (in production, use proper encryption library)
-      const encrypted = Buffer.from(configString).toString('base64');
-      const combined = `${encryptionKey.substring(0, 16)}:${encrypted}`;
-      
-      return Buffer.from(combined).toString('base64');
+      // In production, use proper encryption library
+      // For now, just base64 encode with device key
+      const combined = `${deviceKey}:${configString}`;
+      // Use btoa for base64 encoding (React Native compatible)
+      return btoa(combined);
     } catch (error) {
       console.error('Config encryption error:', error);
       return JSON.stringify(config);
@@ -283,59 +309,57 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const decryptConfig = async (encryptedConfig: string): Promise<RuntimeConfig | null> => {
     try {
-      const securityService = SecurityService.getInstance();
-      const deviceKey = await securityService.generateDeviceFingerprint();
+      const deviceKey = await SecurityService.getInstance().generateDeviceFingerprint();
+      const decoded = atob(encryptedConfig);
+      const [storedKey, configString] = decoded.split(':');
       
-      const decoded = Buffer.from(encryptedConfig, 'base64').toString();
-      const [storedKeyPrefix, encryptedData] = decoded.split(':');
-      
-      if (!storedKeyPrefix || !encryptedData) {
-        throw new Error('Invalid encrypted config format');
+      if (storedKey !== deviceKey) {
+        console.warn('⚠️ Device key mismatch, config may be from different device');
+        return null;
       }
       
-      const configString = Buffer.from(encryptedData, 'base64').toString();
-      const parsedConfig = JSON.parse(configString);
-      
-      // Validate decrypted config
-      if (!isValidConfigStructure(parsedConfig)) {
-        throw new Error('Decrypted config has invalid structure');
-      }
-      
-      return parsedConfig;
+      return JSON.parse(configString);
     } catch (error) {
       console.error('Config decryption error:', error);
-      // Try to parse as unencrypted JSON (fallback)
+      // Try to parse as unencrypted JSON
       try {
-        const fallbackConfig = JSON.parse(encryptedConfig);
-        if (isValidConfigStructure(fallbackConfig)) {
-          return fallbackConfig;
-        }
+        return JSON.parse(encryptedConfig);
       } catch {
-        // Ignore fallback errors
+        return null;
       }
-      return null;
     }
   };
 
   const initializeServicesWithConfig = async (config: RuntimeConfig) => {
     try {
-      console.log('📱 Initializing services with runtime config...');
-      
+      // Initialize Supabase with runtime config
+      const { initializeSupabase } = await import('../lib/supabase');
+      initializeSupabase(config.supabase.url, config.supabase.anonKey);
+      console.log('📱 Supabase initialized with runtime config');
+
       // Initialize AdMob with ad block detection callback
       if (config.features.adsEnabled) {
-        const adService = AdService.getInstance();
-        const adInitSuccess = await adService.initialize(
-          config.admob,
-          config.security.adBlockDetection,
-          handleAdBlockDetection
-        );
-        
-        if (!adInitSuccess) {
-          console.warn('📱 AdMob initialization failed');
+        try {
+          const adService = AdService.getInstance();
+          
+          // Check if already initialized to prevent duplicate initialization
+          if (!adService.getInitializationStatus()) {
+            const adInitSuccess = await adService.initialize(
+              config.admob,
+              config.security.adBlockDetection,
+              handleAdBlockDetection
+            );
+            
+            if (!adInitSuccess) {
+              console.warn('📱 AdMob initialization failed, continuing without ads');
+            }
+          } else {
+            console.log('📱 AdMob already initialized, skipping');
+          }
+        } catch (adError) {
+          console.warn('📱 AdMob initialization error, continuing without ads:', adError.message);
         }
       }
-      
-      // Initialize other services here (analytics, etc.)
       
       console.log('📱 All services initialized with runtime config');
     } catch (error) {
@@ -346,18 +370,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const validateSecurity = async (): Promise<boolean> => {
     try {
       const securityService = SecurityService.getInstance();
-      
-      // Use default security config for initial validation
-      const defaultSecurityConfig = {
+      const securityResult = await securityService.performSecurityChecks({
         security: {
           allowRooted: false,
           allowEmulators: true,
           requireSignatureValidation: false,
           adBlockDetection: true,
         }
-      };
-      
-      const securityResult = await securityService.performSecurityChecks(defaultSecurityConfig);
+      });
       
       setSecurityReport(securityService.getSecurityReport());
       
@@ -380,12 +400,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const handleAdBlockDetection = (detected: boolean) => {
     if (detected) {
       console.warn('🚫 Ad blocking detected by AdService');
-      // Update security report
-      setSecurityReport(prev => ({
-        ...prev,
-        adBlockDetected: detected,
-        lastAdBlockCheck: new Date().toISOString()
-      }));
+      // You can implement user notification or feature restrictions here
+      // For example:
+      // Alert.alert('Ad Blocker Detected', 'Please disable ad blocking to earn coins');
     } else {
       console.log('✅ Ads working normally');
     }
@@ -408,26 +425,30 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const isValidConfigStructure = (config: any): boolean => {
     return (
       config &&
-      typeof config === 'object' &&
       config.supabase &&
-      typeof config.supabase.url === 'string' &&
-      typeof config.supabase.anonKey === 'string' &&
+      config.supabase.url &&
+      config.supabase.anonKey &&
       config.admob &&
-      typeof config.admob.appId === 'string' &&
+      config.admob.appId &&
       config.features &&
-      typeof config.features === 'object' &&
       config.app &&
-      typeof config.app === 'object' &&
       config.security &&
-      typeof config.security === 'object' &&
-      config.metadata &&
-      typeof config.metadata === 'object'
+      config.metadata
     );
   };
 
   const refreshConfig = async () => {
-    console.log('📱 Refreshing runtime config...');
     await fetchFreshConfig();
+  };
+
+  const clearCache = async () => {
+    try {
+      await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+      await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+      console.log('📱 Configuration cache cleared');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
   };
 
   const value: ConfigContextType = {
