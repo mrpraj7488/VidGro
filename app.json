@@ -8,17 +8,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.vidgro.watch",
-      "buildNumber": "1.0.0"
-    },
-    "android": {
-      "package": "com.vidgro.watch",
-      "versionCode": 1,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#0A0E1A"
-      }
+      "supportsTablet": true
     },
     "web": {
       "bundler": "webpack",
