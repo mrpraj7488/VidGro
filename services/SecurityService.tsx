@@ -1,4 +1,4 @@
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
@@ -9,32 +9,11 @@ interface SecurityCheckResult {
   errors: string[];
 }
 
-interface DeviceInfo {
-  brand?: string | null;
-  manufacturer?: string | null;
-  modelName?: string | null;
-  deviceName?: string | null;
-  osName?: string | null;
-  osVersion?: string | null;
-  platformApiLevel?: number | null;
-  deviceType?: Device.DeviceType | null;
-}
-
-interface AppInfo {
-  applicationId?: string | null;
-  applicationName?: string | null;
-  nativeApplicationVersion?: string | null;
-  nativeBuildVersion?: string | null;
-  platform: string;
-  version: string | number;
-}
-
 class SecurityService {
   private static instance: SecurityService;
   private securityChecks: { [key: string]: boolean } = {};
   private appHash: string | null = null;
   private deviceFingerprint: string | null = null;
-  private securityReport: any = {};
 
   static getInstance(): SecurityService {
     if (!SecurityService.instance) {
@@ -51,16 +30,12 @@ class SecurityService {
     };
 
     try {
-      console.log('🔒 Starting comprehensive security checks...');
-
       // Check for rooted/jailbroken devices
       if (config.security?.allowRooted === false) {
         const rootCheckResult = await this.checkRootStatus();
         if (!rootCheckResult.isValid) {
           result.warnings.push('Device appears to be rooted/jailbroken');
-          this.securityChecks['rootCheck'] = false;
-        } else {
-          this.securityChecks['rootCheck'] = true;
+          // Don't block for now, just warn
         }
       }
 
@@ -69,9 +44,7 @@ class SecurityService {
         const emulatorCheckResult = await this.checkEmulatorStatus();
         if (!emulatorCheckResult.isValid) {
           result.warnings.push('Running on emulator');
-          this.securityChecks['emulatorCheck'] = false;
-        } else {
-          this.securityChecks['emulatorCheck'] = true;
+          // Don't fail for emulator, just warn
         }
       }
 
@@ -79,35 +52,19 @@ class SecurityService {
       if (config.security?.requireSignatureValidation === true) {
         const signatureResult = await this.validateAppSignature();
         if (!signatureResult.isValid) {
-          result.errors.push('App signature validation failed - app may be modified');
-          this.securityChecks['signatureCheck'] = false;
-          result.isValid = false;
-        } else {
-          this.securityChecks['signatureCheck'] = true;
+          result.warnings.push('App signature validation failed');
+          // Don't block for now, just warn
         }
       }
 
       // Debug detection
       const debugResult = await this.checkDebugMode();
-      if (!debugResult.isValid && !__DEV__) {
-        result.warnings.push('Debug mode detected in production');
-        this.securityChecks['debugCheck'] = false;
-      } else {
-        this.securityChecks['debugCheck'] = true;
+      if (!debugResult.isValid) {
+        result.warnings.push('Debug mode detected');
       }
 
       // Generate device fingerprint for tracking
       await this.generateDeviceFingerprint();
-      await this.generateAppHash();
-
-      // Update security report
-      this.updateSecurityReport(result);
-
-      console.log('🔒 Security checks completed:', {
-        isValid: result.isValid,
-        warnings: result.warnings.length,
-        errors: result.errors.length
-      });
 
     } catch (error) {
       console.error('Security check error:', error);
@@ -115,20 +72,6 @@ class SecurityService {
     }
 
     return result;
-  }
-
-  private updateSecurityReport(result: SecurityCheckResult) {
-    this.securityReport = {
-      ...this.securityReport,
-      lastSecurityCheck: new Date().toISOString(),
-      checksPerformed: { ...this.securityChecks },
-      warnings: result.warnings,
-      errors: result.errors,
-      isValid: result.isValid,
-      deviceFingerprint: this.deviceFingerprint,
-      appHash: this.appHash,
-      platform: Platform.OS,
-    };
   }
 
   private async checkRootStatus(): Promise<{ isValid: boolean }> {
@@ -139,13 +82,7 @@ class SecurityService {
 
       // Enhanced root detection using multiple methods
       const rootIndicators = await this.checkMultipleRootIndicators();
-      const isRooted = rootIndicators.isRooted;
-      
-      if (isRooted) {
-        console.warn('🔒 Root/jailbreak detected:', rootIndicators.indicators);
-      }
-      
-      return { isValid: !isRooted };
+      return { isValid: !rootIndicators.isRooted };
     } catch (error) {
       console.error('Root check error:', error);
       return { isValid: true }; // Assume valid if check fails
@@ -156,77 +93,25 @@ class SecurityService {
     const indicators: string[] = [];
     
     try {
-      // Method 1: Check for common root/jailbreak files and directories
+      // Method 1: Check for common root apps and files
       if (Platform.OS === 'android') {
-        const suspiciousApps = [
-          'com.topjohnwu.magisk',
-          'com.koushikdutta.superuser',
-          'com.noshufou.android.su',
-          'com.thirdparty.superuser',
-          'eu.chainfire.supersu'
-        ];
-        
-        // In a real implementation, you'd use a native module to check these
-        // For now, we'll use device characteristics as indicators
-        const deviceInfo = await this.getDeviceInfo();
-        
-        if (deviceInfo.brand?.toLowerCase().includes('generic') ||
-            deviceInfo.manufacturer?.toLowerCase().includes('unknown')) {
-          indicators.push('suspicious_device_info');
-        }
+        // This would require native module implementation
+        // For now, use basic detection
+        const suspiciousApps = ['com.topjohnwu.magisk', 'com.koushikdutta.superuser'];
+        // In real implementation, you'd check if these apps are installed
       }
       
-      // Method 2: Check for jailbreak on iOS
+      // Method 2: Check system properties
       if (Platform.OS === 'ios') {
         // Check for jailbreak indicators
-        // This would require native implementation for full detection
-        const deviceInfo = await this.getDeviceInfo();
-        
-        // Basic check - in production you'd use a proper jailbreak detection library
-        if (deviceInfo.deviceType === Device.DeviceType.UNKNOWN) {
-          indicators.push('unknown_device_type');
-        }
+        // This would require native implementation
       }
       
-      // Method 3: Check system properties and environment
-      const environmentCheck = await this.checkEnvironmentIndicators();
-      indicators.push(...environmentCheck);
-      
-      return { isRooted: indicators.length > 2, indicators }; // Require multiple indicators
+      return { isRooted: indicators.length > 0, indicators };
     } catch (error) {
       console.error('Root indicator check failed:', error);
       return { isRooted: false, indicators: [] };
     }
-  }
-
-  private async checkEnvironmentIndicators(): Promise<string[]> {
-    const indicators: string[] = [];
-    
-    try {
-      // Check for debugging tools
-      if (typeof window !== 'undefined' && window.console && window.console.clear) {
-        // Check if console has been modified
-        const originalLog = console.log.toString();
-        if (originalLog.includes('native code') === false) {
-          indicators.push('console_modified');
-        }
-      }
-      
-      // Check for common debugging variables
-      if (typeof global !== 'undefined') {
-        const suspiciousGlobals = ['__REACT_DEVTOOLS_GLOBAL_HOOK__', '__REDUX_DEVTOOLS_EXTENSION__'];
-        for (const globalVar of suspiciousGlobals) {
-          if ((global as any)[globalVar]) {
-            indicators.push(`debug_tool_${globalVar}`);
-          }
-        }
-      }
-      
-    } catch (error) {
-      console.error('Environment check error:', error);
-    }
-    
-    return indicators;
   }
 
   private async checkEmulatorStatus(): Promise<{ isValid: boolean }> {
@@ -254,7 +139,7 @@ class SecurityService {
     }
   }
 
-  private async getDeviceInfo(): Promise<DeviceInfo> {
+  private async getDeviceInfo() {
     try {
       return {
         brand: Device.brand,
@@ -272,11 +157,10 @@ class SecurityService {
     }
   }
 
-  private detectAndroidEmulator(deviceInfo: DeviceInfo): boolean {
+  private detectAndroidEmulator(deviceInfo: any): boolean {
     const emulatorIndicators = [
       'google_sdk', 'emulator', 'android sdk', 'genymotion',
-      'vbox', 'simulator', 'virtual', 'goldfish', 'ranchu',
-      'generic', 'unknown'
+      'vbox', 'simulator', 'virtual', 'goldfish', 'ranchu'
     ];
 
     const brand = deviceInfo.brand?.toLowerCase() || '';
@@ -284,19 +168,17 @@ class SecurityService {
     const modelName = deviceInfo.modelName?.toLowerCase() || '';
     const deviceName = deviceInfo.deviceName?.toLowerCase() || '';
 
-    const indicatorCount = emulatorIndicators.filter(indicator =>
+    return emulatorIndicators.some(indicator =>
       brand.includes(indicator) ||
       manufacturer.includes(indicator) ||
       modelName.includes(indicator) ||
       deviceName.includes(indicator)
-    ).length;
-
-    // Require multiple indicators to reduce false positives
-    return indicatorCount >= 2;
+    );
   }
 
   private async detectIOSSimulator(): Promise<boolean> {
     try {
+      // iOS simulator detection
       if (Platform.OS === 'ios') {
         const deviceType = Device.deviceType;
         // Device.DeviceType.UNKNOWN typically indicates simulator
@@ -319,21 +201,15 @@ class SecurityService {
       this.appHash = currentHash;
       
       // In production, you'd compare against known good signatures
-      // For now, just validate that we can generate a consistent hash
-      const isValid = currentHash.length > 0 && appInfo.applicationId !== null;
-      
-      if (!isValid) {
-        console.warn('🔒 App signature validation failed');
-      }
-      
-      return { isValid };
+      // For now, just validate that we can generate a hash
+      return { isValid: currentHash.length > 0 };
     } catch (error) {
       console.error('Signature validation error:', error);
       return { isValid: true };
     }
   }
 
-  private async getAppInfo(): Promise<AppInfo> {
+  private async getAppInfo() {
     try {
       return {
         applicationId: Application.applicationId,
@@ -345,10 +221,7 @@ class SecurityService {
       };
     } catch (error) {
       console.error('Error getting app info:', error);
-      return {
-        platform: Platform.OS,
-        version: Platform.Version,
-      };
+      return {};
     }
   }
 
@@ -361,17 +234,10 @@ class SecurityService {
       const deviceInfo = await this.getDeviceInfo();
       const appInfo = await this.getAppInfo();
       
-      // Create a stable but unique fingerprint
       const fingerprintData = {
-        brand: deviceInfo.brand,
-        manufacturer: deviceInfo.manufacturer,
-        modelName: deviceInfo.modelName,
-        osName: deviceInfo.osName,
-        osVersion: deviceInfo.osVersion,
-        platform: Platform.OS,
-        appId: appInfo.applicationId,
-        // Add time-based component for rotation (daily)
-        timeComponent: Math.floor(Date.now() / (1000 * 60 * 60 * 24)),
+        ...deviceInfo,
+        ...appInfo,
+        timestamp: Math.floor(Date.now() / (1000 * 60 * 60 * 24)), // Daily rotation
       };
 
       const fingerprintString = JSON.stringify(fingerprintData);
@@ -380,11 +246,10 @@ class SecurityService {
         fingerprintString
       );
 
-      console.log('🔒 Device fingerprint generated');
       return this.deviceFingerprint;
     } catch (error) {
       console.error('Error generating device fingerprint:', error);
-      return 'fallback_fingerprint';
+      return '';
     }
   }
 
@@ -392,12 +257,7 @@ class SecurityService {
     try {
       // Check if app is in debug mode
       const isDebug = __DEV__;
-      
-      // Additional debug detection methods
-      const hasDebugger = typeof window !== 'undefined' && 
-        (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__;
-      
-      return { isValid: !isDebug && !hasDebugger };
+      return { isValid: !isDebug };
     } catch (error) {
       console.error('Debug mode check error:', error);
       return { isValid: true };
@@ -412,17 +272,14 @@ class SecurityService {
 
       // Enhanced app hash generation
       const appInfo = await this.getAppInfo();
+      const deviceInfo = await this.getDeviceInfo();
       
       const hashData = {
-        applicationId: appInfo.applicationId,
-        applicationName: appInfo.applicationName,
-        nativeApplicationVersion: appInfo.nativeApplicationVersion,
-        nativeBuildVersion: appInfo.nativeBuildVersion,
+        ...appInfo,
         platform: Platform.OS,
         version: Platform.Version,
-        buildTime: __DEV__ ? 'development' : 'production',
         // Add more app-specific data for integrity checking
-        bundleId: appInfo.applicationId,
+        buildTime: __DEV__ ? 'development' : 'production',
       };
 
       const hashString = JSON.stringify(hashData);
@@ -431,12 +288,19 @@ class SecurityService {
         hashString
       );
 
-      console.log('🔒 App hash generated');
       return this.appHash;
     } catch (error) {
       console.error('Error generating app hash:', error);
-      return 'fallback_app_hash';
+      return '';
     }
+  }
+
+  isSecurityCheckPassed(checkName: string): boolean {
+    return this.securityChecks[checkName] || false;
+  }
+
+  setSecurityCheckResult(checkName: string, passed: boolean) {
+    this.securityChecks[checkName] = passed;
   }
 
   async validateConfigIntegrity(config: any, expectedHash?: string): Promise<boolean> {
@@ -451,25 +315,11 @@ class SecurityService {
         configString
       );
 
-      const isValid = actualHash === expectedHash;
-      
-      if (!isValid) {
-        console.warn('🔒 Config integrity validation failed');
-      }
-
-      return isValid;
+      return actualHash === expectedHash;
     } catch (error) {
       console.error('Config integrity validation error:', error);
       return false;
     }
-  }
-
-  isSecurityCheckPassed(checkName: string): boolean {
-    return this.securityChecks[checkName] || false;
-  }
-
-  setSecurityCheckResult(checkName: string, passed: boolean) {
-    this.securityChecks[checkName] = passed;
   }
 
   getSecurityReport(): {
@@ -477,90 +327,13 @@ class SecurityService {
     appHash: string | null;
     checksPerformed: { [key: string]: boolean };
     platform: string;
-    lastSecurityCheck?: string;
-    warnings?: string[];
-    errors?: string[];
-    isValid?: boolean;
   } {
     return {
       deviceFingerprint: this.deviceFingerprint,
       appHash: this.appHash,
       checksPerformed: { ...this.securityChecks },
       platform: Platform.OS,
-      ...this.securityReport,
     };
-  }
-
-  // Method to detect tampering attempts
-  async detectTampering(): Promise<boolean> {
-    try {
-      // Check if critical app components have been modified
-      const currentAppHash = await this.generateAppHash();
-      
-      if (this.appHash && this.appHash !== currentAppHash) {
-        console.warn('🔒 App tampering detected - hash mismatch');
-        return true;
-      }
-      
-      // Check for debugging tools
-      if (typeof window !== 'undefined') {
-        const debugTools = [
-          '__REACT_DEVTOOLS_GLOBAL_HOOK__',
-          '__REDUX_DEVTOOLS_EXTENSION__',
-          'chrome',
-          'devtools'
-        ];
-        
-        for (const tool of debugTools) {
-          if ((window as any)[tool]) {
-            console.warn('🔒 Debug tool detected:', tool);
-            return true;
-          }
-        }
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Tampering detection error:', error);
-      return false;
-    }
-  }
-
-  // Method to handle security violations
-  handleSecurityViolation(violation: string, severity: 'warning' | 'error' = 'warning') {
-    console.warn(`🔒 Security violation (${severity}):`, violation);
-    
-    this.securityReport = {
-      ...this.securityReport,
-      violations: [
-        ...(this.securityReport.violations || []),
-        {
-          type: violation,
-          severity,
-          timestamp: new Date().toISOString(),
-        }
-      ]
-    };
-
-    if (severity === 'error') {
-      Alert.alert(
-        'Security Error',
-        `Security violation detected: ${violation}. The app cannot continue.`,
-        [{ text: 'OK' }]
-      );
-    } else {
-      // Log warning but don't block user
-      console.warn('🔒 Security warning logged:', violation);
-    }
-  }
-
-  // Reset security state (useful for testing)
-  resetSecurityState() {
-    this.securityChecks = {};
-    this.appHash = null;
-    this.deviceFingerprint = null;
-    this.securityReport = {};
-    console.log('🔒 Security state reset');
   }
 }
 
