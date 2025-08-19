@@ -1,109 +1,54 @@
 import { createClient } from '@supabase/supabase-js';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useConfig } from '../contexts/ConfigContext';
 
 // Dynamic Supabase client that will be initialized with runtime config
 let supabaseClient: any = null;
-let isInitialized = false;
 
 export const initializeSupabase = (url: string, anonKey: string) => {
-  if (supabaseClient && isInitialized) {
+  if (supabaseClient) {
     console.log('📱 Supabase already initialized');
     return supabaseClient;
   }
 
   console.log('📱 Initializing Supabase with runtime config');
-  console.log('📱 Supabase URL:', url);
-  console.log('📱 Anon Key length:', anonKey.length);
+  supabaseClient = createClient(url, anonKey, {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+      flowType: 'implicit',
+    },
+  });
 
-  try {
-    supabaseClient = createClient(url, anonKey, {
-      auth: {
-        storage: AsyncStorage,
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: false,
-        flowType: 'implicit',
-      },
-      global: {
-        headers: {
-          'X-Client-Info': 'vidgro-mobile',
-        },
-      },
-      db: {
-        schema: 'public',
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
-      },
-    });
-
-    isInitialized = true;
-    console.log('📱 Supabase client created successfully');
-    
-    // Test the connection
-    testSupabaseConnection();
-    
-    return supabaseClient;
-  } catch (error) {
-    console.error('📱 Supabase initialization failed:', error);
-    throw new Error(`Failed to initialize Supabase: ${error}`);
-  }
-};
-
-const testSupabaseConnection = async () => {
-  try {
-    if (!supabaseClient) return;
-    
-    // Simple connection test
-    const { data, error } = await supabaseClient
-      .from('profiles')
-      .select('id')
-      .limit(1);
-    
-    if (error && error.code !== 'PGRST116') {
-      console.warn('📱 Supabase connection test warning:', error.message);
-    } else {
-      console.log('📱 Supabase connection test successful');
-    }
-  } catch (error) {
-    console.warn('📱 Supabase connection test failed:', error);
-  }
+  return supabaseClient;
 };
 
 export const getSupabase = () => {
-  if (!supabaseClient || !isInitialized) {
-    throw new Error('Supabase not initialized. Call initializeSupabase first with runtime config.');
+  if (!supabaseClient) {
+    console.warn('⚠️ Supabase accessed before initialization, returning null');
+    return null;
   }
   return supabaseClient;
 };
 
-// For backward compatibility, export as supabase with proper error handling
+// For backward compatibility, export as supabase
 export const supabase = new Proxy({} as any, {
   get(target, prop) {
-    if (!supabaseClient || !isInitialized) {
-      throw new Error('Supabase not initialized. Ensure ConfigLoader has completed initialization.');
+    const client = getSupabase();
+    if (!client) {
+      console.warn('⚠️ Supabase accessed before initialization');
+      return () => Promise.resolve({ data: null, error: new Error('Supabase not initialized') });
     }
-    return supabaseClient[prop];
+    return client[prop];
   }
 });
 
-// Enhanced video watching function with better error handling
-export const watchVideo = async (userId: string, videoId: string, watchDuration: number, fullyWatched = false) => {
+// Remove old awardCoinsForVideo function and replace with new watchVideo
+export const watchVideo = async (userId, videoId, watchDuration, fullyWatched = false) => {
   try {
-    if (!userId || !videoId) {
-      throw new Error('Missing required parameters: userId or videoId');
-    }
-
-    console.log('📹 Calling watch_video_and_earn_coins:', {
-      userId,
-      videoId,
-      watchDuration,
-      fullyWatched
-    });
-
     const { data, error } = await getSupabase().rpc('watch_video_and_earn_coins', {
       user_uuid: userId,
       video_uuid: videoId,
@@ -116,7 +61,6 @@ export const watchVideo = async (userId: string, videoId: string, watchDuration:
       return { data: null, error };
     }
 
-    console.log('📹 Watch video result:', data);
     return { data, error: null };
   } catch (err) {
     console.error('Unexpected error in watchVideo:', err);
@@ -124,12 +68,9 @@ export const watchVideo = async (userId: string, videoId: string, watchDuration:
   }
 };
 
-// Get user profile with enhanced error handling
+// Get user profile
 export async function getUserProfile(userId: string) {
-  if (!userId) {
-    console.error('getUserProfile: userId is required');
-    return null;
-  }
+  if (!userId) return null;
 
   try {
     const { data, error } = await getSupabase()
@@ -143,7 +84,6 @@ export async function getUserProfile(userId: string) {
       return null;
     }
 
-    console.log('📱 User profile loaded successfully');
     return data;
   } catch (error) {
     console.error('Profile fetch failed:', error);
@@ -151,157 +91,156 @@ export async function getUserProfile(userId: string) {
   }
 }
 
-// Get video queue with enhanced error handling
+// Get video queue
 export async function getVideoQueue(userId: string) {
-  if (!userId) {
-    throw new Error('getUserQueue: userId is required');
-  }
+  if (!userId) return null;
 
   try {
-    console.log('📹 Fetching video queue for user:', userId);
-    
-    const { data, error } = await getSupabase().rpc('get_video_queue_for_user', {
+    const client = getSupabase();
+    if (!client) return [];
+
+    const { data, error } = await client.rpc('get_video_queue_for_user', {
       user_uuid: userId
     });
 
-    if (error) {
-      console.error('Error fetching video queue:', error);
-      throw new Error(`Database error: ${error.message}`);
+    if (!error) {
+      const mapped = (data || []).map((v: any) => ({
+        video_id: v.video_id ?? v.id,
+        youtube_url: v.youtube_url ?? v.video_url ?? '',
+        title: v.title,
+        duration_seconds: Number(v.duration_seconds || 0),
+        coin_reward: Number(v.coin_reward ?? 0),
+        views_count: Number(v.views_count ?? 0),
+        target_views: Number(v.target_views ?? 0),
+        status: v.status,
+        user_id: v.user_id,
+        completed: v.completed ?? false,
+        total_watch_time: Number(v.total_watch_time ?? 0),
+        completion_rate: Number(v.completion_rate ?? 0),
+      }));
+      return mapped;
     }
 
-    console.log('📹 Video queue fetched:', data?.length || 0, 'videos');
-    return data || [];
+    console.warn('RPC get_video_queue_for_user failed, falling back to direct query:', error?.message);
+
+    // Fallback: fetch watchable videos (active OR on_hold expired), not completed, not owned by requester
+    const nowIso = new Date().toISOString();
+    const { data: fallback, error: fallbackError } = await client
+      .from('videos')
+      .select(`
+        id, youtube_url, video_url, title, duration_seconds, coin_reward,
+        views_count, target_views, status, user_id, completed,
+        total_watch_time, completion_rate, created_at, hold_until, repromoted_at
+      `)
+      .neq('user_id', userId)
+      .eq('completed', false)
+      .or(`status.eq.active,status.eq.on_hold.and.hold_until.lte.${nowIso}`)
+      .order('repromoted_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (fallbackError) {
+      console.error('Fallback video query failed:', fallbackError);
+      return [];
+    }
+
+    console.log('🎬 Fallback video query returned:', mapped.length);
+
+    // Map to expected shape
+    const mapped = (fallback || []).map((v: any) => ({
+      video_id: v.id,
+      youtube_url: v.youtube_url || v.video_url,
+      title: v.title,
+      duration_seconds: Number(v.duration_seconds || 0),
+      coin_reward: Number(v.coin_reward ?? 0),
+      views_count: Number(v.views_count ?? 0),
+      target_views: Number(v.target_views ?? 0),
+      status: v.status,
+      user_id: v.user_id,
+      completed: v.completed ?? false,
+      total_watch_time: Number(v.total_watch_time ?? 0),
+      completion_rate: Number(v.completion_rate ?? 0),
+    }));
+
+    console.log('🎬 Fallback video query returned:', mapped.length);
+    return mapped;
   } catch (error) {
     console.error('getVideoQueue error:', error);
     throw error;
   }
 }
 
-// Create video promotion with enhanced validation
-export const createVideoPromotion = async (
-  coinCost: number, 
-  coinReward: number, 
-  duration: number, 
-  targetViews: number, 
-  title: string, 
-  userId: string, 
-  youtubeUrl: string
-) => {
-  try {
-    // Validate inputs
-    if (!userId || !youtubeUrl || !title) {
-      throw new Error('Missing required parameters');
-    }
-
-    if (coinCost <= 0 || coinReward <= 0 || duration <= 0 || targetViews <= 0) {
-      throw new Error('Invalid numeric parameters');
-    }
-
-    console.log('📹 Creating video promotion:', {
-      coinCost,
-      coinReward,
-      duration,
-      targetViews,
-      title: title.substring(0, 50) + '...',
-      userId,
-      youtubeUrl: youtubeUrl.substring(0, 50) + '...'
-    });
-
-    const { data, error } = await getSupabase().rpc('create_video_promotion', {
-      coin_cost_param: coinCost,
-      coin_reward_param: coinReward,
-      duration_seconds_param: duration,
-      target_views_param: targetViews,
-      title_param: title,
-      user_uuid: userId,
-      youtube_url_param: youtubeUrl
-    });
-
-    if (error) {
-      console.error('Error creating video promotion:', error);
-      return { data: null, error };
-    }
-
-    console.log('📹 Video promotion created successfully');
-    return { data, error: null };
-  } catch (err) {
-    console.error('createVideoPromotion error:', err);
-    return { data: null, error: err };
-  }
+// Create video promotion
+export const createVideoPromotion = async (coinCost, coinReward, duration, targetViews, title, userId, youtubeUrl) => {
+  const { data, error } = await getSupabase().rpc('create_video_promotion', {
+    coin_cost_param: coinCost,
+    coin_reward_param: coinReward,
+    duration_seconds_param: duration,
+    target_views_param: targetViews,
+    title_param: title,
+    user_uuid: userId,
+    youtube_url_param: youtubeUrl
+  });
+  return { data, error };
 };
 
-// Repromote video with enhanced validation
-export const repromoteVideo = async (videoId: string, userId: string, additionalCost = 0) => {
-  try {
-    if (!videoId || !userId) {
-      throw new Error('Missing required parameters: videoId or userId');
-    }
-
-    console.log('📹 Repromoting video:', { videoId, userId, additionalCost });
-
-    const { data, error } = await getSupabase().rpc('repromote_video', {
-      video_uuid: videoId,
-      user_uuid: userId,
-      additional_coin_cost: additionalCost
-    });
-
-    if (error) {
-      console.error('Error repromoting video:', error);
-      return { data: null, error };
-    }
-
-    console.log('📹 Video repromoted successfully');
-    return { data, error: null };
-  } catch (err) {
-    console.error('repromoteVideo error:', err);
-    return { data: null, error: err };
-  }
+// Repromote video
+export const repromoteVideo = async (videoId, userId, additionalCost = 0) => {
+  const { data, error } = await getSupabase().rpc('repromote_video', {
+    video_uuid: videoId,
+    user_uuid: userId,
+    additional_coin_cost: additionalCost
+  });
+  return { data, error };
 };
 
-// Delete video with enhanced validation
-export const deleteVideo = async (videoId: string, userId: string) => {
-  try {
-    if (!videoId || !userId) {
-      throw new Error('Missing required parameters: videoId or userId');
-    }
-
-    console.log('📹 Deleting video:', { videoId, userId });
-
-    const { data, error } = await getSupabase().rpc('delete_video_with_refund', {
-      video_uuid: videoId,
-      user_uuid: userId
-    });
-
-    if (error) {
-      console.error('Error deleting video:', error);
-      return { data: null, error };
-    }
-
-    console.log('📹 Video deleted successfully');
-    return { data, error: null };
-  } catch (err) {
-    console.error('deleteVideo error:', err);
-    return { data: null, error: err };
-  }
+// Delete video
+export const deleteVideo = async (videoId, userId) => {
+  const { data, error } = await getSupabase().rpc('delete_video_with_refund', {
+    video_uuid: videoId,
+    user_uuid: userId
+  });
+  return { data, error };
 };
 
 // Get user comprehensive analytics
 export const getUserComprehensiveAnalytics = async (userId: string) => {
   try {
-    if (!userId) {
-      throw new Error('getUserComprehensiveAnalytics: userId is required');
-    }
-
     const { data, error } = await getSupabase().rpc('get_user_comprehensive_analytics', {
       user_uuid: userId
     });
 
-    if (error) {
-      console.error('Error fetching user analytics:', error);
-      return { data: null, error };
+    if (!error) {
+      return { data, error: null };
     }
 
-    return { data, error: null };
+    console.warn('RPC get_user_comprehensive_analytics failed, using fallback:', error?.message);
+    
+    // Fallback: calculate analytics from videos table
+    const { data: videos, error: videosError } = await getSupabase()
+      .from('videos')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (videosError) {
+      console.error('Fallback analytics query failed:', videosError);
+      return { data: null, error: videosError };
+    }
+
+    const analytics = {
+      total_videos_promoted: videos?.length || 0,
+      active_videos: videos?.filter(v => v.status === 'active').length || 0,
+      completed_videos: videos?.filter(v => v.status === 'completed').length || 0,
+      on_hold_videos: videos?.filter(v => v.status === 'on_hold').length || 0,
+      total_views_received: videos?.reduce((sum, v) => sum + (v.views_count || 0), 0) || 0,
+      total_watch_time_received: videos?.reduce((sum, v) => sum + (v.total_watch_time || 0), 0) || 0,
+      total_coins_distributed: videos?.reduce((sum, v) => sum + (v.coins_earned_total || 0), 0) || 0,
+      average_completion_rate: videos?.length > 0 ? videos.reduce((sum, v) => sum + (v.completion_rate || 0), 0) / videos.length : 0,
+      current_coins: 0, // Would need to fetch from profiles table
+      total_coins_earned: videos?.reduce((sum, v) => sum + (v.coins_earned_total || 0), 0) || 0
+    };
+
+    return { data: analytics, error: null };
   } catch (err) {
     console.error('getUserComprehensiveAnalytics error:', err);
     return { data: null, error: err };
@@ -311,20 +250,42 @@ export const getUserComprehensiveAnalytics = async (userId: string) => {
 // Get user videos with analytics
 export const getUserVideosWithAnalytics = async (userId: string) => {
   try {
-    if (!userId) {
-      throw new Error('getUserVideosWithAnalytics: userId is required');
-    }
-
     const { data, error } = await getSupabase().rpc('get_user_videos_with_analytics', {
       user_uuid: userId
     });
 
-    if (error) {
-      console.error('Error fetching user videos:', error);
-      return { data: null, error };
+    if (!error) {
+      return { data, error: null };
     }
 
-    return { data, error: null };
+    console.warn('RPC get_user_videos_with_analytics failed, using fallback:', error?.message);
+    
+    // Fallback: fetch videos directly from videos table
+    const { data: videos, error: videosError } = await getSupabase()
+      .from('videos')
+      .select(`
+        id as video_id,
+        title,
+        views_count,
+        target_views,
+        status,
+        created_at,
+        coin_cost,
+        completion_rate,
+        completed,
+        total_watch_time,
+        coins_earned_total
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (videosError) {
+      console.error('Fallback videos query failed:', videosError);
+      return { data: null, error: videosError };
+    }
+
+    return { data: videos || [], error: null };
   } catch (err) {
     console.error('getUserVideosWithAnalytics error:', err);
     return { data: null, error: err };
@@ -332,25 +293,10 @@ export const getUserVideosWithAnalytics = async (userId: string) => {
 };
 
 export const getUserRecentActivity = async (userId: string) => {
-  try {
-    if (!userId) {
-      throw new Error('getUserRecentActivity: userId is required');
-    }
-
-    const { data, error } = await getSupabase().rpc('get_user_recent_activity', {
-      user_uuid: userId
-    });
-
-    if (error) {
-      console.error('Error fetching user recent activity:', error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
-  } catch (err) {
-    console.error('getUserRecentActivity error:', err);
-    return { data: null, error: err };
-  }
+  const { data, error } = await getSupabase().rpc('get_user_recent_activity', {
+    user_uuid: userId
+  });
+  return { data, error };
 };
 
 // Record coin purchase transaction
@@ -364,20 +310,6 @@ export const recordCoinPurchase = async (
   platform: string = 'unknown'
 ) => {
   try {
-    if (!userId || !packageId || !transactionId) {
-      throw new Error('Missing required parameters for coin purchase');
-    }
-
-    console.log('💰 Recording coin purchase:', {
-      userId,
-      packageId,
-      coinsAmount,
-      bonusCoins,
-      pricePaid,
-      transactionId,
-      platform
-    });
-
     const { data, error } = await getSupabase().rpc('record_coin_purchase', {
       user_uuid: userId,
       package_id: packageId,
@@ -393,7 +325,6 @@ export const recordCoinPurchase = async (
       return { data: null, error };
     }
 
-    console.log('💰 Coin purchase recorded successfully');
     return { data, error: null };
   } catch (err) {
     console.error('recordCoinPurchase error:', err);
@@ -401,13 +332,9 @@ export const recordCoinPurchase = async (
   }
 };
 
-// Get user transaction history with pagination
-export const getUserTransactionHistory = async (userId: string, limit: number = 50, offset: number = 0) => {
+// Get user transaction history
+export const getUserTransactionHistory = async (userId: string, limit: number = 50) => {
   try {
-    if (!userId) {
-      throw new Error('getUserTransactionHistory: userId is required');
-    }
-
     const { data, error } = await getSupabase()
       .from('coin_transactions')
       .select(`
@@ -421,7 +348,7 @@ export const getUserTransactionHistory = async (userId: string, limit: number = 
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .limit(limit);
 
     if (error) {
       console.error('Error fetching transaction history:', error);
@@ -433,31 +360,4 @@ export const getUserTransactionHistory = async (userId: string, limit: number = 
     console.error('getUserTransactionHistory error:', err);
     return { data: null, error: err };
   }
-};
-
-// Health check function to verify Supabase connectivity
-export const healthCheck = async (): Promise<boolean> => {
-  try {
-    if (!supabaseClient || !isInitialized) {
-      return false;
-    }
-
-    const { data, error } = await supabaseClient
-      .from('profiles')
-      .select('id')
-      .limit(1);
-
-    return !error || error.code === 'PGRST116'; // PGRST116 is "no rows returned" which is fine
-  } catch (error) {
-    console.error('Supabase health check failed:', error);
-    return false;
-  }
-};
-
-// Get initialization status
-export const getInitializationStatus = () => {
-  return {
-    isInitialized,
-    hasClient: supabaseClient !== null,
-  };
 };
