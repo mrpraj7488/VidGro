@@ -72,6 +72,21 @@ export default function Analytics() {
     if (user && user.id) {
       // Check if analytics are enabled
       if (!analyticsEnabled) {
+        // Gracefully show empty analytics instead of an infinite loading skeleton
+        setAnalytics({
+          current_coins: profile?.coins || 0,
+          total_videos_promoted: 0,
+          completed_videos: 0,
+          total_views_received: 0,
+          total_watch_time_received: 0,
+          total_coins_distributed: 0,
+          average_completion_rate: 0,
+          active_videos: 0,
+          on_hold_videos: 0,
+          total_coins_earned: 0,
+        });
+        setVideos([]);
+        setRecentActivity([]);
         setLoading(false);
         return;
       }
@@ -126,9 +141,21 @@ export default function Analytics() {
             total_coins_earned: 0
           });
         } else {
-          Alert.alert('Error', 'Failed to load analytics data');
+          // Show empty analytics rather than blocking the screen
+          setAnalytics({
+            current_coins: profile?.coins || 0,
+            total_videos_promoted: 0,
+            completed_videos: 0,
+            total_views_received: 0,
+            total_watch_time_received: 0,
+            total_coins_distributed: 0,
+            average_completion_rate: 0,
+            active_videos: 0,
+            on_hold_videos: 0,
+            total_coins_earned: 0
+          });
         }
-        return;
+        // Continue to attempt loading activity/videos even if summary failed
       }
 
       if (analyticsData) {
@@ -163,7 +190,11 @@ export default function Analytics() {
         // If the function doesn't exist, fetch directly from videos table
         if (typeof videosError === 'object' && videosError !== null && 'message' in videosError && typeof videosError.message === 'string' && (videosError.message.includes('function') || videosError.message.includes('not found'))) {
           console.log('User videos function not found, fetching directly from videos table');
-          const { data: directVideosData, error: directVideosError } = await supabase
+          const supabase = getSupabase();
+          if (!supabase) {
+            console.warn('Supabase not initialized for direct video fetch');
+          } else {
+            const { data: directVideosData, error: directVideosError } = await supabase
             .from('videos')
             .select(`
               id,
@@ -182,28 +213,29 @@ export default function Analytics() {
             .order('created_at', { ascending: false })
             .limit(10);
 
-          if (directVideosError) {
-            console.error('Direct videos error:', directVideosError);
-          } else if (directVideosData) {
-            const videosWithCompletion = directVideosData.map((video: any) => ({
-              video_id: video.id,
-              title: video.title,
-              views_count: video.views_count,
-              target_views: video.target_views,
-              status: video.status,
-              created_at: video.created_at,
-              coin_cost: video.coin_cost || 0,
-              completion_rate: video.completion_rate || (video.target_views > 0 
-                ? Math.round((video.views_count / video.target_views) * 100)
-                : 0),
-              completed: video.completed,
-              total_watch_time: video.total_watch_time || 0,
-              coins_earned_total: video.coins_earned_total || 0
-            }));
-            console.log('Direct videos data:', directVideosData);
-            console.log('Videos with completion:', videosWithCompletion);
-            console.log('Sample direct video coin_cost:', videosWithCompletion[0]?.coin_cost);
-            setVideos(videosWithCompletion);
+            if (directVideosError) {
+              console.error('Direct videos error:', directVideosError);
+            } else if (directVideosData) {
+              const videosWithCompletion = directVideosData.map((video: any) => ({
+                video_id: video.id,
+                title: video.title,
+                views_count: video.views_count,
+                target_views: video.target_views,
+                status: video.status,
+                created_at: video.created_at,
+                coin_cost: video.coin_cost || 0,
+                completion_rate: video.completion_rate || (video.target_views > 0 
+                  ? Math.round((video.views_count / video.target_views) * 100)
+                  : 0),
+                completed: video.completed,
+                total_watch_time: video.total_watch_time || 0,
+                coins_earned_total: video.coins_earned_total || 0
+              }));
+              console.log('Direct videos data:', directVideosData);
+              console.log('Videos with completion:', videosWithCompletion);
+              console.log('Sample direct video coin_cost:', videosWithCompletion[0]?.coin_cost);
+              setVideos(videosWithCompletion);
+            }
           }
         }
       } else if (videosData) {
