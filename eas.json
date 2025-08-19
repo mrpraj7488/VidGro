@@ -7,15 +7,13 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "NODE_ENV": "development",
-        "EXPO_PUBLIC_API_BASE_URL": "https://admin.vidgro.com/api"
+        "NODE_ENV": "development"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "NODE_ENV": "production",
-        "EXPO_PUBLIC_API_BASE_URL": "https://admin.vidgro.com/api"
+        "NODE_ENV": "production"
       },
       "android": {
         "buildType": "apk"
@@ -23,12 +21,10 @@
     },
     "production": {
       "env": {
-        "NODE_ENV": "production",
-        "EXPO_PUBLIC_API_BASE_URL": "https://admin.vidgro.com/api"
+        "NODE_ENV": "production"
       },
       "android": {
-        "buildType": "app-bundle",
-        "gradleCommand": ":app:bundleRelease"
+        "buildType": "app-bundle"
       },
       "ios": {
         "bundleIdentifier": "com.vidgro.watch"
@@ -38,15 +34,7 @@
       "extends": "production",
       "env": {
         "NODE_ENV": "production",
-        "ENABLE_OBFUSCATION": "true",
-        "EXPO_PUBLIC_API_BASE_URL": "https://admin.vidgro.com/api"
-      },
-      "android": {
-        "buildType": "app-bundle",
-        "gradleCommand": ":app:bundleRelease"
-      },
-      "ios": {
-        "bundleIdentifier": "com.vidgro.watch"
+        "ENABLE_OBFUSCATION": "true"
       }
     }
   },
