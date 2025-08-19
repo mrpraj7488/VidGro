@@ -25,32 +25,27 @@ export default function Login() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both email and password');
       return;
     }
 
-    // Minimal email validation - just check for @ symbol
     const trimmedEmail = email.trim();
-    if (!trimmedEmail.includes('@')) {
-      Alert.alert('Error', 'Please enter an email address with @ symbol');
-      return;
-    }
-
     setLoading(true);
     try {
       const { error } = await signIn(trimmedEmail, password);
-      if (error) {
-        Alert.alert('Error', 'Invalid email or password');
-        return;
+              if (error) {
+          Alert.alert('Login Failed', error.message || 'Invalid email or password');
+          return;
+        }
+        
+        // If no error, login was successful
+        router.replace('/(tabs)');
+          } catch (error) {
+        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      } finally {
+        setLoading(false);
       }
-      router.replace('/(tabs)');
-    } catch (error) {
-      console.error('Login error:', error);
-      Alert.alert('Error', 'Invalid email or password');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
