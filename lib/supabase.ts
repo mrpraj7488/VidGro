@@ -7,7 +7,7 @@ import { useConfig } from '../contexts/ConfigContext';
 export interface RuntimeConfig {
   supabase: {
     url: string;
-    anonKey: string | null;
+    anonKey?: string;
   };
   admob: {
     appId?: string;
@@ -42,14 +42,41 @@ export interface RuntimeConfig {
 }
 
 // Dynamic Supabase client that will be initialized with runtime config
+
 let supabaseClient: any = null;
 
-export const initializeSupabase = (url: string, anonKey: string) => {
+// Keep track of initialization attempts
+let initializationAttempts = 0;
+const MAX_INITIALIZATION_ATTEMPTS = 3;
+
+// Helper: Initialize Supabase with config if possible
+const tryInitializeWithConfig = (config: RuntimeConfig | null): boolean => {
+  if (!config?.supabase?.url) {
+    console.warn('⚠️ Cannot initialize Supabase: missing URL in config');
+    return false;
+  }
+
+  // For public endpoint, use fallback key if anonKey is missing
+  const anonKey = config.supabase.anonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    console.warn('⚠️ Cannot initialize Supabase: missing anonKey in config and no fallback available');
+    return false;
+  }
+
+  const client = initializeSupabase(config.supabase.url, anonKey);
+  return !!client;
+};
+
+
+export const initializeSupabase = (url: string, anonKey: string | null | undefined) => {
   if (supabaseClient) {
     console.log('📱 Supabase already initialized');
     return supabaseClient;
   }
-
+  if (!url || !anonKey) {
+    console.warn('⚠️ Cannot initialize Supabase: missing url or anonKey');
+    return null;
+  }
   console.log('📱 Initializing Supabase with runtime config');
   supabaseClient = createClient(url, anonKey, {
     auth: {
@@ -60,7 +87,6 @@ export const initializeSupabase = (url: string, anonKey: string) => {
       flowType: 'implicit',
     },
   });
-
   return supabaseClient;
 };
 
@@ -85,7 +111,12 @@ export const supabase = new Proxy({} as any, {
 });
 
 // Remove old awardCoinsForVideo function and replace with new watchVideo
-export const watchVideo = async (userId, videoId, watchDuration, fullyWatched = false) => {
+export const watchVideo = async (
+  userId: string,
+  videoId: string,
+  watchDuration: number,
+  fullyWatched: boolean = false
+): Promise<{ data: any; error: any }> => {
   try {
     const { data, error } = await getSupabase().rpc('watch_video_and_earn_coins', {
       user_uuid: userId,
@@ -107,7 +138,7 @@ export const watchVideo = async (userId, videoId, watchDuration, fullyWatched = 
 };
 
 // Get user profile
-export async function getUserProfile(userId: string) {
+export async function getUserProfile(userId: string): Promise<any> {
   if (!userId) return null;
 
   try {
@@ -130,9 +161,8 @@ export async function getUserProfile(userId: string) {
 }
 
 // Get video queue
-export async function getVideoQueue(userId: string) {
-  if (!userId) return null;
-
+export async function getVideoQueue(userId: string): Promise<any[]> {
+  if (!userId) return [];
   try {
     const client = getSupabase();
     if (!client) return [];
@@ -142,7 +172,7 @@ export async function getVideoQueue(userId: string) {
     });
 
     if (!error) {
-      const mapped = (data || []).map((v: any) => ({
+      return (data || []).map((v: any) => ({
         video_id: v.video_id ?? v.id,
         youtube_url: v.youtube_url ?? v.video_url ?? '',
         title: v.title,
@@ -156,7 +186,6 @@ export async function getVideoQueue(userId: string) {
         total_watch_time: Number(v.total_watch_time ?? 0),
         completion_rate: Number(v.completion_rate ?? 0),
       }));
-      return mapped;
     }
 
     console.warn('RPC get_video_queue_for_user failed, falling back to direct query:', error?.message);
@@ -182,10 +211,8 @@ export async function getVideoQueue(userId: string) {
       return [];
     }
 
-    console.log('🎬 Fallback video query returned:', mapped.length);
-
     // Map to expected shape
-    const mapped = (fallback || []).map((v: any) => ({
+    const fallbackMapped = (fallback || []).map((v: any) => ({
       video_id: v.id,
       youtube_url: v.youtube_url || v.video_url,
       title: v.title,
@@ -200,8 +227,8 @@ export async function getVideoQueue(userId: string) {
       completion_rate: Number(v.completion_rate ?? 0),
     }));
 
-    console.log('🎬 Fallback video query returned:', mapped.length);
-    return mapped;
+    console.log('🎬 Fallback video query returned:', fallbackMapped.length);
+    return fallbackMapped;
   } catch (error) {
     console.error('getVideoQueue error:', error);
     throw error;
@@ -209,7 +236,15 @@ export async function getVideoQueue(userId: string) {
 }
 
 // Create video promotion
-export const createVideoPromotion = async (coinCost, coinReward, duration, targetViews, title, userId, youtubeUrl) => {
+export const createVideoPromotion = async (
+  coinCost: number,
+  coinReward: number,
+  duration: number,
+  targetViews: number,
+  title: string,
+  userId: string,
+  youtubeUrl: string
+): Promise<{ data: any; error: any }> => {
   const { data, error } = await getSupabase().rpc('create_video_promotion', {
     coin_cost_param: coinCost,
     coin_reward_param: coinReward,
@@ -223,7 +258,11 @@ export const createVideoPromotion = async (coinCost, coinReward, duration, targe
 };
 
 // Repromote video
-export const repromoteVideo = async (videoId, userId, additionalCost = 0) => {
+export const repromoteVideo = async (
+  videoId: string,
+  userId: string,
+  additionalCost: number = 0
+): Promise<{ data: any; error: any }> => {
   const { data, error } = await getSupabase().rpc('repromote_video', {
     video_uuid: videoId,
     user_uuid: userId,
@@ -233,7 +272,10 @@ export const repromoteVideo = async (videoId, userId, additionalCost = 0) => {
 };
 
 // Delete video
-export const deleteVideo = async (videoId, userId) => {
+export const deleteVideo = async (
+  videoId: string,
+  userId: string
+): Promise<{ data: any; error: any }> => {
   const { data, error } = await getSupabase().rpc('delete_video_with_refund', {
     video_uuid: videoId,
     user_uuid: userId
@@ -267,15 +309,15 @@ export const getUserComprehensiveAnalytics = async (userId: string) => {
 
     const analytics = {
       total_videos_promoted: videos?.length || 0,
-      active_videos: videos?.filter(v => v.status === 'active').length || 0,
-      completed_videos: videos?.filter(v => v.status === 'completed').length || 0,
-      on_hold_videos: videos?.filter(v => v.status === 'on_hold').length || 0,
-      total_views_received: videos?.reduce((sum, v) => sum + (v.views_count || 0), 0) || 0,
-      total_watch_time_received: videos?.reduce((sum, v) => sum + (v.total_watch_time || 0), 0) || 0,
-      total_coins_distributed: videos?.reduce((sum, v) => sum + (v.coins_earned_total || 0), 0) || 0,
-      average_completion_rate: videos?.length > 0 ? videos.reduce((sum, v) => sum + (v.completion_rate || 0), 0) / videos.length : 0,
+      active_videos: videos?.filter((v: any) => v.status === 'active').length || 0,
+      completed_videos: videos?.filter((v: any) => v.status === 'completed').length || 0,
+      on_hold_videos: videos?.filter((v: any) => v.status === 'on_hold').length || 0,
+      total_views_received: videos?.reduce((sum: number, v: any) => sum + (v.views_count || 0), 0) || 0,
+      total_watch_time_received: videos?.reduce((sum: number, v: any) => sum + (v.total_watch_time || 0), 0) || 0,
+      total_coins_distributed: videos?.reduce((sum: number, v: any) => sum + (v.coins_earned_total || 0), 0) || 0,
+      average_completion_rate: videos?.length > 0 ? videos.reduce((sum: number, v: any) => sum + (v.completion_rate || 0), 0) / videos.length : 0,
       current_coins: 0, // Would need to fetch from profiles table
-      total_coins_earned: videos?.reduce((sum, v) => sum + (v.coins_earned_total || 0), 0) || 0
+      total_coins_earned: videos?.reduce((sum: number, v: any) => sum + (v.coins_earned_total || 0), 0) || 0
     };
 
     return { data: analytics, error: null };
@@ -401,7 +443,7 @@ export const getUserTransactionHistory = async (userId: string, limit: number = 
 };
 
 // Validate runtime configuration structure
-const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
+export const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
   try {
     // Check if config has required structure
     if (!config || typeof config !== 'object') {
@@ -418,37 +460,30 @@ const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
       return null;
     }
 
-    // Check supabase configuration
-    if (!config.supabase.url) {
+    // Validate basic structure first
+    const hasAllRequiredFields = requiredFields.every(field => {
+      const hasField = field in config;
+      if (!hasField) {
+        console.warn(`📱 Config validation failed: Missing required field: ${field}`);
+      }
+      return hasField;
+    });
+
+    if (!hasAllRequiredFields) {
+      return null;
+    }
+
+    // Check if Supabase URL exists
+    if (!config.supabase?.url) {
       console.warn('📱 Config validation failed: Missing Supabase URL');
       return null;
     }
 
-    // For public endpoint, anonKey might be missing (that's okay)
-    // For secure endpoint, anonKey should be present
-    const hasAnonKey = !!config.supabase.anonKey;
-    
-    if (!hasAnonKey) {
-      console.log('📱 Config validation: Public endpoint detected (no anonKey) - this is expected');
-      // Return minimal config for public endpoint
-      return {
-        supabase: {
-          url: config.supabase.url,
-          anonKey: null // Will be filled from secure endpoint or cached config
-        },
-        admob: config.admob || {},
-        features: config.features || {},
-        app: config.app || {},
-        security: config.security || {},
-        metadata: config.metadata || {}
-      };
-    }
-
-    // Full config with anonKey
-    return {
+    // Create validated config with all fields
+    const validatedConfig = {
       supabase: {
         url: config.supabase.url,
-        anonKey: config.supabase.anonKey
+        anonKey: config.supabase.anonKey || undefined
       },
       admob: config.admob || {},
       features: config.features || {},
@@ -456,21 +491,34 @@ const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
       security: config.security || {},
       metadata: config.metadata || {}
     };
+
+    // Try to initialize Supabase with the validated config
+    if (!supabaseClient && initializationAttempts < MAX_INITIALIZATION_ATTEMPTS) {
+      initializationAttempts++;
+      const initialized = tryInitializeWithConfig(validatedConfig);
+      if (initialized) {
+        console.log('📱 Supabase initialized successfully with config');
+      } else {
+        console.warn(`📱 Supabase initialization attempt ${initializationAttempts} failed`);
+      }
+    }
+
+    return validatedConfig;
   } catch (error) {
     console.error('📱 Config validation error:', error);
     return null;
   }
 };
 
+import SecurityService from '../services/SecurityService';
 // Fetch runtime configuration from secure endpoint
 export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
   try {
     console.log('📱 Fetching runtime config from secure endpoint');
-    
-    const deviceId = await getDeviceId();
+    const deviceId = await SecurityService.getInstance().generateDeviceFingerprint();
     const clientId = process.env.EXPO_PUBLIC_MOBILE_CLIENT_ID || 'vidgro_mobile_2024';
     const clientSecret = process.env.EXPO_PUBLIC_MOBILE_CLIENT_SECRET || 'vidgro_secret_key_2024';
-    
+
     const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config/secure`, {
       method: 'POST',
       headers: {
@@ -489,7 +537,7 @@ export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
 
     const result = await response.json();
     console.log('📱 Server response received:', result);
-    
+
     if (result.error) {
       throw new Error(result.error);
     }
@@ -503,30 +551,30 @@ export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
     throw new Error('Invalid config structure in response data');
   } catch (error) {
     console.error('📱 Failed to fetch runtime config from secure endpoint:', error);
-    
+
     // Fallback to public endpoint for backward compatibility (minimal data)
     try {
       console.log('📱 Falling back to public endpoint for minimal config');
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('📱 Public endpoint response (minimal config):', result);
-      
+
       if (result.error) {
         throw new Error(result.error);
       }
-      
+
       // Validate the public config structure
       const validatedConfig = validateRuntimeConfig(result.data);
       if (validatedConfig) {
         console.log('📱 Public endpoint config validated successfully');
         return validatedConfig;
       }
-      
+
       throw new Error('Invalid config structure in public endpoint response');
     } catch (fallbackError) {
       console.error('📱 Both secure and public endpoints failed:', fallbackError);
