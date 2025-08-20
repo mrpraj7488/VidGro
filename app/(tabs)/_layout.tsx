@@ -1,14 +1,9 @@
 import { Tabs } from 'expo-router';
 import { Play, TrendingUp, ChartBar as BarChart3, MoveHorizontal as MoreHorizontal } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Platform, View } from 'react-native';
+import { Platform, View, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  interpolate,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
@@ -17,8 +12,53 @@ export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const { user, loading } = useAuth();
   const router = useRouter();
+  // Subtle shadow/scale on press for tab buttons
+  const TabButtonContainer = (props: any) => {
+    const { children, accessibilityRole, accessibilityState, accessibilityLabel, testID, onPress, onLongPress, disabled, style } = props;
 
+    const scale = useSharedValue(1);
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: scale.value }],
+    }));
 
+    // Static, platform-specific shadow (do not reference Platform inside worklet)
+    const baseShadowStyle = Platform.OS === 'ios'
+      ? {
+          shadowColor: colors.shadowColor,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: isDark ? 0.35 : 0.12,
+          shadowRadius: 10,
+        }
+      : {
+          elevation: 6,
+        } as const;
+
+    const onPressIn = () => {
+      scale.value = withTiming(1.04, { duration: 120 });
+    };
+    const onPressOut = () => {
+      scale.value = withTiming(1, { duration: 180 });
+    };
+
+    return (
+      <Pressable
+        accessibilityRole={accessibilityRole}
+        accessibilityState={accessibilityState}
+        accessibilityLabel={accessibilityLabel}
+        testID={testID}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        disabled={disabled}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={style}
+      >
+        <Animated.View style={[{ flex: 1, justifyContent: 'center', alignItems: 'center' }, baseShadowStyle, animatedStyle]}>
+          {children}
+        </Animated.View>
+      </Pressable>
+    );
+  };
 
   // Authentication guard
   useEffect(() => {
@@ -72,9 +112,10 @@ export default function TabLayout() {
             fontWeight: '600',
             marginBottom: Platform.OS === 'ios' ? 0 : 4,
           },
-          tabBarIconStyle: {
-            marginTop: Platform.OS === 'ios' ? 4 : 2,
-          },
+          tabBarIconStyle: { marginTop: Platform.OS === 'ios' ? 4 : 2 },
+          tabBarButton: (props) => (
+            <TabButtonContainer {...props} />
+          ),
           tabBarBackground: () => (
             <View style={{ flex: 1, position: 'relative' }}>
               
