@@ -3,6 +3,44 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useConfig } from '../contexts/ConfigContext';
 
+// Type definitions
+export interface RuntimeConfig {
+  supabase: {
+    url: string;
+    anonKey: string | null;
+  };
+  admob: {
+    appId?: string;
+    bannerId?: string;
+    interstitialId?: string;
+    rewardedId?: string;
+  };
+  features: {
+    coinsEnabled: boolean;
+    adsEnabled: boolean;
+    vipEnabled: boolean;
+    referralsEnabled: boolean;
+    analyticsEnabled: boolean;
+  };
+  app: {
+    minVersion: string;
+    forceUpdate: boolean;
+    maintenanceMode: boolean;
+    apiVersion: string;
+  };
+  security: {
+    allowEmulators: boolean;
+    allowRooted: boolean;
+    requireSignatureValidation: boolean;
+    adBlockDetection: boolean;
+  };
+  metadata: {
+    configVersion: string;
+    lastUpdated: string;
+    ttl: number;
+  };
+}
+
 // Dynamic Supabase client that will be initialized with runtime config
 let supabaseClient: any = null;
 
@@ -362,12 +400,88 @@ export const getUserTransactionHistory = async (userId: string, limit: number = 
   }
 };
 
+// Validate runtime configuration structure
+const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
+  try {
+    // Check if config has required structure
+    if (!config || typeof config !== 'object') {
+      console.warn('📱 Config validation failed: Invalid config object');
+      return null;
+    }
+
+    // Check for required top-level fields
+    const requiredFields = ['supabase', 'admob', 'features', 'app', 'security', 'metadata'];
+    const missingFields = requiredFields.filter(field => !config[field]);
+    
+    if (missingFields.length > 0) {
+      console.warn('📱 Config validation failed: Missing required fields:', missingFields);
+      return null;
+    }
+
+    // Check supabase configuration
+    if (!config.supabase.url) {
+      console.warn('📱 Config validation failed: Missing Supabase URL');
+      return null;
+    }
+
+    // For public endpoint, anonKey might be missing (that's okay)
+    // For secure endpoint, anonKey should be present
+    const hasAnonKey = !!config.supabase.anonKey;
+    
+    if (!hasAnonKey) {
+      console.log('📱 Config validation: Public endpoint detected (no anonKey) - this is expected');
+      // Return minimal config for public endpoint
+      return {
+        supabase: {
+          url: config.supabase.url,
+          anonKey: null // Will be filled from secure endpoint or cached config
+        },
+        admob: config.admob || {},
+        features: config.features || {},
+        app: config.app || {},
+        security: config.security || {},
+        metadata: config.metadata || {}
+      };
+    }
+
+    // Full config with anonKey
+    return {
+      supabase: {
+        url: config.supabase.url,
+        anonKey: config.supabase.anonKey
+      },
+      admob: config.admob || {},
+      features: config.features || {},
+      app: config.app || {},
+      security: config.security || {},
+      metadata: config.metadata || {}
+    };
+  } catch (error) {
+    console.error('📱 Config validation error:', error);
+    return null;
+  }
+};
+
 // Fetch runtime configuration from secure endpoint
 export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
   try {
     console.log('📱 Fetching runtime config from secure endpoint');
     
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config`);
+    const deviceId = await getDeviceId();
+    const clientId = process.env.EXPO_PUBLIC_MOBILE_CLIENT_ID || 'vidgro_mobile_2024';
+    const clientSecret = process.env.EXPO_PUBLIC_MOBILE_CLIENT_SECRET || 'vidgro_secret_key_2024';
+    
+    const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config/secure`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientId,
+        clientSecret,
+        deviceId
+      })
+    });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -380,9 +494,43 @@ export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
       throw new Error(result.error);
     }
 
-    return result.data;
+    // Validate the config structure
+    const validatedConfig = validateRuntimeConfig(result.data);
+    if (validatedConfig) {
+      return validatedConfig;
+    }
+
+    throw new Error('Invalid config structure in response data');
   } catch (error) {
-    console.error('📱 Failed to fetch runtime config:', error);
-    return null;
+    console.error('📱 Failed to fetch runtime config from secure endpoint:', error);
+    
+    // Fallback to public endpoint for backward compatibility (minimal data)
+    try {
+      console.log('📱 Falling back to public endpoint for minimal config');
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('📱 Public endpoint response (minimal config):', result);
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      
+      // Validate the public config structure
+      const validatedConfig = validateRuntimeConfig(result.data);
+      if (validatedConfig) {
+        console.log('📱 Public endpoint config validated successfully');
+        return validatedConfig;
+      }
+      
+      throw new Error('Invalid config structure in public endpoint response');
+    } catch (fallbackError) {
+      console.error('📱 Both secure and public endpoints failed:', fallbackError);
+      return null;
+    }
   }
 };
