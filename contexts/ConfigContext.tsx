@@ -168,10 +168,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const fetchFreshConfig = async () => {
     try {
       // 1) Try secure endpoint first (returns anonKey if authorized)
-      let freshConfig = await fetchSecureRuntimeConfig();
+      let freshConfig: RuntimeConfig | null = await fetchSecureRuntimeConfig();
 
       // 2) Fallback to public endpoint if secure failed
-      if (!freshConfig) {
+      const allowPublicFallback = process.env.EXPO_PUBLIC_ALLOW_PUBLIC_CONFIG !== 'false';
+      if (!freshConfig && allowPublicFallback) {
         const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin-vidgro.netlify.app';
         const configUrl = `${apiBaseUrl}/api/client-runtime-config`;
 
@@ -188,10 +189,15 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           },
         });
 
-        console.log('📱 Server response received:', JSON.stringify(response.data, null, 2));
+        // Avoid logging full payload in production
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Server response received:', JSON.stringify(response.data, null, 2));
+        }
 
         const rawConfig = response.data.data || response.data as RuntimeConfig;
-        console.log('📱 Extracted config:', JSON.stringify(rawConfig, null, 2));
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Extracted config:', JSON.stringify(rawConfig, null, 2));
+        }
 
         // Normalize and validate using shared validator (allows missing anonKey for public endpoint)
         const validated = validateRuntimeConfig(rawConfig);
@@ -210,6 +216,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       }
       
       // Validate config integrity (optional HMAC check)
+      if (!freshConfig) throw new Error('No configuration available from secure or public endpoints');
+
       const configHash = await generateConfigHash(freshConfig);
       // No response headers when using secure helper; skip header-based integrity check here
       const integrityValid = true;
@@ -252,10 +260,21 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const cacheConfig = async (config: RuntimeConfig, hash: string) => {
     try {
-      // Use unencrypted storage for development to prevent corruption
-      await AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
+      // In production, avoid persisting secrets (strip anonKey before caching)
+      const safeToCache: RuntimeConfig = process.env.NODE_ENV === 'production'
+        ? { 
+            ...config, 
+            supabase: { ...config.supabase, anonKey: undefined }
+          }
+        : config;
+
+      await AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(safeToCache));
       await AsyncStorage.setItem(CONFIG_HASH_KEY, hash);
-      console.log('📱 Config cached successfully (unencrypted for development)');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📱 Config cached successfully (unencrypted for development)');
+      } else {
+        console.log('📱 Config cached (secrets not persisted)');
+      }
     } catch (error) {
       console.error('Error caching config:', error);
     }
