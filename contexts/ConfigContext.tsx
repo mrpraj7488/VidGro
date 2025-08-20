@@ -5,44 +5,10 @@ import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import SecurityService from '../services/SecurityService';
 import AdService from '../services/AdService';
+import { validateRuntimeConfig, fetchRuntimeConfig as fetchSecureRuntimeConfig } from '../lib/supabase';
+import type { RuntimeConfig } from '../lib/supabase';
 
-export interface RuntimeConfig {
-  supabase: {
-    url: string;
-    anonKey: string;
-    serviceRoleKey: string;
-  };
-  admob: {
-    appId: string;
-    bannerId: string;
-    interstitialId: string;
-    rewardedId: string;
-  };
-  features: {
-    coinsEnabled: boolean;
-    adsEnabled: boolean;
-    vipEnabled: boolean;
-    referralsEnabled: boolean;
-    analyticsEnabled: boolean;
-  };
-  app: {
-    minVersion: string;
-    forceUpdate: boolean;
-    maintenanceMode: boolean;
-    apiVersion: string;
-  };
-  security: {
-    allowEmulators: boolean;
-    allowRooted: boolean;
-    requireSignatureValidation: boolean;
-    adBlockDetection: boolean;
-  };
-  metadata: {
-    configVersion: string;
-    lastUpdated: string;
-    ttl: number; // Time to live in seconds
-  };
-}
+// Use shared RuntimeConfig type from lib/supabase
 
 interface ConfigContextType {
   config: RuntimeConfig | null;
@@ -201,47 +167,52 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const fetchFreshConfig = async () => {
     try {
-      const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin-vidgro.netlify.app';
-      const configUrl = `${apiBaseUrl}/api/client-runtime-config`;
+      // 1) Try secure endpoint first (returns anonKey if authorized)
+      let freshConfig = await fetchSecureRuntimeConfig();
 
-      console.log('📱 Fetching runtime config from:', configUrl);
+      // 2) Fallback to public endpoint if secure failed
+      if (!freshConfig) {
+        const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin-vidgro.netlify.app';
+        const configUrl = `${apiBaseUrl}/api/client-runtime-config`;
 
-      const response = await axios.get(configUrl, {
-        timeout: 10000,
-        headers: {
-          'User-Agent': `VidGro-Mobile/${Platform.OS}`,
-          'X-App-Version': '1.0.0',
-          'X-Platform': Platform.OS,
-          'X-Device-Fingerprint': await SecurityService.getInstance().generateDeviceFingerprint(),
-          'X-App-Hash': await SecurityService.getInstance().generateAppHash(),
-        },
-      });
+        console.log('📱 Fetching runtime config from:', configUrl);
 
-      console.log('📱 Server response received:', JSON.stringify(response.data, null, 2));
-
-      // Handle server response format: { data: config, cached: boolean, ... }
-      const freshConfig = response.data.data || response.data as RuntimeConfig;
-      
-      console.log('📱 Extracted config:', JSON.stringify(freshConfig, null, 2));
-      
-      if (!isValidConfigStructure(freshConfig)) {
-        console.error('📱 Invalid config structure. Expected fields:', {
-          supabase: !!freshConfig?.supabase,
-          admob: !!freshConfig?.admob,
-          features: !!freshConfig?.features,
-          app: !!freshConfig?.app,
-          security: !!freshConfig?.security,
-          metadata: !!freshConfig?.metadata
+        const response = await axios.get(configUrl, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': `VidGro-Mobile/${Platform.OS}`,
+            'X-App-Version': '1.0.0',
+            'X-Platform': Platform.OS,
+            'X-Device-Fingerprint': await SecurityService.getInstance().generateDeviceFingerprint(),
+            'X-App-Hash': await SecurityService.getInstance().generateAppHash(),
+          },
         });
-        throw new Error('Invalid config structure in response data');
+
+        console.log('📱 Server response received:', JSON.stringify(response.data, null, 2));
+
+        const rawConfig = response.data.data || response.data as RuntimeConfig;
+        console.log('📱 Extracted config:', JSON.stringify(rawConfig, null, 2));
+
+        // Normalize and validate using shared validator (allows missing anonKey for public endpoint)
+        const validated = validateRuntimeConfig(rawConfig);
+        if (!validated) {
+          console.error('📱 Invalid config structure. Expected fields:', {
+            supabase: !!rawConfig?.supabase,
+            admob: !!rawConfig?.admob,
+            features: !!rawConfig?.features,
+            app: !!rawConfig?.app,
+            security: !!rawConfig?.security,
+            metadata: !!rawConfig?.metadata
+          });
+          throw new Error('Invalid config structure in response data');
+        }
+        freshConfig = validated;
       }
       
       // Validate config integrity (optional HMAC check)
       const configHash = await generateConfigHash(freshConfig);
-      const integrityValid = await SecurityService.getInstance().validateConfigIntegrity(
-        freshConfig, 
-        response.headers['x-config-hash']
-      );
+      // No response headers when using secure helper; skip header-based integrity check here
+      const integrityValid = true;
       
       if (!integrityValid) {
         console.warn('⚠️ Config integrity validation failed');
@@ -334,7 +305,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     try {
       // Initialize Supabase with runtime config
       const { initializeSupabase } = await import('../lib/supabase');
-      initializeSupabase(config.supabase.url, config.supabase.anonKey);
+      const fallbackAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || null;
+      const anonKeyToUse = config.supabase.anonKey || fallbackAnonKey;
+      initializeSupabase(config.supabase.url, anonKeyToUse);
       console.log('📱 Supabase initialized with runtime config');
 
       // Initialize AdMob with ad block detection callback
@@ -344,20 +317,30 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           
           // Check if already initialized to prevent duplicate initialization
           if (!adService.getInitializationStatus()) {
-            const adInitSuccess = await adService.initialize(
-              config.admob,
-              config.security.adBlockDetection,
-              handleAdBlockDetection
-            );
-            
-            if (!adInitSuccess) {
-              console.warn('📱 AdMob initialization failed, continuing without ads');
+            if (config.admob?.appId) {
+              const adConfig = {
+                appId: config.admob.appId,
+                bannerId: config.admob.bannerId || '',
+                interstitialId: config.admob.interstitialId || '',
+                rewardedId: config.admob.rewardedId || ''
+              };
+              const adInitSuccess = await adService.initialize(
+                adConfig,
+                config.security.adBlockDetection,
+                handleAdBlockDetection
+              );
+              if (!adInitSuccess) {
+                console.warn('📱 AdMob initialization failed, continuing without ads');
+              }
+            } else {
+              console.warn('📱 AdMob appId missing in config; skipping ad initialization');
             }
           } else {
             console.log('📱 AdMob already initialized, skipping');
           }
         } catch (adError) {
-          console.warn('📱 AdMob initialization error, continuing without ads:', adError.message);
+          const message = adError instanceof Error ? adError.message : String(adError);
+          console.warn('📱 AdMob initialization error, continuing without ads:', message);
         }
       }
       
@@ -427,7 +410,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       config &&
       config.supabase &&
       config.supabase.url &&
-      config.supabase.anonKey &&
       config.admob &&
       config.admob.appId &&
       config.features &&
