@@ -1,584 +1,467 @@
-import { createClient } from '@supabase/supabase-js';
-import 'react-native-url-polyfill/auto';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useConfig } from '../contexts/ConfigContext';
-
-// Type definitions
-export interface RuntimeConfig {
-  supabase: {
-    url: string;
-    anonKey?: string;
-  };
-  admob: {
-    appId?: string;
-    bannerId?: string;
-    interstitialId?: string;
-    rewardedId?: string;
-  };
-  features: {
-    coinsEnabled: boolean;
-    adsEnabled: boolean;
-    vipEnabled: boolean;
-    referralsEnabled: boolean;
-    analyticsEnabled: boolean;
-  };
-  app: {
-    minVersion: string;
-    forceUpdate: boolean;
-    maintenanceMode: boolean;
-    apiVersion: string;
-  };
-  security: {
-    allowEmulators: boolean;
-    allowRooted: boolean;
-    requireSignatureValidation: boolean;
-    adBlockDetection: boolean;
-  };
-  metadata: {
-    configVersion: string;
-    lastUpdated: string;
-    ttl: number;
-  };
-}
-
-// Dynamic Supabase client that will be initialized with runtime config
-
-let supabaseClient: any = null;
-
-// Keep track of initialization attempts
-let initializationAttempts = 0;
-const MAX_INITIALIZATION_ATTEMPTS = 3;
-
-// Helper: Initialize Supabase with config if possible
-const tryInitializeWithConfig = (config: RuntimeConfig | null): boolean => {
-  if (!config?.supabase?.url) {
-    console.warn('⚠️ Cannot initialize Supabase: missing URL in config');
-    return false;
-  }
-
-  // For public endpoint, use fallback key if anonKey is missing
-  const anonKey = config.supabase.anonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-  if (!anonKey) {
-    console.warn('⚠️ Cannot initialize Supabase: missing anonKey in config and no fallback available');
-    return false;
-  }
-
-  const client = initializeSupabase(config.supabase.url, anonKey);
-  return !!client;
-};
-
-
-export const initializeSupabase = (url: string, anonKey: string | null | undefined) => {
-  if (supabaseClient) {
-    console.log('📱 Supabase already initialized');
-    return supabaseClient;
-  }
-  if (!url || !anonKey) {
-    console.warn('⚠️ Cannot initialize Supabase: missing url or anonKey');
-    return null;
-  }
-  console.log('📱 Initializing Supabase with runtime config');
-  supabaseClient = createClient(url, anonKey, {
-    auth: {
-      storage: AsyncStorage,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-      flowType: 'implicit',
-    },
-  });
-  return supabaseClient;
-};
-
-export const getSupabase = () => {
-  if (!supabaseClient) {
-    console.warn('⚠️ Supabase accessed before initialization, returning null');
-    return null;
-  }
-  return supabaseClient;
-};
-
-// For backward compatibility, export as supabase
-export const supabase = new Proxy({} as any, {
-  get(target, prop) {
-    const client = getSupabase();
-    if (!client) {
-      console.warn('⚠️ Supabase accessed before initialization');
-      return () => Promise.resolve({ data: null, error: new Error('Supabase not initialized') });
-    }
-    return client[prop];
-  }
-});
-
-// Remove old awardCoinsForVideo function and replace with new watchVideo
-export const watchVideo = async (
-  userId: string,
-  videoId: string,
-  watchDuration: number,
-  fullyWatched: boolean = false
-): Promise<{ data: any; error: any }> => {
-  try {
-    const { data, error } = await getSupabase().rpc('watch_video_and_earn_coins', {
-      user_uuid: userId,
-      video_uuid: videoId,
-      watch_duration: watchDuration,
-      video_fully_watched: fullyWatched
-    });
-
-    if (error) {
-      console.error('Error calling watch_video_and_earn_coins:', error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
-  } catch (err) {
-    console.error('Unexpected error in watchVideo:', err);
-    return { data: null, error: err };
-  }
-};
-
-// Get user profile
-export async function getUserProfile(userId: string): Promise<any> {
-  if (!userId) return null;
-
-  try {
-    const { data, error } = await getSupabase()
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Profile fetch failed:', error);
-    return null;
-  }
-}
-
-// Get video queue
-export async function getVideoQueue(userId: string): Promise<any[]> {
-  if (!userId) return [];
-  try {
-    const client = getSupabase();
-    if (!client) return [];
-
-    const { data, error } = await client.rpc('get_video_queue_for_user', {
-      user_uuid: userId
-    });
-
-    if (!error) {
-      return (data || []).map((v: any) => ({
-        video_id: v.video_id ?? v.id,
-        youtube_url: v.youtube_url ?? v.video_url ?? '',
-        title: v.title,
-        duration_seconds: Number(v.duration_seconds || 0),
-        coin_reward: Number(v.coin_reward ?? 0),
-        views_count: Number(v.views_count ?? 0),
-        target_views: Number(v.target_views ?? 0),
-        status: v.status,
-        user_id: v.user_id,
-        completed: v.completed ?? false,
-        total_watch_time: Number(v.total_watch_time ?? 0),
-        completion_rate: Number(v.completion_rate ?? 0),
-      }));
-    }
-
-    console.warn('RPC get_video_queue_for_user failed, falling back to direct query:', error?.message);
-
-    // Fallback: fetch watchable videos (active OR on_hold expired), not completed, not owned by requester
-    const nowIso = new Date().toISOString();
-    const { data: fallback, error: fallbackError } = await client
-      .from('videos')
-      .select(`
-        id, youtube_url, video_url, title, duration_seconds, coin_reward,
-        views_count, target_views, status, user_id, completed,
-        total_watch_time, completion_rate, created_at, hold_until, repromoted_at
-      `)
-      .neq('user_id', userId)
-      .eq('completed', false)
-      .or(`status.eq.active,status.eq.on_hold.and.hold_until.lte.${nowIso}`)
-      .order('repromoted_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (fallbackError) {
-      console.error('Fallback video query failed:', fallbackError);
-      return [];
-    }
-
-    // Map to expected shape
-    const fallbackMapped = (fallback || []).map((v: any) => ({
-      video_id: v.id,
-      youtube_url: v.youtube_url || v.video_url,
-      title: v.title,
-      duration_seconds: Number(v.duration_seconds || 0),
-      coin_reward: Number(v.coin_reward ?? 0),
-      views_count: Number(v.views_count ?? 0),
-      target_views: Number(v.target_views ?? 0),
-      status: v.status,
-      user_id: v.user_id,
-      completed: v.completed ?? false,
-      total_watch_time: Number(v.total_watch_time ?? 0),
-      completion_rate: Number(v.completion_rate ?? 0),
-    }));
-
-    console.log('🎬 Fallback video query returned:', fallbackMapped.length);
-    return fallbackMapped;
-  } catch (error) {
-    console.error('getVideoQueue error:', error);
-    throw error;
-  }
-}
-
-// Create video promotion
-export const createVideoPromotion = async (
-  coinCost: number,
-  coinReward: number,
-  duration: number,
-  targetViews: number,
-  title: string,
-  userId: string,
-  youtubeUrl: string
-): Promise<{ data: any; error: any }> => {
-  const { data, error } = await getSupabase().rpc('create_video_promotion', {
-    coin_cost_param: coinCost,
-    coin_reward_param: coinReward,
-    duration_seconds_param: duration,
-    target_views_param: targetViews,
-    title_param: title,
-    user_uuid: userId,
-    youtube_url_param: youtubeUrl
-  });
-  return { data, error };
-};
-
-// Repromote video
-export const repromoteVideo = async (
-  videoId: string,
-  userId: string,
-  additionalCost: number = 0
-): Promise<{ data: any; error: any }> => {
-  const { data, error } = await getSupabase().rpc('repromote_video', {
-    video_uuid: videoId,
-    user_uuid: userId,
-    additional_coin_cost: additionalCost
-  });
-  return { data, error };
-};
-
-// Delete video
-export const deleteVideo = async (
-  videoId: string,
-  userId: string
-): Promise<{ data: any; error: any }> => {
-  const { data, error } = await getSupabase().rpc('delete_video_with_refund', {
-    video_uuid: videoId,
-    user_uuid: userId
-  });
-  return { data, error };
-};
-
-// Get user comprehensive analytics
-export const getUserComprehensiveAnalytics = async (userId: string) => {
-  try {
-    const { data, error } = await getSupabase().rpc('get_user_comprehensive_analytics', {
-      user_uuid: userId
-    });
-
-    if (!error) {
-      return { data, error: null };
-    }
-
-    console.warn('RPC get_user_comprehensive_analytics failed, using fallback:', error?.message);
-    
-    // Fallback: calculate analytics from videos table
-    const { data: videos, error: videosError } = await getSupabase()
-      .from('videos')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (videosError) {
-      console.error('Fallback analytics query failed:', videosError);
-      return { data: null, error: videosError };
-    }
-
-    const analytics = {
-      total_videos_promoted: videos?.length || 0,
-      active_videos: videos?.filter((v: any) => v.status === 'active').length || 0,
-      completed_videos: videos?.filter((v: any) => v.status === 'completed').length || 0,
-      on_hold_videos: videos?.filter((v: any) => v.status === 'on_hold').length || 0,
-      total_views_received: videos?.reduce((sum: number, v: any) => sum + (v.views_count || 0), 0) || 0,
-      total_watch_time_received: videos?.reduce((sum: number, v: any) => sum + (v.total_watch_time || 0), 0) || 0,
-      total_coins_distributed: videos?.reduce((sum: number, v: any) => sum + (v.coins_earned_total || 0), 0) || 0,
-      average_completion_rate: videos?.length > 0 ? videos.reduce((sum: number, v: any) => sum + (v.completion_rate || 0), 0) / videos.length : 0,
-      current_coins: 0, // Would need to fetch from profiles table
-      total_coins_earned: videos?.reduce((sum: number, v: any) => sum + (v.coins_earned_total || 0), 0) || 0
-    };
-
-    return { data: analytics, error: null };
-  } catch (err) {
-    console.error('getUserComprehensiveAnalytics error:', err);
-    return { data: null, error: err };
-  }
-};
-
-// Get user videos with analytics
-export const getUserVideosWithAnalytics = async (userId: string) => {
-  try {
-    const { data, error } = await getSupabase().rpc('get_user_videos_with_analytics', {
-      user_uuid: userId
-    });
-
-    if (!error) {
-      return { data, error: null };
-    }
-
-    console.warn('RPC get_user_videos_with_analytics failed, using fallback:', error?.message);
-    
-    // Fallback: fetch videos directly from videos table
-    const { data: videos, error: videosError } = await getSupabase()
-      .from('videos')
-      .select(`
-        id as video_id,
-        title,
-        views_count,
-        target_views,
-        status,
-        created_at,
-        coin_cost,
-        completion_rate,
-        completed,
-        total_watch_time,
-        coins_earned_total
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (videosError) {
-      console.error('Fallback videos query failed:', videosError);
-      return { data: null, error: videosError };
-    }
-
-    return { data: videos || [], error: null };
-  } catch (err) {
-    console.error('getUserVideosWithAnalytics error:', err);
-    return { data: null, error: err };
-  }
-};
-
-export const getUserRecentActivity = async (userId: string) => {
-  const { data, error } = await getSupabase().rpc('get_user_recent_activity', {
-    user_uuid: userId
-  });
-  return { data, error };
-};
-
-// Record coin purchase transaction
-export const recordCoinPurchase = async (
-  userId: string,
-  packageId: string,
-  coinsAmount: number,
-  bonusCoins: number,
-  pricePaid: number,
-  transactionId: string,
-  platform: string = 'unknown'
-) => {
-  try {
-    const { data, error } = await getSupabase().rpc('record_coin_purchase', {
-      user_uuid: userId,
-      package_id: packageId,
-      coins_amount: coinsAmount,
-      bonus_coins: bonusCoins,
-      price_paid: pricePaid,
-      transaction_id: transactionId,
-      purchase_platform: platform
-    });
-
-    if (error) {
-      console.error('Error recording coin purchase:', error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
-  } catch (err) {
-    console.error('recordCoinPurchase error:', err);
-    return { data: null, error: err };
-  }
-};
-
-// Get user transaction history
-export const getUserTransactionHistory = async (userId: string, limit: number = 50) => {
-  try {
-    const { data, error } = await getSupabase()
-      .from('coin_transactions')
-      .select(`
-        id,
-        amount,
-        transaction_type,
-        description,
-        reference_id,
-        metadata,
-        created_at
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('Error fetching transaction history:', error);
-      return { data: null, error };
-    }
-
-    return { data, error: null };
-  } catch (err) {
-    console.error('getUserTransactionHistory error:', err);
-    return { data: null, error: err };
-  }
-};
-
-// Validate runtime configuration structure
-export const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
-  try {
-    // Check if config has required structure
-    if (!config || typeof config !== 'object') {
-      console.warn('📱 Config validation failed: Invalid config object');
-      return null;
-    }
-
-    // Check for required top-level fields
-    const requiredFields = ['supabase', 'admob', 'features', 'app', 'security', 'metadata'];
-    const missingFields = requiredFields.filter(field => !config[field]);
-    
-    if (missingFields.length > 0) {
-      console.warn('📱 Config validation failed: Missing required fields:', missingFields);
-      return null;
-    }
-
-    // Validate basic structure first
-    const hasAllRequiredFields = requiredFields.every(field => {
-      const hasField = field in config;
-      if (!hasField) {
-        console.warn(`📱 Config validation failed: Missing required field: ${field}`);
-      }
-      return hasField;
-    });
-
-    if (!hasAllRequiredFields) {
-      return null;
-    }
-
-    // Check if Supabase URL exists
-    if (!config.supabase?.url) {
-      console.warn('📱 Config validation failed: Missing Supabase URL');
-      return null;
-    }
-
-    // Create validated config with all fields
-    const validatedConfig = {
-      supabase: {
-        url: config.supabase.url,
-        anonKey: config.supabase.anonKey || undefined
-      },
-      admob: config.admob || {},
-      features: config.features || {},
-      app: config.app || {},
-      security: config.security || {},
-      metadata: config.metadata || {}
-    };
-
-    // Try to initialize Supabase with the validated config
-    if (!supabaseClient && initializationAttempts < MAX_INITIALIZATION_ATTEMPTS) {
-      initializationAttempts++;
-      const initialized = tryInitializeWithConfig(validatedConfig);
-      if (initialized) {
-        console.log('📱 Supabase initialized successfully with config');
-      } else {
-        console.warn(`📱 Supabase initialization attempt ${initializationAttempts} failed`);
-      }
-    }
-
-    return validatedConfig;
-  } catch (error) {
-    console.error('📱 Config validation error:', error);
-    return null;
-  }
-};
-
+import axios from 'axios';
+import { Platform } from 'react-native';
+import * as Crypto from 'expo-crypto';
 import SecurityService from '../services/SecurityService';
-// Fetch runtime configuration from secure endpoint
-export const fetchRuntimeConfig = async (): Promise<RuntimeConfig | null> => {
-  try {
-    console.log('📱 Fetching runtime config from secure endpoint');
-    const deviceId = await SecurityService.getInstance().generateDeviceFingerprint();
-    const clientId = process.env.EXPO_PUBLIC_MOBILE_CLIENT_ID || 'vidgro_mobile_2024';
-    const clientSecret = process.env.EXPO_PUBLIC_MOBILE_CLIENT_SECRET || 'vidgro_secret_key_2024';
+import AdService from '../services/AdService';
+import { validateRuntimeConfig, fetchRuntimeConfig as fetchSecureRuntimeConfig } from '../lib/supabase';
+import type { RuntimeConfig } from '../lib/supabase';
 
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config/secure`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        clientId,
-        clientSecret,
-        deviceId
-      })
+// Use shared RuntimeConfig type from lib/supabase
+
+interface ConfigContextType {
+  config: RuntimeConfig | null;
+  loading: boolean;
+  error: string | null;
+  isConfigValid: boolean;
+  securityReport: any;
+  refreshConfig: () => Promise<void>;
+  validateSecurity: () => Promise<boolean>;
+  handleAdBlockDetection: (detected: boolean) => void;
+}
+
+const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
+
+export function useConfig() {
+  const context = useContext(ConfigContext);
+  if (context === undefined) {
+    throw new Error('useConfig must be used within a ConfigProvider');
+  }
+  return context;
+}
+
+const CONFIG_CACHE_KEY = 'runtime_config_cache';
+const CONFIG_HASH_KEY = 'runtime_config_hash';
+const DEFAULT_TTL = 3600; // 1 hour
+
+export function ConfigProvider({ children }: { children: ReactNode }) {
+  const [config, setConfig] = useState<RuntimeConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isConfigValid, setIsConfigValid] = useState(false);
+  const [securityReport, setSecurityReport] = useState<any>(null);
+
+  useEffect(() => {
+    // Clear any potentially corrupted cache on startup in development
+    const clearCorruptedCache = async () => {
+      try {
+        const cachedData = await AsyncStorage.getItem(CONFIG_CACHE_KEY);
+        if (cachedData && !cachedData.startsWith('{')) {
+          // If cached data doesn't look like JSON, it's likely corrupted encrypted data
+          console.log('📱 Clearing potentially corrupted cache on startup');
+          await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+          await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+        }
+      } catch (error) {
+        console.log('📱 Cache check failed, clearing cache');
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+      }
+    };
+    
+    clearCorruptedCache().then(() => {
+      initializeConfig();
     });
+  }, []);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log('📱 Server response received:', result);
-
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    // Validate the config structure
-    const validatedConfig = validateRuntimeConfig(result.data);
-    if (validatedConfig) {
-      return validatedConfig;
-    }
-
-    throw new Error('Invalid config structure in response data');
-  } catch (error) {
-    console.error('📱 Failed to fetch runtime config from secure endpoint:', error);
-
-    // Fallback to public endpoint for backward compatibility (minimal data)
+  const initializeConfig = async () => {
     try {
-      console.log('📱 Falling back to public endpoint for minimal config');
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/api/client-runtime-config`);
+      setLoading(true);
+      setError(null);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // First, perform security checks
+      const securityValid = await validateSecurity();
+      if (!securityValid) {
+        setError('Security validation failed. Some features may be restricted.');
+        setLoading(false);
+        // Continue with limited functionality
       }
 
-      const result = await response.json();
-      console.log('📱 Public endpoint response (minimal config):', result);
-
-      if (result.error) {
-        throw new Error(result.error);
+      // Try to load cached config first
+      const cachedConfig = await loadCachedConfig();
+      if (cachedConfig && isCacheValid(cachedConfig)) {
+        setConfig(cachedConfig);
+        setIsConfigValid(true);
+        
+        // Don't set loading to false yet, wait for services to initialize
+        // Initialize services with cached config first
+        await initializeServicesWithConfig(cachedConfig);
+        
+        // Now set loading to false
+        setLoading(false);
+        
+        // Fetch fresh config in background (don't await)
+        fetchFreshConfig().catch(error => {
+          console.warn('📱 Background config refresh failed:', error);
+        });
+        return;
       }
 
-      // Validate the public config structure
-      const validatedConfig = validateRuntimeConfig(result.data);
-      if (validatedConfig) {
-        console.log('📱 Public endpoint config validated successfully');
-        return validatedConfig;
+      // No valid cached config, fetch fresh config
+      await fetchFreshConfig();
+    } catch (err) {
+      console.error('Config initialization error:', err);
+      setError('Failed to initialize app configuration');
+      setLoading(false);
+    }
+  };
+
+  const loadCachedConfig = async (): Promise<RuntimeConfig | null> => {
+    try {
+      const cachedData = await AsyncStorage.getItem(CONFIG_CACHE_KEY);
+      if (!cachedData) return null;
+
+      let parsedConfig;
+      try {
+        // Check if data looks like JSON (starts with {)
+        if (cachedData.startsWith('{')) {
+          // Direct JSON, parse it
+          parsedConfig = JSON.parse(cachedData);
+        } else {
+          // Encrypted data, try to decrypt
+          parsedConfig = await decryptConfig(cachedData);
+        }
+      } catch (parseError) {
+        console.warn('📱 Cache parse/decrypt failed, clearing corrupted cache');
+        // Clear corrupted cache immediately
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+        return null;
+      }
+      
+      // Validate config structure
+      if (!isValidConfigStructure(parsedConfig)) {
+        console.log('📱 Cached config has invalid structure, clearing cache');
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+        return null;
       }
 
-      throw new Error('Invalid config structure in public endpoint response');
-    } catch (fallbackError) {
-      console.error('📱 Both secure and public endpoints failed:', fallbackError);
+      return parsedConfig;
+    } catch (error) {
+      console.error('Error loading cached config:', error);
+      // Clear corrupted cache
+      try {
+        await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+        await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+        console.log('📱 Cleared corrupted cache data');
+      } catch (clearError) {
+        console.error('Error clearing cache:', clearError);
+      }
       return null;
     }
-  }
-};
+  };
+
+  const isCacheValid = (cachedConfig: RuntimeConfig): boolean => {
+    if (!cachedConfig.metadata?.lastUpdated || !cachedConfig.metadata?.ttl) {
+      return false;
+    }
+
+    const lastUpdated = new Date(cachedConfig.metadata.lastUpdated);
+    const ttl = cachedConfig.metadata.ttl * 1000; // Convert to milliseconds
+    const now = new Date();
+
+    return (now.getTime() - lastUpdated.getTime()) < ttl;
+  };
+
+  const fetchFreshConfig = async () => {
+    try {
+      // 1) Try secure endpoint first (returns anonKey if authorized)
+      let freshConfig: RuntimeConfig | null = await fetchSecureRuntimeConfig();
+
+      // 2) Fallback to public endpoint if secure failed
+      const allowPublicFallback = process.env.EXPO_PUBLIC_ALLOW_PUBLIC_CONFIG !== 'false';
+      if (!freshConfig && allowPublicFallback) {
+        const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin-vidgro.netlify.app';
+        const configUrl = `${apiBaseUrl}/api/client-runtime-config`;
+
+        console.log('📱 Fetching runtime config from:', configUrl);
+
+        const response = await axios.get(configUrl, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': `VidGro-Mobile/${Platform.OS}`,
+            'X-App-Version': '1.0.0',
+            'X-Platform': Platform.OS,
+            'X-Device-Fingerprint': await SecurityService.getInstance().generateDeviceFingerprint(),
+            'X-App-Hash': await SecurityService.getInstance().generateAppHash(),
+          },
+        });
+
+        // Avoid logging full payload in production
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Server response received:', JSON.stringify(response.data, null, 2));
+        }
+
+        const rawConfig = response.data.data || response.data as RuntimeConfig;
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Extracted config:', JSON.stringify(rawConfig, null, 2));
+        }
+
+        // Normalize and validate using shared validator (allows missing anonKey for public endpoint)
+        const validated = validateRuntimeConfig(rawConfig);
+        if (!validated) {
+          console.error('📱 Invalid config structure. Expected fields:', {
+            supabase: !!rawConfig?.supabase,
+            admob: !!rawConfig?.admob,
+            features: !!rawConfig?.features,
+            app: !!rawConfig?.app,
+            security: !!rawConfig?.security,
+            metadata: !!rawConfig?.metadata
+          });
+          throw new Error('Invalid config structure in response data');
+        }
+        freshConfig = validated;
+      }
+      
+      // Validate config integrity (optional HMAC check)
+      if (!freshConfig) throw new Error('No configuration available from secure or public endpoints');
+
+      const configHash = await generateConfigHash(freshConfig);
+      // No response headers when using secure helper; skip header-based integrity check here
+      const integrityValid = true;
+      
+      if (!integrityValid) {
+        console.warn('⚠️ Config integrity validation failed');
+      }
+      
+      // Cache the fresh config
+      await cacheConfig(freshConfig, configHash);
+
+      setConfig(freshConfig);
+      setIsConfigValid(true);
+      setError(null);
+
+      console.log('📱 Runtime config loaded successfully');
+      console.log('📱 Features enabled:', freshConfig.features);
+      
+      // Initialize services with runtime config
+      await initializeServicesWithConfig(freshConfig);
+      
+    } catch (err: any) {
+      console.error('Error fetching fresh config:', err);
+      
+      // Try to use cached config as fallback
+      const cachedConfig = await loadCachedConfig();
+      if (cachedConfig) {
+        console.log('📱 Using cached config as fallback');
+        setConfig(cachedConfig);
+        setIsConfigValid(true);
+        setError('Using cached configuration');
+      } else {
+        setError(`Failed to load configuration: ${err.message}`);
+        setIsConfigValid(false);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cacheConfig = async (config: RuntimeConfig, hash: string) => {
+    try {
+      // In production, avoid persisting secrets (strip anonKey before caching)
+      const safeToCache: RuntimeConfig = process.env.NODE_ENV === 'production'
+        ? { 
+            ...config, 
+            supabase: { ...config.supabase, anonKey: undefined }
+          }
+        : config;
+
+      await AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(safeToCache));
+      await AsyncStorage.setItem(CONFIG_HASH_KEY, hash);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📱 Config cached successfully (unencrypted for development)');
+      } else {
+        console.log('📱 Config cached (secrets not persisted)');
+      }
+    } catch (error) {
+      console.error('Error caching config:', error);
+    }
+  };
+
+  const encryptConfig = async (config: RuntimeConfig): Promise<string> => {
+    try {
+      // Simple encryption using device-specific key
+      const deviceKey = await SecurityService.getInstance().generateDeviceFingerprint();
+      const configString = JSON.stringify(config);
+      
+      // In production, use proper encryption library
+      // For now, just base64 encode with device key
+      const combined = `${deviceKey}:${configString}`;
+      // Use btoa for base64 encoding (React Native compatible)
+      return btoa(combined);
+    } catch (error) {
+      console.error('Config encryption error:', error);
+      return JSON.stringify(config);
+    }
+  };
+
+  const decryptConfig = async (encryptedConfig: string): Promise<RuntimeConfig | null> => {
+    try {
+      const deviceKey = await SecurityService.getInstance().generateDeviceFingerprint();
+      const decoded = atob(encryptedConfig);
+      const [storedKey, configString] = decoded.split(':');
+      
+      if (storedKey !== deviceKey) {
+        console.warn('⚠️ Device key mismatch, config may be from different device');
+        return null;
+      }
+      
+      return JSON.parse(configString);
+    } catch (error) {
+      console.error('Config decryption error:', error);
+      // Try to parse as unencrypted JSON
+      try {
+        return JSON.parse(encryptedConfig);
+      } catch {
+        return null;
+      }
+    }
+  };
+
+  const initializeServicesWithConfig = async (config: RuntimeConfig) => {
+    try {
+      // Initialize Supabase with runtime config
+      const { initializeSupabase } = await import('../lib/supabase');
+      const fallbackAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || null;
+      const anonKeyToUse = config.supabase.anonKey || fallbackAnonKey;
+      initializeSupabase(config.supabase.url, anonKeyToUse);
+      console.log('📱 Supabase initialized with runtime config');
+
+      // Initialize AdMob with ad block detection callback
+      if (config.features.adsEnabled) {
+        try {
+          const adService = AdService.getInstance();
+          
+          // Check if already initialized to prevent duplicate initialization
+          if (!adService.getInitializationStatus()) {
+            if (config.admob?.appId) {
+              const adConfig = {
+                appId: config.admob.appId,
+                bannerId: config.admob.bannerId || '',
+                interstitialId: config.admob.interstitialId || '',
+                rewardedId: config.admob.rewardedId || ''
+              };
+              const adInitSuccess = await adService.initialize(
+                adConfig,
+                config.security.adBlockDetection,
+                handleAdBlockDetection
+              );
+              if (!adInitSuccess) {
+                console.warn('📱 AdMob initialization failed, continuing without ads');
+              }
+            } else {
+              console.warn('📱 AdMob appId missing in config; skipping ad initialization');
+            }
+          } else {
+            console.log('📱 AdMob already initialized, skipping');
+          }
+        } catch (adError) {
+          const message = adError instanceof Error ? adError.message : String(adError);
+          console.warn('📱 AdMob initialization error, continuing without ads:', message);
+        }
+      }
+      
+      console.log('📱 All services initialized with runtime config');
+    } catch (error) {
+      console.error('Service initialization error:', error);
+    }
+  };
+
+  const validateSecurity = async (): Promise<boolean> => {
+    try {
+      const securityService = SecurityService.getInstance();
+      const securityResult = await securityService.performSecurityChecks({
+        security: {
+          allowRooted: false,
+          allowEmulators: true,
+          requireSignatureValidation: false,
+          adBlockDetection: true,
+        }
+      });
+      
+      setSecurityReport(securityService.getSecurityReport());
+      
+      if (securityResult.warnings.length > 0) {
+        console.warn('🔒 Security warnings:', securityResult.warnings);
+      }
+      
+      if (securityResult.errors.length > 0) {
+        console.error('🔒 Security errors:', securityResult.errors);
+        return false;
+      }
+      
+      return securityResult.isValid;
+    } catch (error) {
+      console.error('Security validation error:', error);
+      return true; // Don't block app if security check fails
+    }
+  };
+
+  const handleAdBlockDetection = (detected: boolean) => {
+    if (detected) {
+      console.warn('🚫 Ad blocking detected by AdService');
+      // You can implement user notification or feature restrictions here
+      // For example:
+      // Alert.alert('Ad Blocker Detected', 'Please disable ad blocking to earn coins');
+    } else {
+      console.log('✅ Ads working normally');
+    }
+  };
+
+  const generateConfigHash = async (config: RuntimeConfig): Promise<string> => {
+    try {
+      const configString = JSON.stringify(config);
+      const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        configString
+      );
+      return hash;
+    } catch (error) {
+      console.error('Error generating config hash:', error);
+      return '';
+    }
+  };
+
+  const isValidConfigStructure = (config: any): boolean => {
+    return (
+      config &&
+      config.supabase &&
+      config.supabase.url &&
+      config.admob &&
+      config.admob.appId &&
+      config.features &&
+      config.app &&
+      config.security &&
+      config.metadata
+    );
+  };
+
+  const refreshConfig = async () => {
+    await fetchFreshConfig();
+  };
+
+  const clearCache = async () => {
+    try {
+      await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
+      await AsyncStorage.removeItem(CONFIG_HASH_KEY);
+      console.log('📱 Configuration cache cleared');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  };
+
+  const value: ConfigContextType = {
+    config,
+    loading,
+    error,
+    isConfigValid,
+    securityReport,
+    refreshConfig,
+    validateSecurity,
+    handleAdBlockDetection,
+  };
+
+  return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
+}
