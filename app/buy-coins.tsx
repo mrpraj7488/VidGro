@@ -244,19 +244,19 @@ export default function BuyCoinsScreen() {
     try {
       const supabase = getSupabase();
       const { error } = await supabase
-        .from('coin_transactions')
+        .from('transactions')
         .insert({
           user_id: user.id,
           amount: packageItem.coins + packageItem.bonus,
-          transaction_type: 'purchase',
+          transaction_type: 'coin_purchase',
           description: `Purchased ${packageItem.coins.toLocaleString()} + ${packageItem.bonus.toLocaleString()} bonus coins`,
-          reference_id: transactionId,
           metadata: {
             package_id: packageItem.id,
             original_coins: packageItem.coins,
             bonus_coins: packageItem.bonus,
             price_paid: packageItem.price,
-            platform: Platform.OS
+            platform: Platform.OS,
+            reference_id: transactionId
           }
         });
 
