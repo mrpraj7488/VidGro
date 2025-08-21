@@ -8,6 +8,7 @@ import {
   Alert, 
   Dimensions,
   Platform,
+  StatusBar,
   Animated as RNAnimated,
   Easing
 } from 'react-native';
@@ -15,27 +16,27 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Coins, Crown, Star, Shield, Zap, TrendingUp, Clock, Users, CircleCheck as CheckCircle, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, Coins, Crown, Star, CheckCircle, Zap, Users, Shield, Clock, Sparkles } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { getSupabase } from '../lib/supabase';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  withTiming,
   withSpring,
   withRepeat,
-  withTiming,
   withSequence,
-  withDelay,
   interpolate,
-  Easing as ReanimatedEasing,
+  Easing as ReanimatedEasing
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
-import { getSupabase } from '../lib/supabase';
-import { useConfig } from '../contexts/ConfigContext';
-import { useFeatureFlag } from '../hooks/useFeatureFlags';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 380;
-const isVerySmallScreen = screenWidth < 350;
+const isTinyScreen = screenWidth < 350;
+const isVerySmallScreen = screenWidth < 320;
 const isTablet = screenWidth >= 768;
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface CoinPackage {
   id: string;
@@ -44,28 +45,36 @@ interface CoinPackage {
   originalPrice?: number;
   bonus: number;
   popular: boolean;
+  badge?: string;
+  productId: string;
+  savings: number;
+  valueProps: string[];
+  socialProof: string;
   bestValue: boolean;
   limitedTime: boolean;
-  socialProof: string;
-  valueProps: string[];
-  badge?: string;
-  savings: number;
-  productId: string; // For in-app purchases
 }
 
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export default function BuyCoinsScreen() {
   const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
-  const { config } = useConfig();
-  const coinsEnabled = useFeatureFlag('coinsEnabled');
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [iapAvailable, setIapAvailable] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
+  
+  // Animation values
+  const shimmerAnimation = useSharedValue(0);
+  const cardAnimations = useRef<{ [key: string]: RNAnimated.Value }>({});
+  
+  // Create button animations for each package using hooks properly
+  const starterButtonAnim = useSharedValue(1);
+  const creatorButtonAnim = useSharedValue(1);
+  const proButtonAnim = useSharedValue(1);
+  const premiumButtonAnim = useSharedValue(1);
+  
+  const buttonAnimationRefs = useRef<{ [key: string]: Animated.SharedValue<number> }>({});
 
   const coinPackages: CoinPackage[] = [
     {
@@ -75,12 +84,13 @@ export default function BuyCoinsScreen() {
       originalPrice: 39,
       bonus: 100,
       popular: false,
-      bestValue: false,
-      limitedTime: true,
-      socialProof: '2.3K creators started',
-      valueProps: ['Perfect for testing', 'Quick boost'],
-      savings: 10,
       productId: 'com.vidgro.coins.starter',
+      badge: undefined,
+      savings: 10,
+      valueProps: ['Instant delivery', 'No ads'],
+      socialProof: '2K+ bought today',
+      bestValue: false,
+      limitedTime: false
     },
     {
       id: 'creator',
@@ -89,13 +99,13 @@ export default function BuyCoinsScreen() {
       originalPrice: 89,
       bonus: 500,
       popular: true,
-      bestValue: false,
-      limitedTime: false,
-      socialProof: '15K+ creators love this',
-      valueProps: ['Most popular', '20% bonus', 'Best for growth'],
-      badge: 'RECOMMENDED',
-      savings: 20,
+      badge: 'POPULAR',
       productId: 'com.vidgro.coins.creator',
+      savings: 20,
+      valueProps: ['Priority support', 'Bonus features'],
+      socialProof: '5K+ creators love this',
+      bestValue: false,
+      limitedTime: false
     },
     {
       id: 'pro',
@@ -104,88 +114,66 @@ export default function BuyCoinsScreen() {
       originalPrice: 179,
       bonus: 1500,
       popular: false,
-      bestValue: true,
-      limitedTime: false,
-      socialProof: '8K+ pros upgraded',
-      valueProps: ['Maximum value', '30% bonus', 'Serious creators'],
       badge: 'BEST VALUE',
-      savings: 50,
       productId: 'com.vidgro.coins.pro',
+      savings: 50,
+      valueProps: ['VIP status', 'Exclusive content'],
+      socialProof: 'Best value for pros',
+      bestValue: true,
+      limitedTime: false
     },
     {
-      id: 'enterprise',
+      id: 'premium',
       coins: 10000,
       price: 249,
       originalPrice: 349,
-      bonus: 3000,
-      popular: false,
-      bestValue: false,
-      limitedTime: false,
-      socialProof: '1.2K+ agencies',
-      valueProps: ['Agency level', '30% bonus', 'Bulk promotion'],
-      badge: 'ENTERPRISE',
+      bonus: 5000,
+      popular: true,
+      badge: 'PREMIUM',
+      productId: 'com.vidgro.coins.premium',
       savings: 100,
-      productId: 'com.vidgro.coins.enterprise',
-    },
-    {
-      id: 'ultimate',
-      coins: 25000,
-      price: 499,
-      originalPrice: 699,
-      bonus: 8000,
-      popular: false,
+      valueProps: ['Lifetime perks', 'Premium badge'],
+      socialProof: 'Top creators choice',
       bestValue: false,
-      limitedTime: false,
-      socialProof: '500+ top creators',
-      valueProps: ['Ultimate package', '32% bonus', 'Viral potential'],
-      badge: 'ULTIMATE',
-      savings: 200,
-      productId: 'com.vidgro.coins.ultimate',
-    },
-    {
-      id: 'legendary',
-      coins: 50000,
-      price: 899,
-      originalPrice: 1299,
-      bonus: 20000,
-      popular: false,
-      bestValue: false,
-      limitedTime: false,
-      socialProof: '100+ legendary',
-      valueProps: ['Legendary status', '40% bonus', 'Unlimited potential'],
-      badge: 'LEGENDARY',
-      savings: 400,
-      productId: 'com.vidgro.coins.legendary',
+      limitedTime: true
     },
   ];
-
-  // Animation values
-  const cardAnimations = useRef<{ [key: string]: RNAnimated.Value }>(
-    coinPackages.reduce((acc, pkg) => {
-      acc[pkg.id] = new RNAnimated.Value(0);
-      return acc;
-    }, {} as { [key: string]: RNAnimated.Value })
-  );
-  const buttonAnimations = useRef<{ [key: string]: Animated.SharedValue<number> }>(
-    coinPackages.reduce((acc, pkg) => {
-      acc[pkg.id] = useSharedValue(1);
-      return acc;
-    }, {} as { [key: string]: Animated.SharedValue<number> })
-  );
-  const shimmerAnimation = useSharedValue(0);
+  
+  // Initialize all animations in a single place
+  const initializeAnimations = () => {
+    coinPackages.forEach(pkg => {
+      if (!cardAnimations.current[pkg.id]) {
+        cardAnimations.current[pkg.id] = new RNAnimated.Value(0);
+      }
+    });
+    
+    // Map button animations to refs
+    buttonAnimationRefs.current['starter'] = starterButtonAnim;
+    buttonAnimationRefs.current['creator'] = creatorButtonAnim;
+    buttonAnimationRefs.current['pro'] = proButtonAnim;
+    buttonAnimationRefs.current['premium'] = premiumButtonAnim;
+  };
+  
+  // Call initialization immediately
+  initializeAnimations();
 
   useEffect(() => {
+    // Ensure animations are initialized
+    initializeAnimations();
+    
     initializeIAP();
     
     // Staggered card entrance
     coinPackages.forEach((pkg, index) => {
-      RNAnimated.timing(cardAnimations.current[pkg.id], {
-        toValue: 1,
-        duration: 600,
-        delay: index * 100,
-        easing: Easing.bezier(0.4, 0, 0.2, 1),
-        useNativeDriver: true,
-      }).start();
+      if (cardAnimations.current[pkg.id]) {
+        RNAnimated.timing(cardAnimations.current[pkg.id], {
+          toValue: 1,
+          duration: 600,
+          delay: index * 100,
+          easing: Easing.bezier(0.4, 0, 0.2, 1),
+          useNativeDriver: true,
+        }).start();
+      }
     });
 
     // Continuous shimmer animation
@@ -286,7 +274,7 @@ export default function BuyCoinsScreen() {
     }
 
     // Animate button
-    buttonAnimations.current[packageItem.id].value = withSequence(
+    buttonAnimationRefs.current[packageItem.id].value = withSequence(
       withSpring(0.95, { damping: 15, stiffness: 400 }),
       withSpring(1.05, { damping: 15, stiffness: 400 }),
       withSpring(1, { damping: 15, stiffness: 400 })
@@ -393,10 +381,21 @@ export default function BuyCoinsScreen() {
   });
 
   const renderPackageCard = (packageItem: CoinPackage, index: number) => {
-    const cardAnimation = cardAnimations.current[packageItem.id];
-    const buttonAnimation = buttonAnimations.current[packageItem.id];
+    // Get or create animation values
+    let cardAnimation = cardAnimations.current[packageItem.id];
+    let buttonAnimation = buttonAnimationRefs.current[packageItem.id];
     
-    const animatedStyle = {
+    // Fallback if animations don't exist
+    if (!cardAnimation) {
+      cardAnimation = new RNAnimated.Value(1);
+      cardAnimations.current[packageItem.id] = cardAnimation;
+    }
+    if (!buttonAnimation) {
+      // Use a default value if button animation doesn't exist
+      buttonAnimation = { value: 1 } as Animated.SharedValue<number>;
+    }
+    
+    const animatedStyle = cardAnimation ? {
       opacity: cardAnimation,
       transform: [
         {
@@ -412,10 +411,10 @@ export default function BuyCoinsScreen() {
           }),
         },
       ],
-    };
+    } : { opacity: 1, transform: [] };
 
     const buttonAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: buttonAnimation.value }],
+      transform: [{ scale: buttonAnimation ? buttonAnimation.value : 1 }],
     }));
 
     const isSelected = selectedPackage === packageItem.id;
