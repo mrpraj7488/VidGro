@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Dimensions } 
 import { WebView } from 'react-native-webview';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
-import { watchVideo } from '@/lib/supabase';
+import { watchVideoAndEarnCoins } from '@/lib/supabase';
 import GlobalHeader from '@/components/GlobalHeader';
 import { ExternalLink } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -325,10 +325,16 @@ export default function ViewTab() {
         await processRewardAndSkip();
       } else {
         // Process reward but don't skip
-        const result = await watchVideo(user.id, currentVideo.video_id, watchTimerRef.current, false);
+        const result = await watchVideoAndEarnCoins(user.id, currentVideo.video_id, watchTimerRef.current, true);
         
         if (result.error || !result.data?.success) {
           throw new Error(result.error?.message || result.data?.error || 'Failed to process video watch');
+        }
+        
+        // If video was marked as completed, refresh the queue
+        if (result.data?.video_completed) {
+          console.log('Video marked as completed, refreshing queue');
+          await refreshQueue(user.id);
         }
         
         await refreshProfile();
@@ -348,10 +354,16 @@ export default function ViewTab() {
     setIsVideoTransitioning(true);
     
     try {
-      const result = await watchVideo(user.id, currentVideo.video_id, watchTimerRef.current, false);
+      const result = await watchVideoAndEarnCoins(user.id, currentVideo.video_id, watchTimerRef.current, true);
       
       if (result.error || !result.data?.success) {
         throw new Error(result.error?.message || result.data?.error || 'Failed to process video watch');
+      }
+      
+      // If video was marked as completed, refresh the queue
+      if (result.data?.video_completed) {
+        console.log('Video marked as completed, refreshing queue');
+        await refreshQueue(user.id);
       }
       
       await refreshProfile();
@@ -378,16 +390,14 @@ export default function ViewTab() {
       moveToNextVideo();
     }
     
-    if (videoQueue.length === 0) {
+    if (videoQueue.length === 0 && user) {
       await refreshQueue(user.id);
     }
   }, [processRewardAndSkip, moveToNextVideo, videoQueue.length, refreshQueue, user]);
 
   // Handle manual skip
   const handleManualSkip = useCallback(() => {
-    if (!currentVideo) return;
-
-    const targetDuration = currentVideo.duration_seconds;
+    const targetDuration = currentVideo?.duration_seconds || 0;
     
     if (watchTimer >= targetDuration && !rewardProcessedRef.current) {
       handleVideoCompletion();
@@ -398,6 +408,8 @@ export default function ViewTab() {
       moveToNextVideo();
     }
   }, [currentVideo, watchTimer, handleVideoCompletion, moveToNextVideo]);
+
+  // Render WebView - removed as WebView is rendered directly in the component
 
   // WebView message handler
   const handleWebViewMessage = useCallback((event: any) => {
@@ -952,12 +964,9 @@ export default function ViewTab() {
           {storeError && (
             <Text style={[styles.errorText, { color: colors.error }]}>Error: {storeError}</Text>
           )}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            onPress={() => user && fetchVideos(user.id)}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+            onPress={() => user && fetchVideos(user.id)}><Text style={styles.retryButtonText}>Retry</Text></TouchableOpacity>
         </View>
       </View>
     );
@@ -977,12 +986,9 @@ export default function ViewTab() {
           <Text style={[styles.emptyText, { color: colors.text }]}>
             {videoQueue.length === 0 ? 'No videos available' : 'Loading next video...'}
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: colors.primary }]}
-            onPress={() => user && fetchVideos(user.id)}
-          >
-            <Text style={styles.refreshButtonText}>Refresh</Text>
-          </TouchableOpacity>
+            onPress={() => user && fetchVideos(user.id)}><Text style={styles.refreshButtonText}>Refresh</Text></TouchableOpacity>
           {storeError && (
             <Text style={[styles.errorText, { color: colors.error }]}>Error: {storeError}</Text>
           )}
@@ -1036,7 +1042,7 @@ export default function ViewTab() {
           }}
           key={`video-${currentVideo?.video_id || 'default'}`}
           startInLoadingState={false}
-          renderLoading={() => null}
+          renderLoading={() => <></>}
         />
       </View>
 
@@ -1053,20 +1059,15 @@ export default function ViewTab() {
       <View style={[styles.controlsContainer, { backgroundColor: colors.background }]}>
         <View style={[styles.youtubeButtonContainer, { backgroundColor: colors.surface }]}>
           <ExternalLink size={20} color="#FF0000" />
-          <TouchableOpacity onPress={handleOpenYouTube} style={styles.youtubeTextButton}>
-            <Text style={[styles.youtubeButtonText, { color: colors.text }]}>Open on YouTube</Text>
-          </TouchableOpacity>
+          <TouchableOpacity onPress={handleOpenYouTube} style={styles.youtubeTextButton}><Text style={[styles.youtubeButtonText, { color: colors.text }]}>Open on YouTube</Text></TouchableOpacity>
           <View style={styles.autoPlayContainer}>
             <Text style={[styles.autoPlayText, { color: colors.textSecondary }]}>Auto Skip</Text>
-            <TouchableOpacity 
-              style={[styles.toggle, { backgroundColor: colors.border }]} 
-              onPress={() => setAutoSkipEnabled(!autoSkipEnabled)}
-            >
-              <View style={[
-                styles.toggleSlider, 
+            <TouchableOpacity
+              style={[styles.toggle, { backgroundColor: colors.border }]}
+              onPress={() => setAutoSkipEnabled(!autoSkipEnabled)}><View style={[
+                styles.toggleSlider,
                 autoSkipEnabled && [styles.toggleActive, { backgroundColor: colors.success }]
-              ]} />
-            </TouchableOpacity>
+              ]} /></TouchableOpacity>
           </View>
         </View>
 
@@ -1097,15 +1098,10 @@ export default function ViewTab() {
           </View>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.skipButtonBase, buttonState.style]}
           onPress={handleManualSkip}
-          disabled={buttonState.disabled}
-        >
-          <Text style={styles.skipButtonText}>
-            {buttonState.text}
-          </Text>
-        </TouchableOpacity>
+          disabled={buttonState.disabled}><Text style={styles.skipButtonText}>{buttonState.text}</Text></TouchableOpacity>
       </View>
     </View>
   );
