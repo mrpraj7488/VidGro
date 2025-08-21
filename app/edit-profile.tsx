@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Dimensions,
   Platform,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAlert } from '@/contexts/AlertContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, User, Mail, CreditCard as Edit3, Save, Camera, Lock, Eye, EyeOff, Crown, Coins, Calendar, Hash } from 'lucide-react-native';
@@ -40,6 +40,7 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 export default function EditProfileScreen() {
   const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { showError, showSuccess, showConfirm } = useAlert();
   const router = useRouter();
   
   const [username, setUsername] = useState(profile?.username || '');
