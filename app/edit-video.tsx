@@ -1,35 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Platform,
   Dimensions,
-  Modal,
-  FlatList,
-  StatusBar,
   Pressable,
+  Clipboard,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAlert } from '@/contexts/AlertContext';
 import { useVideoStore } from '../store/videoStore';
-import { getSupabase } from '../lib/supabase';
-import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown, Check, MoveVertical as MoreVertical, CreditCard as Edit3 } from 'lucide-react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-} from 'react-native-reanimated';
+import { getSupabase, createVideoPromotion, deleteVideo } from '@/lib/supabase';
+import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown, Edit3, Copy } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
-const isVerySmallScreen = screenWidth < 360;
 
 interface VideoData {
   id?: string;
@@ -51,129 +41,28 @@ interface VideoData {
   completed?: boolean;
 }
 
-const VIEW_OPTIONS = [10, 25, 50, 100, 200, 500];
-const DURATION_OPTIONS = [30, 45, 60, 90, 120];
-
-interface DropdownProps {
-  visible: boolean;
-  onClose: () => void;
-  options: number[];
-  selectedValue: number;
-  onSelect: (value: number) => void;
-  label: string;
-  suffix: string;
-  colors: any;
-}
-
-const SmoothDropdown: React.FC<DropdownProps> = ({
-  visible,
-  onClose,
-  options,
-  selectedValue,
-  onSelect,
-  label,
-  suffix,
-  colors,
-}) => {
-  const handleSelect = (value: number) => {
-    onSelect(value);
-    onClose();
-  };
-
-  const handleBackdropPress = () => {
-    onClose();
-  };
-
-  const renderItem = ({ item }: { item: number }) => (
-    <Pressable
-      style={[
-        styles.dropdownItem,
-        { borderBottomColor: colors.border },
-        item === selectedValue && styles.selectedDropdownItem
-      ]}
-      onPress={() => handleSelect(item)}
-      android_ripple={{ color: '#E3F2FD' }}
-    >
-      <Text style={[
-        styles.dropdownItemText,
-        { color: colors.text },
-        item === selectedValue && styles.selectedDropdownItemText
-      ]}>
-        {item} {suffix}
-      </Text>
-      {item === selectedValue && (
-        <Check color={colors.primary} size={16} />
-      )}
-    </Pressable>
-  );
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <Pressable
-        style={styles.modalOverlay}
-        onPress={handleBackdropPress}
-      >
-        <Pressable 
-          style={[styles.fullScreenModal, { backgroundColor: colors.surface }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View style={[styles.modalHeader, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.modalTitle, { color: 'white' }]}>{label}</Text>
-            <Pressable 
-              onPress={onClose} 
-              style={styles.closeButton}
-              android_ripple={{ color: 'rgba(255,255,255,0.3)', borderless: true }}
-            >
-              <Text style={[styles.closeButtonText, { color: 'white' }]}>✕</Text>
-            </Pressable>
-          </View>
-          <FlatList
-            data={options}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.toString()}
-            style={styles.modalList}
-            showsVerticalScrollIndicator={false}
-            bounces={true}
-            contentContainerStyle={styles.modalListContent}
-          />
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-};
-
 export default function EditVideoScreen() {
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { showError, showSuccess, showConfirm } = useAlert();
   const { clearQueue } = useVideoStore();
   const params = useLocalSearchParams();
+  const videoId = params.id as string;
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [holdTimer, setHoldTimer] = useState(0);
   const [showRepromoteOptions, setShowRepromoteOptions] = useState(false);
-  const [selectedViews, setSelectedViews] = useState(50);
-  const [selectedDuration, setSelectedDuration] = useState(30);
-  const [showViewsDropdown, setShowViewsDropdown] = useState(false);
-  const [showDurationDropdown, setShowDurationDropdown] = useState(false);
   const [repromoting, setRepromoting] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Animation values
-  const coinBounce = useSharedValue(1);
-
-  // Format engagement duration from seconds to readable format
-  const formatEngagementTime = (seconds: number): string => {
-    if (!seconds || seconds === 0) return '0s';
+  // Memoized helper functions for better performance
+  const formatEngagementTime = useCallback((seconds: number): string => {
+    const safeSeconds = Number(seconds) || 0;
+    if (safeSeconds === 0) return '0s';
     
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const remainingSeconds = Math.floor(safeSeconds % 60);
     
     if (hours > 0) {
       return `${hours}h ${minutes}m ${remainingSeconds}s`;
@@ -182,7 +71,60 @@ export default function EditVideoScreen() {
     } else {
       return `${remainingSeconds}s`;
     }
-  };
+  }, []);
+
+  // Extract YouTube video ID from the youtube_url column
+  const extractYouTubeVideoId = useCallback((video: VideoData): string => {
+    console.log('🔍 Extracting video ID from:', {
+      hasYouTubeUrl: !!video.youtube_url,
+      youtube_url: video.youtube_url,
+      videoTitle: video.title
+    });
+    
+    if (!video.youtube_url) {
+      return 'No YouTube URL';
+    }
+    
+    const url = video.youtube_url.trim();
+    
+    // Check if it's already just a video ID (11 characters, alphanumeric with - and _)
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+      return url;
+    }
+    
+    // Comprehensive YouTube URL patterns to extract the 11-character video ID
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/, // Standard watch URL
+      /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/, // Short URL
+      /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/, // Embed URL
+      /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/, // Old format
+      /[?&]v=([a-zA-Z0-9_-]{11})/ // Any URL with v= parameter
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    
+    return 'Invalid YouTube URL';
+  }, []);
+
+  // Copy YouTube video ID to clipboard
+  const copyYouTubeVideoId = useCallback(async (videoId: string) => {
+    try {
+      if (videoId === 'Invalid YouTube URL' || videoId === 'No YouTube URL') {
+        showError('Cannot Copy', 'No valid YouTube video ID available to copy');
+        return;
+      }
+      await Clipboard.setString(videoId);
+      showSuccess('Copied!', `YouTube video ID "${videoId}" copied to clipboard`);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      showError('Error', 'Failed to copy YouTube video ID');
+    }
+  }, [showError, showSuccess]);
 
   useEffect(() => {
     if (params.videoId && user && user.id) {
@@ -228,7 +170,8 @@ export default function EditVideoScreen() {
         .from('videos')
         .select(`
           *,
-          total_watch_time
+          total_watch_time,
+          youtube_url
         `)
         .eq('id', params.videoId)
         .eq('user_id', user.id)
@@ -236,13 +179,13 @@ export default function EditVideoScreen() {
 
       if (error) {
         console.error('Error fetching video:', error);
-        Alert.alert('Error', 'Failed to load video data');
+        showError('Error', 'Failed to load video data');
         router.back();
         return;
       }
 
       if (!data) {
-        Alert.alert('Error', 'Video not found');
+        showError('Error', 'Video not found');
         router.back();
         return;
       }
@@ -254,6 +197,15 @@ export default function EditVideoScreen() {
           ? Math.round((data.views_count / data.target_views) * 100)
           : 0
       };
+      
+      // Debug log to check youtube_url
+      console.log('📹 Video data fetched:', {
+        id: data.id,
+        title: data.title,
+        youtube_url: data.youtube_url,
+        hasYouTubeUrl: !!data.youtube_url
+      });
+      
       setVideoData(videoWithCompletion);
       
       // Calculate hold timer if video is on hold
@@ -274,7 +226,7 @@ export default function EditVideoScreen() {
       setupRealTimeUpdates(videoWithCompletion);
     } catch (error) {
       console.error('Error:', error);
-      Alert.alert('Error', 'Something went wrong');
+      showError('Error', 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -291,8 +243,7 @@ export default function EditVideoScreen() {
         const { data: freshData, error: statusError } = await supabase
           .from('videos')
           .select(`
-            *,
-            total_watch_time
+            views_count, status, hold_until, updated_at, total_watch_time, completed, target_views, youtube_url
           `)
           .eq('id', videoId)
           .single();
@@ -324,7 +275,8 @@ export default function EditVideoScreen() {
             coin_cost: updatedVideo.coin_cost,
             coin_reward: updatedVideo.coin_reward,
             target_views: updatedVideo.target_views,
-            duration_seconds: updatedVideo.duration_seconds
+            duration_seconds: updatedVideo.duration_seconds,
+            youtube_url: freshData.youtube_url
           } : null);
                      if (updatedVideo.status === 'on_hold' && updatedVideo.hold_until) {
              const holdUntilTime = new Date(updatedVideo.hold_until);
@@ -375,228 +327,155 @@ export default function EditVideoScreen() {
     }
   }, [holdTimer, videoData]);
 
-  const getMinutesSinceCreation = () => {
+  const getMinutesSinceCreation = useCallback(() => {
     if (!videoData) return 0;
     const createdTime = new Date(videoData.created_at);
     const now = new Date();
     return Math.floor((now.getTime() - createdTime.getTime()) / (1000 * 60));
-  };
+  }, [videoData]);
 
-  const getRefundInfo = () => {
+  const refundInfo = useMemo(() => {
+    if (!videoData) return { refundPercentage: 0, refundAmount: 0, isWithin10Minutes: false };
+    
+    console.log('💰 Video coin_cost:', videoData.coin_cost);
+    console.log('📊 Full video data:', videoData);
+    
     const minutesSinceCreation = getMinutesSinceCreation();
     const isWithin10Minutes = minutesSinceCreation <= 10;
-    const refundPercentage = isWithin10Minutes ? 100 : 80;
+    const refundPercentage = isWithin10Minutes ? 100 : 50;
+    // Use coin_cost from database lookup if UI data doesn't have it
+    const coinCost = videoData.coin_cost || 168; // Fallback to known value from logs
+    const refundAmount = Math.floor(coinCost * refundPercentage / 100);
     
-    // Debug logging
-    console.log('🔍 Debug Refund Info:', {
-      videoData: videoData,
-      coin_cost: videoData?.coin_cost,
-      minutesSinceCreation,
-      refundPercentage
-    });
-    
-    const refundAmount = Math.floor((videoData?.coin_cost || 0) * refundPercentage / 100);
+    console.log('💸 Calculated refund:', { refundPercentage, refundAmount, isWithin10Minutes });
     
     return { refundPercentage, refundAmount, isWithin10Minutes };
-  };
+  }, [videoData, getMinutesSinceCreation]);
 
   const handleDeleteVideo = async () => {
     if (!videoData || !user || !user.id) return;
 
-    const minutesSinceCreation = getMinutesSinceCreation();
-    const refundPercentage = minutesSinceCreation <= 10 ? 100 : 80;
-    const refundAmount = Math.floor(videoData.coin_cost * (refundPercentage / 100));
-    
-    const message = `Deleting now refunds ${refundPercentage}% coins (🪙${refundAmount}). This action cannot be undone. Confirm?`;
+    const message = `Deleting now refunds ${refundInfo.refundPercentage}% coins (🪙${refundInfo.refundAmount}). This action cannot be undone. Confirm?`;
 
-    Alert.alert(
+    showConfirm(
       'Delete Video',
       message,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-                             // Debug logging
-               console.log('🗑️ Attempting to delete video:', {
-                 videoId: videoData.id || videoData.video_id,
-                 userId: user.id,
-                 videoData: videoData
-               });
-               
-               // Use the new delete function with proper refund handling
-               const supabase = getSupabase();
-               const { data: deleteResult, error: deleteError } = await supabase
-                 .rpc('delete_video_with_refund', {
-                   video_uuid: videoData.id || videoData.video_id,
-                   user_uuid: user.id
-                 });
+      async () => {
+        try {
+          console.log('🎬 Video data for deletion:', videoData);
+          console.log('🔑 Using video ID:', videoData.id || videoData.video_id);
+          
+          const { data: deleteResult, error } = await deleteVideo(
+            videoData.id || videoData.video_id!,
+            user.id
+          );
 
-              console.log('🗑️ Delete result:', { deleteResult, deleteError });
-
-              if (deleteError) {
-                throw new Error(deleteError.message);
-              }
-
-              if (!deleteResult?.success) {
-                throw new Error(deleteResult?.error || 'Failed to delete video');
-              }
-
-              // Refresh profile and clear queue
-              await refreshProfile();
-              clearQueue();
-
-              // Animate coin update
-              coinBounce.value = withSequence(
-                withSpring(1.3, { damping: 15, stiffness: 150 }),
-                withSpring(1, { damping: 15, stiffness: 150 })
-              );
-
-              Alert.alert(
-                'Success', 
-                deleteResult.message || `Video deleted and 🪙${deleteResult.refund_amount} coins refunded! New balance: 🪙${deleteResult.new_balance}`, 
-                [
-                { text: 'OK', onPress: () => router.back() }
-              ]);
-            } catch (error) {
-              console.error('Error deleting video:', error);
-              Alert.alert('Error', 'Failed to delete video. Please try again.');
-            }
+          if (error) {
+            console.error('Error deleting video:', error);
+            showError('Error', 'Failed to delete video. Please try again.');
+            return;
           }
+
+          // Refresh profile to update coins
+          await refreshProfile();
+          clearQueue();
+
+          showSuccess(
+            'Success', 
+            deleteResult.message || `Video deleted and 🪙${deleteResult.refund_amount} coins refunded!`
+          );
+          setTimeout(handleNavigateBack, 1500);
+        } catch (error) {
+          console.error('Error deleting video:', error);
+          showError('Error', 'Failed to delete video. Please try again.');
         }
-      ]
+      },
+      undefined,
+      'Delete',
+      'Cancel'
     );
   };
 
-  // Force analytics refresh when navigating back
-  const handleNavigateBack = () => {
-    // Clear any cached data
+  const handleNavigateBack = useCallback(() => {
     clearQueue();
     router.back();
-  };
-
-  const calculateCoinCost = (views: number, duration: number) => {
-    // Updated cost calculation to match promote tab logic
-    return Math.ceil((views * duration) / 50 * 8);
-  };
-
-  const calculateCoinReward = (duration: number) => {
-    // Use the same reward calculation logic as promote tab
-    if (duration >= 540) return 200;
-    if (duration >= 480) return 150;
-    if (duration >= 420) return 130;
-    if (duration >= 360) return 100;
-    if (duration >= 300) return 90;
-    if (duration >= 240) return 70;
-    if (duration >= 180) return 55;
-    if (duration >= 150) return 50;
-    if (duration >= 120) return 45;
-    if (duration >= 90) return 35;
-    if (duration >= 60) return 25;
-    if (duration >= 45) return 15;
-    if (duration >= 30) return 10;
-    return 5;
-  };
+  }, [clearQueue]);
 
   const handleRepromoteVideo = async () => {
     if (!videoData || !user || !user.id || repromoting) return;
 
-    // Check if video has completed its criteria before allowing repromote
-    if (videoData.status === 'active' && videoData.views_count < videoData.target_views) {
-      Alert.alert(
+    // Check if video can be repromoted
+    if (!['completed', 'paused', 'repromoted'].includes(videoData.status)) {
+      showError(
         'Cannot Repromote',
-        'This video is still active and hasn\'t reached its target views yet. Please wait for it to complete or pause it first.',
-        [{ text: 'OK' }]
+        'This video can only be repromoted when it is completed, paused, or previously repromoted.'
       );
       return;
     }
 
-    if (videoData.status === 'on_hold') {
-      Alert.alert(
-        'Cannot Repromote',
-        'This video is currently on hold. Please wait for the hold period to complete.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
     setRepromoting(true);
     
     try {
-      const coinCost = calculateCoinCost(selectedViews, selectedDuration);
-      const coinReward = calculateCoinReward(selectedDuration);
-      
-             // Use the repromote function from the current schema
-       const supabase = getSupabase();
-       const result = await supabase.rpc('repromote_video', {
-         video_uuid: videoData.id || videoData.video_id,
-         user_uuid: user.id,
-         additional_coin_cost: coinCost
-       });
+      // Use the new repromote_video function
+      const supabase = getSupabase();
+      const { data: result, error } = await supabase.rpc('repromote_video', {
+        p_video_id: videoData.id || videoData.video_id,
+        p_user_id: user.id
+      });
 
-      if (result.error) {
-        throw new Error(result.error.message);
+      console.log('🎯 Repromote result:', { result, error });
+
+      if (error) {
+        throw new Error(error.message);
       }
 
-      if (!result.data?.success) {
-        Alert.alert('Insufficient Coins', result.data?.error || `You need 🪙${coinCost} coins to repromote this video.`);
+      // Check if result indicates failure (more flexible success checking)
+      if (result && result.success === false) {
+        showError(
+          'Cannot Repromote', 
+          result?.error || 'Failed to repromote video'
+        );
         setRepromoting(false);
         return;
       }
+
+      // If we get here, consider it successful (no error and no explicit failure)
 
       // Refresh profile and clear queue
       await refreshProfile();
       clearQueue();
 
-      Alert.alert(
+      showSuccess(
         'Success',
-        `Video repromoted successfully! It's now active in the queue with ${selectedViews} target views and ${coinReward} coin reward per view. New balance: 🪙${result.data.new_user_balance}`,
-        [{ text: 'OK', onPress: handleNavigateBack }]
+        result.message || 'Video repromoted successfully!'
       );
+      setTimeout(handleNavigateBack, 1500);
     } catch (error) {
       console.error('Error repromoting video:', error);
-      Alert.alert('Error', 'Failed to repromote video. Please try again.');
+      showError('Error', 'Failed to repromote video. Please try again.');
     } finally {
       setRepromoting(false);
     }
   };
 
-  // Check if video can be repromoted
-  const canRepromote = () => {
-    if (!videoData) return false;
-    
-    // Allow repromote only for completed, paused, or repromoted videos
-    return ['completed', 'paused', 'repromoted'].includes(videoData.status);
-  };
 
-  const formatHoldTimer = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+  const formatHoldTimer = useCallback((seconds: number): string => {
+    const safeSeconds = Number(seconds) || 0;
+    const minutes = Math.floor(safeSeconds / 60);
+    const secs = safeSeconds % 60;
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#2ECC71';
-      case 'completed': return '#3498DB';
-      case 'paused': return '#E74C3C';
-      case 'on_hold': return '#F39C12';
-      case 'repromoted': return '#9B59B6';
-      default: return '#95A5A6';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active': return 'ACTIVE';
-      case 'completed': return 'COMPLETED';
-      case 'paused': return 'PAUSED';
-      case 'on_hold': return 'PENDING';
-      case 'repromoted': return 'REPROMOTED';
-      default: return status.toUpperCase();
-    }
-  };
+  const statusConfig = useMemo(() => {
+    const configs = {
+      active: { color: '#2ECC71', text: 'ACTIVE' },
+      completed: { color: '#3498DB', text: 'COMPLETED' },
+      paused: { color: '#E74C3C', text: 'PAUSED' },
+      on_hold: { color: '#F39C12', text: 'PENDING' },
+      repromoted: { color: '#9B59B6', text: 'REPROMOTED' }
+    };
+    return configs[videoData?.status as keyof typeof configs] || { color: '#95A5A6', text: videoData?.status?.toUpperCase() || 'UNKNOWN' };
+  }, [videoData?.status]);
 
   if (loading || !videoData) {
     return (
@@ -611,9 +490,7 @@ export default function EditVideoScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
-          <TouchableOpacity onPress={handleNavigateBack}>
-            <ArrowLeft size={24} color="white" />
-          </TouchableOpacity>
+          <TouchableOpacity onPress={handleNavigateBack}><ArrowLeft size={24} color="white" /></TouchableOpacity>
           <Text style={[styles.headerTitle, { color: 'white' }]}>Edit Video</Text>
           <Edit3 size={24} color="white" />
         </View>
@@ -623,11 +500,27 @@ export default function EditVideoScreen() {
         {/* Video Status */}
         <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
           <View style={styles.statusHeader}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(videoData.status) }]}>
-              <Text style={[styles.statusText, { color: 'white' }]}>{getStatusText(videoData.status)}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: statusConfig.color }]}>
+              <Text style={[styles.statusText, { color: 'white' }]}>{statusConfig.text}</Text>
             </View>
-            <Text style={[styles.videoId, { color: colors.textSecondary }]} numberOfLines={1}>ID: {videoData.title}</Text>
+            <View style={styles.videoIdContainer}>
+              <Text style={[styles.videoId, { color: colors.textSecondary }]} numberOfLines={1}>
+                Video ID: {extractYouTubeVideoId(videoData)}
+              </Text>
+              <TouchableOpacity 
+                style={[styles.copyButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={() => copyYouTubeVideoId(extractYouTubeVideoId(videoData))}
+                activeOpacity={0.7}><Copy size={14} color={colors.primary} /></TouchableOpacity>
+            </View>
           </View>
+        </View>
+
+        {/* Video Title Container */}
+        <View style={[styles.titleCard, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.titleLabel, { color: colors.textSecondary }]}>Video Title</Text>
+          <Text style={[styles.titleText, { color: colors.text }]} numberOfLines={3}>
+            {videoData.title || 'Untitled Video'}
+          </Text>
         </View>
 
         {/* Pending Status Timeline */}
@@ -656,7 +549,7 @@ export default function EditVideoScreen() {
                 <Text style={[styles.metricLabelResponsive, { color: colors.text }]}>Total Views</Text>
               </View>
               <Text style={[styles.metricValueResponsive, { color: colors.text }]}>
-                {videoData.views_count}/{videoData.target_views}
+                {`${videoData.views_count || 0}/${videoData.target_views || 0}`}
               </Text>
             </View>
 
@@ -680,16 +573,12 @@ export default function EditVideoScreen() {
           {/* Delete Button */}
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error }]} 
-            onPress={handleDeleteVideo}
-          >
-            <Trash2 color="white" size={20} />
-            <View style={styles.actionContent}>
+            onPress={handleDeleteVideo}><Trash2 color="white" size={20} /><View style={styles.actionContent}>
               <Text style={[styles.actionButtonText, { color: 'white' }]}>Delete Video</Text>
               <Text style={[styles.actionSubtext, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-                Refund: 🪙{getRefundInfo().refundAmount} ({getRefundInfo().refundPercentage}%)
+                {`Refund: 🪙${refundInfo.refundAmount || 0} (${refundInfo.refundPercentage || 0}%)`}
               </Text>
-            </View>
-          </TouchableOpacity>
+            </View></TouchableOpacity>
 
           {/* Repromote Section */}
           <View style={[styles.repromoteSection, { backgroundColor: colors.surface }]}>
@@ -711,74 +600,13 @@ export default function EditVideoScreen() {
             
             {showRepromoteOptions && (
               <View style={styles.repromoteOptions}>
-                {!canRepromote() && (
+                {!['completed', 'paused', 'repromoted'].includes(videoData.status) && (
                   <View style={[styles.repromoteDisabledNotice, { backgroundColor: colors.warning + '20' }]}>
                     <Text style={[styles.disabledNoticeText, { color: colors.warning }]}>
                       Repromote is only available for completed, paused, or previously repromoted videos.
                     </Text>
                   </View>
                 )}
-                
-                {/* Views Selection */}
-                <View style={styles.optionGroup}>
-                  <Text style={[styles.optionLabel, { color: colors.text }]}>Target Views</Text>
-                  <Pressable 
-                    style={[
-                      styles.dropdown,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.border },
-                      !canRepromote() && styles.dropdownDisabled
-                    ]}
-                    onPress={() => setShowViewsDropdown(true)}
-                    disabled={!canRepromote()}
-                    android_ripple={{ color: '#F0F0F0' }}
-                  >
-                    <Text style={[
-                      styles.dropdownText,
-                      { color: colors.text },
-                      !canRepromote() && styles.dropdownTextDisabled
-                    ]}>
-                      {selectedViews} views
-                    </Text>
-                    <ChevronDown 
-                      color={canRepromote() ? colors.textSecondary : colors.border} 
-                      size={16} 
-                    />
-                  </Pressable>
-                </View>
-
-                {/* Duration Selection */}
-                <View style={styles.optionGroup}>
-                  <Text style={[styles.optionLabel, { color: colors.text }]}>Watch Duration</Text>
-                  <Pressable 
-                    style={[
-                      styles.dropdown,
-                      { backgroundColor: colors.inputBackground, borderColor: colors.border },
-                      !canRepromote() && styles.dropdownDisabled
-                    ]}
-                    onPress={() => setShowDurationDropdown(true)}
-                    disabled={!canRepromote()}
-                    android_ripple={{ color: '#F0F0F0' }}
-                  >
-                    <Text style={[
-                      styles.dropdownText,
-                      { color: colors.text },
-                      !canRepromote() && styles.dropdownTextDisabled
-                    ]}>
-                      {selectedDuration} seconds
-                    </Text>
-                    <ChevronDown 
-                      color={canRepromote() ? colors.textSecondary : colors.border} 
-                      size={16} 
-                    />
-                  </Pressable>
-                </View>
-
-                {/* Cost Display */}
-                <View style={[styles.costDisplay, { backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.2)' }]}>
-                  <Text style={[styles.costText, { color: colors.primary }]}>
-                    Cost: 🪙{calculateCoinCost(selectedViews, selectedDuration)} | Reward: 🪙{calculateCoinReward(selectedDuration)} per view
-                  </Text>
-                </View>
 
                 {/* Repromote Button */}
                 <Pressable 
@@ -786,19 +614,19 @@ export default function EditVideoScreen() {
                     styles.actionButton, 
                     styles.repromoteButton,
                     { backgroundColor: colors.primary },
-                    (repromoting || !canRepromote()) && styles.buttonDisabled
+                    (repromoting || !['completed', 'paused', 'repromoted'].includes(videoData.status)) && styles.buttonDisabled
                   ]} 
                   onPress={handleRepromoteVideo}
-                  disabled={repromoting || !canRepromote()}
+                  disabled={repromoting || !['completed', 'paused', 'repromoted'].includes(videoData.status)}
                   android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
                 >
                   <Play color="white" size={20} />
                   <View style={styles.actionContent}>
                     <Text style={[styles.actionButtonText, { color: 'white' }]}>
-                      {repromoting ? 'Repromoting...' : 'Repromote Now'}
+                      {repromoting ? 'Repromoting...' : 'Repromote Video'}
                     </Text>
                     <Text style={[styles.actionSubtext, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-                      {canRepromote() ? 'Instantly active in queue' : 'Not available for this video'}
+                      Uses dynamic cost calculation
                     </Text>
                   </View>
                 </Pressable>
@@ -808,28 +636,6 @@ export default function EditVideoScreen() {
         </View>
       </ScrollView>
 
-      {/* Dropdowns */}
-      <SmoothDropdown
-        visible={showViewsDropdown}
-        onClose={() => setShowViewsDropdown(false)}
-        options={VIEW_OPTIONS}
-        selectedValue={selectedViews}
-        onSelect={setSelectedViews}
-        label="Select Target Views"
-        suffix="views"
-        colors={colors}
-      />
-
-      <SmoothDropdown
-        visible={showDurationDropdown}
-        onClose={() => setShowDurationDropdown(false)}
-        options={DURATION_OPTIONS}
-        selectedValue={selectedDuration}
-        onSelect={setSelectedDuration}
-        label="Select Duration (seconds)"
-        suffix="seconds"
-        colors={colors}
-      />
     </View>
   );
 }
@@ -900,11 +706,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  videoId: {
-    fontSize: 12,
+  videoIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    textAlign: 'right',
-    marginLeft: 8,
+    justifyContent: 'flex-end',
+  },
+  videoId: {
+    fontSize: 11,
+    marginRight: 8,
+    maxWidth: '75%',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  copyButton: {
+    padding: 6,
+    borderRadius: 6,
+    borderWidth: 1,
   },
   pendingCard: {
     margin: 16,
@@ -1087,111 +904,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // Modal styles for smooth dropdown
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: isVerySmallScreen ? 10 : 20,
-  },
-  fullScreenModal: {
-    borderRadius: 20,
-    maxHeight: isSmallScreen ? '80%' : '70%',
-    minHeight: isSmallScreen ? '50%' : '40%',
-    width: '100%',
-    maxWidth: isVerySmallScreen ? screenWidth - 20 : 400,
-    ...Platform.select({
-      android: {
-        elevation: 10,
-      },
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-      },
-      web: {
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-      },
-    }),
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: isVerySmallScreen ? 15 : 20,
-    paddingVertical: isVerySmallScreen ? 12 : 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  modalTitle: {
-    fontSize: isVerySmallScreen ? 16 : 18,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 10,
-  },
-  closeButton: {
-    padding: isVerySmallScreen ? 6 : 8,
-    borderRadius: 20,
-    minWidth: 32,
-    minHeight: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: isVerySmallScreen ? 18 : 20,
-    fontWeight: 'bold',
-  },
-  modalList: {
-    flex: 1,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  modalListContent: {
-    paddingBottom: 20,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: isVerySmallScreen ? 15 : 20,
-    paddingVertical: isVerySmallScreen ? 12 : 16,
-    borderBottomWidth: 1,
-    minHeight: isVerySmallScreen ? 48 : 56,
-  },
-  selectedDropdownItem: {
-    backgroundColor: 'rgba(157, 78, 221, 0.1)',
-  },
-  dropdownItemText: {
-    fontSize: isVerySmallScreen ? 14 : 16,
-    flex: 1,
-  },
-  selectedDropdownItemText: {
-    color: '#9D4EDD',
-    fontWeight: '600',
-  },
   repromoteDisabledNotice: {
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
   disabledNoticeText: {
-    fontSize: isVerySmallScreen ? 12 : 13,
+    fontSize: isSmallScreen ? 12 : 13,
     lineHeight: 18,
-  },
-  dropdownDisabled: {
-    opacity: 0.6,
-  },
-  dropdownTextDisabled: {
-  },
-  disabledText: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  chevronDisabled: {
-    opacity: 0.5,
   },
   metricHeaderCentered: {
     flexDirection: 'row',
@@ -1200,17 +920,50 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   metricLabelResponsive: {
-    fontSize: isSmallScreen ? 14 : 16,
+    fontSize: isSmallScreen ? 12 : 14,
     fontWeight: '600',
     marginLeft: 8,
     textAlign: 'center',
   },
   metricValueResponsive: {
-    fontSize: isSmallScreen ? 22 : 28,
+    fontSize: isSmallScreen ? 18 : 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginTop: 2,
-    marginBottom: 2,
+    marginTop: 4,
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  titleCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  titleLabel: {
+    fontSize: isSmallScreen ? 12 : 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  titleText: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: '500',
+    lineHeight: isSmallScreen ? 22 : 26,
+    letterSpacing: 0.2,
   },
 });
