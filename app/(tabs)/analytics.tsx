@@ -83,7 +83,6 @@ export default function Analytics() {
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/(auth)/login');
@@ -157,6 +156,12 @@ export default function Analytics() {
       };
     }
   }, [user, analyticsEnabled]);
+
+  useEffect(() => {
+    videos.forEach((video, index) => {
+      console.log(`Video ${index}:`, JSON.stringify(video, null, 2));
+    });
+  }, [videos]);
 
   const fetchAnalytics = async () => {
     if (!user || !user.id) return;
@@ -550,7 +555,6 @@ export default function Analytics() {
           ) : (
             <>
               {getDisplayedVideos().map((video) => {
-                const StatusIcon = getStatusIcon(video.status, video.is_repromoted);
                 const statusColor = getStatusColor(video.status, video.is_repromoted);
                 const displayStatus = video.is_repromoted ? 'Repromoted' : (video.status ? video.status.charAt(0).toUpperCase() + video.status.slice(1) : 'Unknown');
                 return (
@@ -585,13 +589,13 @@ export default function Analytics() {
                       </View>
                       <View style={styles.videoStat}>
                         <View style={{ marginRight: 4 }}>
-                          <StatusIcon size={16} color={statusColor} />
+                          <TrendingUp size={16} color={statusColor} />
                         </View>
                         <Text style={[styles.videoStatText, { color: statusColor }]}>
                           {displayStatus}
                         </Text>
                       </View>
-                      {video.is_repromoted && video.repromote_count && video.repromote_count > 0 && (
+                      {video.is_repromoted && typeof video.repromote_count === 'number' && video.repromote_count > 0 && (
                         <View style={styles.videoStat}>
                           <View style={{ marginRight: 4 }}>
                             <TrendingUp size={14} color="#9B59B6" />
@@ -623,7 +627,7 @@ export default function Analytics() {
                         <Text style={[styles.costText, { color: colors.textSecondary }]}>
                           {`Spent: 🪙${safeNumber(video.coin_cost)}`}
                         </Text>
-                        {video.repromote_cost && video.repromote_cost > 0 && (
+                        {video.repromote_cost && typeof video.repromote_cost === 'number' && video.repromote_cost > 0 && (
                           <Text style={[styles.repromoteText, { color: '#9B59B6', marginLeft: 4 }]}>
                             {`(+🪙${safeNumber(video.repromote_cost)} repromote)`}
                           </Text>
@@ -971,11 +975,6 @@ const styles = StyleSheet.create({
   },
   costText: {
     fontSize: 12,
-  },
-  engagementText: {
-    fontSize: 11,
-    color: '#666',
-    marginTop: 2,
   },
   completedText: {
     fontSize: 11,
