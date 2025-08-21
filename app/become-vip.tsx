@@ -292,6 +292,30 @@ export default function BecomeVIPScreen() {
       expiryDate.setMonth(expiryDate.getMonth() + 1);
     }
 
+    // Record VIP purchase transaction
+    try {
+      const { getSupabase } = await import('@/lib/supabase');
+      const supabase = getSupabase();
+      
+      if (user?.id) {
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            transaction_type: 'coin_purchase',
+            amount: -plan.price, // Negative because it's a purchase cost
+            description: `VIP ${plan.duration} subscription purchase`,
+            created_at: new Date().toISOString()
+          });
+        
+        if (transactionError) {
+          console.error('Failed to record VIP transaction:', transactionError);
+        }
+      }
+    } catch (error) {
+      console.error('Error recording VIP transaction:', error);
+    }
+
     // In a real app, you would update the database here
     // For now, we'll simulate the VIP activation
     
