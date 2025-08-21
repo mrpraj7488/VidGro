@@ -457,7 +457,6 @@ export default function Analytics() {
             >
               <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
             </TouchableOpacity>
-          )}
         </View>
       </View>
     );
