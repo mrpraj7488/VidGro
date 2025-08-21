@@ -451,11 +451,6 @@ export default function Analytics() {
             <TouchableOpacity
               style={[styles.retryButton, { backgroundColor: colors.primary }]}
               onPress={() => {
-            >
-              <Text style={styles.refreshButtonText}>Refresh</Text>
-            </TouchableOpacity>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
                 setHasError(false);
                 fetchAnalytics();
               }}
