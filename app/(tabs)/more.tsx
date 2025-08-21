@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAlert } from '@/contexts/AlertContext';
 import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
 import { DollarSign, Crown, ShieldOff, Star, Bug, Gift, Play, Clock, Coins, Sparkles, Zap } from 'lucide-react-native';
@@ -34,6 +35,7 @@ export default function MoreTab() {
   const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
   const { config } = useConfig();
+  const { showError, showSuccess, showInfo, showConfirm } = useAlert();
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   const [freeCoinsAvailable, setFreeCoinsAvailable] = useState(true);
@@ -129,7 +131,7 @@ export default function MoreTab() {
 
     // Check if ads are enabled in runtime config
     if (!config?.features.adsEnabled) {
-      Alert.alert('Feature Unavailable', 'Free coins through ads are currently disabled.');
+      showInfo('Feature Unavailable', 'Free coins through ads are currently disabled.');
       return;
     }
 
@@ -138,22 +140,15 @@ export default function MoreTab() {
     const adBlockStatus = adService.getAdBlockStatus();
     
     if (adBlockStatus.detected) {
-      Alert.alert(
+      showConfirm(
         'Ad Blocker Detected',
-        'Please disable ad blocking software to earn free coins through ads.',
-        [
-          { text: 'Cancel' },
-          { 
-            text: 'Reset & Try Again', 
-            onPress: () => {
-              adService.resetAdBlockDetection();
-              // Retry the ad
-              setTimeout(() => handleFreeCoinsClick(), 1000);
-            }
-          }
-        ]
+        'Please disable ad blocking software to earn free coins through ads. Reset detection and try again?',
+        () => {
+          adService.resetAdBlockDetection();
+          // Retry the ad after a short delay
+          setTimeout(() => handleFreeCoinsClick(), 1000);
+        }
       );
-      setLoading(false);
       return;
     }
 
@@ -168,90 +163,86 @@ export default function MoreTab() {
       withSpring(1, { damping: 15, stiffness: 400 })
     );
 
-    setLoading(true);
+    // Show confirmation and handle the ad flow
+    showConfirm(
+      '🎬 Watch Ad for Free Coins',
+      'Watch a 30-second ad to earn 100 free coins. Continue?',
+      () => {
+        // Start loading after confirmation
+        setLoading(true);
+        handleAdReward();
+      },
+      () => {
+        // User cancelled
+        setLoading(false);
+      }
+    );
+  };
 
+  const handleAdReward = async () => {
     try {
-      Alert.alert(
-        '🎬 Watch Ad for Free Coins',
-        'Watch a 30-second ad to earn 100 free coins. Continue?',
-        [
-          { 
-            text: 'Cancel', 
-            style: 'cancel',
-            onPress: () => setLoading(false)
-          },
-          { 
-            text: '▶️ Watch Ad', 
-            onPress: async () => {
-              // Use AdService to show rewarded ad
-              const adService = AdService.getInstance();
-              const adResult = await adService.showRewardedAd();
-              
-              if (adResult.success) {
-                try {
-                  // Award coins to user
-                  if (user) {
-                    const supabase = getSupabase();
-                    const { error } = await supabase
-                      .from('coin_transactions')
-                      .insert({
-                        user_id: user.id,
-                        amount: adResult.reward || 100,
-                        transaction_type: 'ad_reward',
-                        description: 'Free coins earned by watching 30-second ad',
-                        reference_id: `ad_${Date.now()}`,
-                        metadata: {
-                          ad_duration: 30,
-                          platform: Platform.OS
-                        }
-                      });
-
-                    if (!error) {
-                      // Update user's coin balance
-                      await supabase
-                        .from('profiles')
-                        .update({ 
-                          coins: (profile?.coins || 0) + (adResult.reward || 100)
-                        })
-                        .eq('id', user.id);
-
-                      // Record claim time
-                      await AsyncStorage.setItem('lastFreeCoinsClaimTime', new Date().toISOString());
-                      
-                      // Refresh profile and check availability
-                      await refreshProfile();
-                      await checkFreeCoinsAvailability();
-
-                      if (Platform.OS !== 'web') {
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      }
-
-                      Alert.alert(
-                        '🎉 Coins Earned!',
-                        `${adResult.reward || 100} coins have been added to your account! Come back in 2 hours for more free coins.`,
-                        [{ text: '🚀 Awesome!' }]
-                      );
-                    } else {
-                      throw new Error('Failed to award coins');
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error awarding free coins:', error);
-                  Alert.alert('Error', 'Failed to award coins. Please try again.');
-                } finally {
-                  setLoading(false);
+      // Use AdService to show rewarded ad
+      const adService = AdService.getInstance();
+      const adResult = await adService.showRewardedAd();
+      
+      if (adResult.success) {
+        try {
+          // Award coins to user
+          if (user) {
+            const supabase = getSupabase();
+            const { error } = await supabase
+              .from('coin_transactions')
+              .insert({
+                user_id: user.id,
+                amount: adResult.reward || 100,
+                transaction_type: 'ad_reward',
+                description: 'Free coins earned by watching 30-second ad',
+                reference_id: `ad_${Date.now()}`,
+                metadata: {
+                  ad_duration: 30,
+                  platform: Platform.OS
                 }
-              } else {
-                Alert.alert('Ad Failed', 'Unable to show ad. Please try again later.');
-                setLoading(false);
+              });
+
+            if (!error) {
+              // Update user's coin balance
+              await supabase
+                .from('profiles')
+                .update({ 
+                  coins: (profile?.coins || 0) + (adResult.reward || 100)
+                })
+                .eq('id', user.id);
+
+              // Record claim time
+              await AsyncStorage.setItem('lastFreeCoinsClaimTime', new Date().toISOString());
+              
+              // Refresh profile and check availability
+              await refreshProfile();
+              await checkFreeCoinsAvailability();
+
+              if (Platform.OS !== 'web') {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               }
+
+              showSuccess(
+                '🎉 Coins Earned!',
+                `${adResult.reward || 100} coins have been added to your account! Come back in 2 hours for more free coins.`
+              );
+            } else {
+              throw new Error('Failed to award coins');
             }
           }
-        ]
-      );
+        } catch (error) {
+          console.error('Error awarding free coins:', error);
+          showError('Error', 'Failed to award coins. Please try again.');
+        }
+      } else {
+        showError('Ad Failed', 'Unable to show ad. Please try again later.');
+      }
     } catch (error) {
       console.error('Error handling free coins:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      showError('Error', 'Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
