@@ -111,7 +111,7 @@ export const supabase = new Proxy({} as any, {
 });
 
 // Remove old awardCoinsForVideo function and replace with new watchVideo
-export const watchVideo = async (
+export const watchVideoAndEarnCoins = async (
   userId: string,
   videoId: string,
   watchDuration: number,
@@ -122,7 +122,7 @@ export const watchVideo = async (
       user_uuid: userId,
       video_uuid: videoId,
       watch_duration: watchDuration,
-      video_fully_watched: fullyWatched
+      video_fully_watched: fullyWatched,
     });
 
     if (error) {
@@ -174,7 +174,7 @@ export async function getVideoQueue(userId: string): Promise<any[]> {
     if (!error) {
       return (data || []).map((v: any) => ({
         video_id: v.video_id ?? v.id,
-        youtube_url: v.youtube_url ?? v.video_url ?? '',
+        youtube_url: v.youtube_url ?? '',
         title: v.title,
         duration_seconds: Number(v.duration_seconds || 0),
         coin_reward: Number(v.coin_reward ?? 0),
@@ -190,18 +190,22 @@ export async function getVideoQueue(userId: string): Promise<any[]> {
 
     console.warn('RPC get_video_queue_for_user failed, falling back to direct query:', error?.message);
 
-    // Fallback: fetch watchable videos (active OR on_hold expired), not completed, not owned by requester
+    // Improved fallback: fetch watchable videos with better filtering
     const nowIso = new Date().toISOString();
     const { data: fallback, error: fallbackError } = await client
       .from('videos')
       .select(`
-        id, youtube_url, video_url, title, duration_seconds, coin_reward,
+        id, youtube_url, title, duration_seconds, coin_reward,
         views_count, target_views, status, user_id, completed,
         total_watch_time, completion_rate, created_at, hold_until, repromoted_at
       `)
-      .neq('user_id', userId)
-      .eq('completed', false)
-      .or(`status.eq.active,status.eq.on_hold.and.hold_until.lte.${nowIso}`)
+      .neq('user_id', userId)                                    // Not user's own videos
+      .is('deleted_at', null)                                    // Not deleted videos
+      .eq('completed', false)                                    // Not completed videos
+      .neq('status', 'completed')                                // Not completed status videos
+      .neq('status', 'paused')                                   // Not paused videos
+      .lt('views_count', 'target_views')                         // Haven't reached target views
+      .or(`status.eq.active,status.eq.on_hold.and.hold_until.lte.${nowIso},status.eq.repromoted`)
       .order('repromoted_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(50);
@@ -214,7 +218,7 @@ export async function getVideoQueue(userId: string): Promise<any[]> {
     // Map to expected shape
     const fallbackMapped = (fallback || []).map((v: any) => ({
       video_id: v.id,
-      youtube_url: v.youtube_url || v.video_url,
+      youtube_url: v.youtube_url,
       title: v.title,
       duration_seconds: Number(v.duration_seconds || 0),
       coin_reward: Number(v.coin_reward ?? 0),
@@ -254,6 +258,25 @@ export const createVideoPromotion = async (
     user_uuid: userId,
     youtube_url_param: youtubeUrl
   });
+  
+  // Record promotion transaction if successful
+  if (!error && data?.success) {
+    const supabase = getSupabase();
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        transaction_type: 'video_promotion',
+        amount: -coinCost, // Negative because it's a cost
+        description: `Video promotion: ${title}`,
+        created_at: new Date().toISOString()
+      });
+    
+    if (transactionError) {
+      console.error('Failed to record promotion transaction:', transactionError);
+    }
+  }
+  
   return { data, error };
 };
 
@@ -276,11 +299,110 @@ export const deleteVideo = async (
   videoId: string,
   userId: string
 ): Promise<{ data: any; error: any }> => {
-  const { data, error } = await getSupabase().rpc('delete_video_with_refund', {
-    video_uuid: videoId,
-    user_uuid: userId
-  });
-  return { data, error };
+  // Use direct table operations for reliable deletion with refund
+  const supabase = getSupabase();
+  
+  console.log('🔍 Attempting to delete video:', { videoId, userId });
+  
+  // Get video details for refund calculation - try multiple approaches
+  let { data: video, error: videoError } = await supabase
+    .from('videos')
+    .select('*')
+    .eq('id', videoId)
+    .eq('user_id', userId)
+    .single();
+  
+  console.log('📊 Video lookup result:', { video, videoError });
+  
+  if (videoError || !video) {
+    // Try lookup without user_id constraint (in case of permission issues)
+    const { data: altVideo, error: altError } = await supabase
+      .from('videos')
+      .select('*')
+      .eq('id', videoId)
+      .single();
+    
+    console.log('📊 Alternative video lookup (no user constraint):', { altVideo, altError });
+    
+    if (altError || !altVideo) {
+      return { data: null, error: { message: 'Video not found in database' } };
+    }
+    
+    // Verify ownership manually
+    if (altVideo.user_id !== userId) {
+      return { data: null, error: { message: 'Video not owned by user' } };
+    }
+    
+    // Use the alternative video data
+    video = altVideo;
+  }
+  
+  // Calculate refund
+  const minutesSinceCreation = (Date.now() - new Date(video.created_at).getTime()) / (1000 * 60);
+  const refundPercentage = minutesSinceCreation <= 10 ? 100 : 50;
+  const refundAmount = Math.round((video.coin_cost * refundPercentage) / 100);
+  
+  // Delete video
+  const { error: deleteError } = await supabase
+    .from('videos')
+    .delete()
+    .eq('id', videoId)
+    .eq('user_id', userId);
+  
+  if (deleteError) {
+    return { data: null, error: deleteError };
+  }
+  
+  // Get current user balance first
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('coins')
+    .eq('id', userId)
+    .single();
+  
+  if (profileError || !profile) {
+    return { data: null, error: { message: 'Could not fetch user profile' } };
+  }
+  
+  // Update user balance
+  const newBalance = (profile.coins || 0) + refundAmount;
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ 
+      coins: newBalance,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId);
+  
+  if (updateError) {
+    return { data: null, error: updateError };
+  }
+  
+  // Record refund transaction for recent activity
+  const { error: transactionError } = await supabase
+    .from('transactions')
+    .insert({
+      user_id: userId,
+      transaction_type: 'refund',
+      amount: refundAmount,
+      description: `Video deletion refund (${refundPercentage}%): ${video.title}`,
+      created_at: new Date().toISOString()
+    });
+  
+  if (transactionError) {
+    console.error('Failed to record refund transaction:', transactionError);
+    // Don't fail the whole operation for transaction logging
+  }
+  
+  return { 
+    data: {
+      success: true,
+      refund_amount: refundAmount,
+      refund_percentage: refundPercentage,
+      message: `Video deleted successfully with ${refundPercentage}% refund`
+    }, 
+    error: null 
+  };
 };
 
 // Get user comprehensive analytics
@@ -373,10 +495,41 @@ export const getUserVideosWithAnalytics = async (userId: string) => {
 };
 
 export const getUserRecentActivity = async (userId: string) => {
-  const { data, error } = await getSupabase().rpc('get_user_recent_activity', {
-    user_uuid: userId
-  });
-  return { data, error };
+  try {
+    // First try the RPC function
+    const { data: rpcData, error: rpcError } = await getSupabase().rpc('get_user_recent_activity', {
+      user_uuid: userId
+    });
+    
+    if (!rpcError && rpcData) {
+      return { data: rpcData, error: null };
+    }
+    
+    // If RPC fails, query transactions table directly
+    const { data, error } = await getSupabase()
+      .from('transactions')
+      .select('transaction_type, amount, description, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    // Transform data to match expected format
+    const transformedData = data?.map(transaction => ({
+      activity_type: transaction.transaction_type,
+      amount: transaction.amount,
+      description: transaction.description,
+      created_at: transaction.created_at
+    })) || [];
+
+    return { data: transformedData, error: null };
+  } catch (err) {
+    console.error('getUserRecentActivity error:', err);
+    return { data: null, error: err };
+  }
 };
 
 // Record coin purchase transaction
