@@ -565,9 +565,7 @@ export default function Analytics() {
                 Start promoting your videos to see analytics here
               </Text>
             </View>
-          ) : (
-            <>
-              {getDisplayedVideos().map((video) => {
+          ) : (<>{getDisplayedVideos().map((video) => {
                 const StatusIcon = getStatusIcon(video.status, video.is_repromoted);
                 const statusColor = getStatusColor(video.status, video.is_repromoted);
                 const displayStatus = video.is_repromoted ? 'Repromoted' : video.status.charAt(0).toUpperCase() + video.status.slice(1);
@@ -651,11 +649,9 @@ export default function Analytics() {
                         <Text style={[styles.repromoteDate, { color: '#9B59B6' }]}>
                           {`🔄 Repromoted ${formatDate(video.last_repromoted_at)}`}
                         </Text>
-                      )}
-                    </View></TouchableOpacity>
+                      )}</View></TouchableOpacity>
                 );
               })}
-              
               {videos.length > 1 && (
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
@@ -696,9 +692,7 @@ export default function Analytics() {
                 Your coin transactions will appear here
               </Text>
             </View>
-          ) : (
-            <>
-              {getDisplayedActivity().map((activity, index) => (
+          ) : (<>{getDisplayedActivity().map((activity, index) => (
                 <View key={`${activity.activity_type}-${activity.created_at}-${index}`} style={[styles.activityCard, { backgroundColor: colors.surface }]}>
                   <View style={styles.activityHeader}>
                     <View style={styles.activityInfo}>
@@ -713,16 +707,14 @@ export default function Analytics() {
                       styles.activityAmount,
                       { color: activity.amount > 0 ? colors.success : colors.error }
                     ]}>
-                      {activity.amount > 0 ? '+' : ''}{safeNumber(activity.amount)} 🪙
+                      {`${activity.amount > 0 ? '+' : ''}${safeNumber(activity.amount)} 🪙`}
                     </Text>
                   </View>
                   <Text style={[styles.activityDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                     {safeString(activity.description, 'No description available')}
                   </Text>
                 </View>
-              ))}
-              
-              {recentActivity.length > 1 && (
+              ))}{recentActivity.length > 1 && (
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
                     style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
