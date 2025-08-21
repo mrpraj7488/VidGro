@@ -78,11 +78,11 @@ export default function Analytics() {
   const [loadingStates, setLoadingStates] = useState({
     analytics: true,
     videos: true,
-    activity: true
+    activity: true,
   });
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -92,16 +92,14 @@ export default function Analytics() {
 
   useEffect(() => {
     if (authLoading) return;
-    
+
     if (!user) {
       router.replace('/(auth)/login');
       return;
     }
 
     if (user?.id) {
-      // Check if analytics are enabled
       if (!analyticsEnabled) {
-        // Gracefully show empty analytics instead of an infinite loading skeleton
         const emptyAnalytics = {
           current_coins: profile?.coins || 0,
           total_videos_promoted: 0,
@@ -113,6 +111,7 @@ export default function Analytics() {
           active_videos: 0,
           on_hold_videos: 0,
           total_coins_earned: 0,
+          repromoted_videos: 0,
         };
         setAnalytics(emptyAnalytics);
         setVideos([]);
@@ -121,8 +120,7 @@ export default function Analytics() {
         setLoading(false);
         return;
       }
-      
-      // Initialize with timeout protection
+
       const initTimeout = setTimeout(() => {
         if (loading) {
           console.warn('Analytics loading timeout - showing fallback data');
@@ -130,13 +128,12 @@ export default function Analytics() {
           setLoadingStates({ analytics: false, videos: false, activity: false });
           setLoading(false);
         }
-      }, 10000); // 10 second timeout
-      
+      }, 10000);
+
       fetchAnalytics().finally(() => {
         clearTimeout(initTimeout);
       });
-      
-      // Reduced interval for better performance (30 seconds instead of 5)
+
       const statusCheckInterval = setInterval(async () => {
         if (!loading && !refreshing) {
           try {
@@ -145,7 +142,6 @@ export default function Analytics() {
               const { data: updatedCount, error: holdsError } = await supabase.rpc('check_and_update_expired_holds');
               if (!holdsError && updatedCount && updatedCount > 0) {
                 console.log(`${updatedCount} videos automatically activated from hold`);
-                // Only refresh if not currently loading
                 fetchAnalytics();
               }
             }
@@ -153,8 +149,8 @@ export default function Analytics() {
             console.error('Error checking expired holds:', error);
           }
         }
-      }, 30000); // Reduced to 30 seconds
-      
+      }, 30000);
+
       return () => {
         clearTimeout(initTimeout);
         clearInterval(statusCheckInterval);
@@ -170,20 +166,16 @@ export default function Analytics() {
       setHasError(false);
       setLoadingStates({ analytics: true, videos: true, activity: true });
 
-      // Use Promise.allSettled for concurrent loading with individual error handling
       const [analyticsResult, videosResult, activityResult] = await Promise.allSettled([
         getUserComprehensiveAnalytics(user.id),
         getUserVideosWithAnalytics(user.id),
-        getUserRecentActivity(user.id)
+        getUserRecentActivity(user.id),
       ]);
 
-      // Handle analytics data
       if (analyticsResult.status === 'fulfilled') {
         const { data: analyticsData, error: analyticsError } = analyticsResult.value;
-
         if (analyticsError) {
           console.error('Analytics error:', analyticsError);
-          // Use fallback analytics
           setAnalytics({
             current_coins: profile?.coins || 0,
             total_videos_promoted: 0,
@@ -195,18 +187,14 @@ export default function Analytics() {
             active_videos: 0,
             on_hold_videos: 0,
             total_coins_earned: 0,
-            repromoted_videos: 0
+            repromoted_videos: 0,
           });
         } else if (analyticsData) {
-          // Extract the summary data from the response
           const summary = analyticsData.summary || {};
-          // Count active videos properly - exclude completed and repromoted
-          const activeCount = analyticsData.videos?.filter((v: any) => 
-            v.status === 'active' && !v.completed && !v.is_repromoted
-          ).length || 0;
+          const activeCount = analyticsData.videos?.filter((v: any) => v.status === 'active' && !v.completed && !v.is_repromoted).length || 0;
           const repromoteCount = analyticsData.videos?.filter((v: any) => v.is_repromoted).length || 0;
           const completedCount = analyticsData.videos?.filter((v: any) => v.completed).length || 0;
-          
+
           setAnalytics({
             current_coins: analyticsData.user?.coins || profile?.coins || 0,
             total_videos_promoted: summary.total_videos || 0,
@@ -218,7 +206,7 @@ export default function Analytics() {
             active_videos: activeCount,
             on_hold_videos: summary.on_hold_videos || 0,
             total_coins_earned: summary.total_coins_earned || 0,
-            repromoted_videos: repromoteCount
+            repromoted_videos: repromoteCount,
           });
         }
       } else {
@@ -234,23 +222,21 @@ export default function Analytics() {
           active_videos: 0,
           on_hold_videos: 0,
           total_coins_earned: 0,
-          repromoted_videos: 0
+          repromoted_videos: 0,
         });
       }
-      setLoadingStates(prev => ({ ...prev, analytics: false }));
+      setLoadingStates((prev) => ({ ...prev, analytics: false }));
 
-      // Handle activity data
       if (activityResult.status === 'fulfilled') {
         const { data: activityData, error: activityError } = activityResult.value;
         if (activityError) {
           console.error('Recent activity error:', activityError);
           setRecentActivity([]);
         } else if (activityData) {
-          // Ensure all activity items have the required fields
-          const validActivityData = activityData.filter((activity: any) => 
-            activity && 
-            typeof activity === 'object' && 
-            activity.activity_type && 
+          const validActivityData = activityData.filter((activity: any) =>
+            activity &&
+            typeof activity === 'object' &&
+            activity.activity_type &&
             typeof activity.amount === 'number' &&
             activity.description &&
             activity.created_at
@@ -263,14 +249,12 @@ export default function Analytics() {
         console.error('Activity request failed:', activityResult.reason);
         setRecentActivity([]);
       }
-      setLoadingStates(prev => ({ ...prev, activity: false }));
+      setLoadingStates((prev) => ({ ...prev, activity: false }));
 
-      // Handle videos data
       if (videosResult.status === 'fulfilled') {
         const { data: videosData, error: videosError } = videosResult.value;
         if (videosError) {
           console.error('Videos error:', videosError);
-          // Fallback to direct query
           try {
             const supabase = getSupabase();
             if (supabase) {
@@ -303,16 +287,14 @@ export default function Analytics() {
                   status: video.status,
                   created_at: video.created_at,
                   coin_cost: video.coin_cost || 0,
-                  completion_rate: video.completion_rate || (video.target_views > 0 
-                    ? Math.round((video.views_count / video.target_views) * 100)
-                    : 0),
+                  completion_rate: video.completion_rate || (video.target_views > 0 ? Math.round((video.views_count / video.target_views) * 100) : 0),
                   completed: video.completed,
                   total_watch_time: video.total_watch_time || 0,
                   coins_earned_total: video.coins_earned_total || 0,
-                  repromote_count: 0, // Not tracked in database
+                  repromote_count: 0,
                   last_repromoted_at: video.repromoted_at,
-                  repromote_cost: 0, // Not tracked in database
-                  is_repromoted: video.repromoted_at ? true : false
+                  repromote_cost: 0,
+                  is_repromoted: video.repromoted_at ? true : false,
                 }));
                 setVideos(videosWithCompletion);
               } else {
@@ -341,7 +323,7 @@ export default function Analytics() {
             repromote_count: video.repromote_count || 0,
             last_repromoted_at: video.last_repromoted_at || video.repromoted_at,
             repromote_cost: video.repromote_cost || 0,
-            is_repromoted: video.is_repromoted || (video.last_repromoted_at ? true : false) || (video.repromoted_at ? true : false)
+            is_repromoted: video.is_repromoted || (video.last_repromoted_at ? true : false) || (video.repromoted_at ? true : false),
           }));
           setVideos(transformedVideos);
         } else {
@@ -351,14 +333,12 @@ export default function Analytics() {
         console.error('Videos request failed:', videosResult.reason);
         setVideos([]);
       }
-      setLoadingStates(prev => ({ ...prev, videos: false }));
+      setLoadingStates((prev) => ({ ...prev, videos: false }));
 
     } catch (error) {
       console.error('Error fetching analytics:', error);
       setHasError(true);
-      setRetryCount(prev => prev + 1);
-      
-      // Don't show alert on first few failures, just log
+      setRetryCount((prev) => prev + 1);
       if (retryCount >= 2) {
         Alert.alert('Error', 'Unable to load analytics. Please check your connection and try again.');
       }
@@ -375,7 +355,7 @@ export default function Analytics() {
   };
 
   const getStatusColor = (status: string, isRepromoted?: boolean) => {
-    if (isRepromoted) return '#9B59B6'; // Purple for repromoted videos
+    if (isRepromoted) return '#9B59B6';
     switch (status) {
       case 'active': return '#2ECC71';
       case 'completed': return '#3498DB';
@@ -386,19 +366,31 @@ export default function Analytics() {
   };
 
   const getStatusIcon = (status: string, isRepromoted?: boolean) => {
-    if (isRepromoted) return TrendingUp; // Trending up icon for repromoted
+    if (isRepromoted) {
+      console.log('StatusIcon: TrendingUp');
+      return TrendingUp;
+    }
     switch (status) {
-      case 'active': return Play;
-      case 'completed': return CheckCircle;
-      case 'paused': return Pause;
-      case 'on_hold': return Timer;
-      default: return Play;
+      case 'active':
+        console.log('StatusIcon: Play');
+        return Play;
+      case 'completed':
+        console.log('StatusIcon: CheckCircle');
+        return CheckCircle;
+      case 'paused':
+        console.log('StatusIcon: Pause');
+        return Pause;
+      case 'on_hold':
+        console.log('StatusIcon: Timer');
+        return Timer;
+      default:
+        console.log('StatusIcon: Default Play');
+        return Play;
     }
   };
 
   const formatTransactionType = (type: string) => {
     if (!type) return 'Unknown Transaction';
-    
     switch (type) {
       case 'video_promotion': return 'Video Promotion';
       case 'purchase': return 'Coin Purchase';
@@ -414,14 +406,14 @@ export default function Analytics() {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
   const handleVideoPress = (video: VideoAnalytics) => {
     router.push({
       pathname: '/edit-video',
-      params: { videoData: JSON.stringify(video) }
+      params: { videoData: JSON.stringify(video) },
     });
   };
 
@@ -437,7 +429,6 @@ export default function Analytics() {
     return Math.max(0, total - displayed);
   };
 
-  // Helper function to safely render strings
   const safeString = (value: any, fallback: string = '') => {
     if (value == null) return fallback;
     try {
@@ -446,15 +437,13 @@ export default function Analytics() {
       return fallback;
     }
   };
-  
-  // Helper function to safely render numbers
+
   const safeNumber = (value: any, fallback: number = 0) => {
     if (value == null) return fallback;
     const num = Number(value);
     return isNaN(num) ? fallback : num;
   };
 
-  // Show loading only on initial load, not on refresh
   if (authLoading || (loading && !refreshing)) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -467,14 +456,17 @@ export default function Analytics() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.text }]}>Loading analytics...</Text>
-          {hasError ? (
+          {hasError && (
             <TouchableOpacity
               style={[styles.retryButton, { backgroundColor: colors.primary }]}
               onPress={() => {
                 setHasError(false);
                 fetchAnalytics();
-              }}><Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text></TouchableOpacity>
-          ) : null}
+              }}
+            >
+              <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -496,10 +488,8 @@ export default function Analytics() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Overview Cards - Only 2 columns */}
         <View style={styles.overviewSection}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Overview</Text>
-          
           <View style={styles.statsGrid}>
             <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
               <View style={styles.statHeader}>
@@ -510,7 +500,6 @@ export default function Analytics() {
                 {safeNumber(analytics?.total_videos_promoted)}
               </Text>
             </View>
-
             <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
               <View style={styles.statHeader}>
                 <Coins size={20} color="#FFD700" />
@@ -523,26 +512,21 @@ export default function Analytics() {
           </View>
         </View>
 
-        {/* Video Status Summary */}
         <View style={styles.statusSection}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Video Status</Text>
-          
           <View style={styles.statusGrid}>
             <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#2ECC71' }]}>
               <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.active_videos)}</Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Active</Text>
             </View>
-            
             <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#3498DB' }]}>
               <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.completed_videos)}</Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Completed</Text>
             </View>
-            
             <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#F39C12' }]}>
               <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.on_hold_videos)}</Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>On Hold</Text>
             </View>
-            
             <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#9B59B6' }]}>
               <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.repromoted_videos)}</Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Repromoted</Text>
@@ -550,13 +534,11 @@ export default function Analytics() {
           </View>
         </View>
 
-        {/* Promoted Videos */}
         <View style={styles.videosSection}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Promoted Videos</Text>
             <BarChart3 size={20} color={colors.primary} />
           </View>
-          
           {videos.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
               <Play size={48} color={colors.textSecondary} />
@@ -565,15 +547,18 @@ export default function Analytics() {
                 Start promoting your videos to see analytics here
               </Text>
             </View>
-          ) : (<>{getDisplayedVideos().map((video) => {
+          ) : (
+            <>
+              {getDisplayedVideos().map((video) => {
                 const StatusIcon = getStatusIcon(video.status, video.is_repromoted);
                 const statusColor = getStatusColor(video.status, video.is_repromoted);
-                const displayStatus = video.is_repromoted ? 'Repromoted' : video.status.charAt(0).toUpperCase() + video.status.slice(1);
+                const displayStatus = video.is_repromoted ? 'Repromoted' : (video.status ? video.status.charAt(0).toUpperCase() + video.status.slice(1) : 'Unknown');
                 return (
                   <TouchableOpacity
                     key={video.video_id}
                     style={[styles.videoCard, { backgroundColor: colors.surface }]}
-                    onPress={() => handleVideoPress(video)}>
+                    onPress={() => handleVideoPress(video)}
+                  >
                     <View style={styles.videoHeader}>
                       <View style={styles.videoTitleContainer}>
                         <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
@@ -583,7 +568,11 @@ export default function Analytics() {
                           {formatDate(video.created_at)}
                         </Text>
                       </View>
-                      <TouchableOpacity style={styles.editButton}><View style={{ padding: 4 }}><Edit3 size={16} color={colors.textSecondary} /></View></TouchableOpacity>
+                      <TouchableOpacity style={styles.editButton}>
+                        <View style={{ padding: 4 }}>
+                          <Edit3 size={16} color={colors.textSecondary} />
+                        </View>
+                      </TouchableOpacity>
                     </View>
                     <View style={styles.videoStats}>
                       <View style={styles.videoStat}>
@@ -620,8 +609,8 @@ export default function Analytics() {
                             styles.progressFill, 
                             { 
                               width: `${Math.min(safeNumber(video.completion_rate), 100)}%`,
-                              backgroundColor: statusColor
-                            }
+                              backgroundColor: statusColor,
+                            },
                           ]} 
                         />
                       </View>
@@ -649,14 +638,18 @@ export default function Analytics() {
                         <Text style={[styles.repromoteDate, { color: '#9B59B6' }]}>
                           {`🔄 Repromoted ${formatDate(video.last_repromoted_at)}`}
                         </Text>
-                      )}</View></TouchableOpacity>
+                      )}
+                    </View>
+                  </TouchableOpacity>
                 );
               })}
               {videos.length > 1 && (
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
                     style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
-                    onPress={() => setShowAllVideos(!showAllVideos)}><View style={styles.viewMoreContent}>
+                    onPress={() => setShowAllVideos(!showAllVideos)}
+                  >
+                    <View style={styles.viewMoreContent}>
                       <Text style={[styles.viewMoreText, { color: colors.primary }]}>
                         {showAllVideos 
                           ? 'Show Less' 
@@ -670,20 +663,19 @@ export default function Analytics() {
                           <ChevronDown size={16} color={colors.primary} />
                         )}
                       </View>
-                    </View></TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
                 </View>
               )}
             </>
           )}
         </View>
 
-        {/* Recent Activity */}
         <View style={styles.activitySection}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
             <Activity size={20} color={colors.primary} />
           </View>
-          
           {recentActivity.length === 0 ? (
             <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
               <Activity size={48} color={colors.textSecondary} />
@@ -692,7 +684,9 @@ export default function Analytics() {
                 Your coin transactions will appear here
               </Text>
             </View>
-          ) : (<>{getDisplayedActivity().map((activity, index) => (
+          ) : (
+            <>
+              {getDisplayedActivity().map((activity, index) => (
                 <View key={`${activity.activity_type}-${activity.created_at}-${index}`} style={[styles.activityCard, { backgroundColor: colors.surface }]}>
                   <View style={styles.activityHeader}>
                     <View style={styles.activityInfo}>
@@ -703,10 +697,7 @@ export default function Analytics() {
                         {formatDate(activity.created_at)}
                       </Text>
                     </View>
-                    <Text style={[
-                      styles.activityAmount,
-                      { color: activity.amount > 0 ? colors.success : colors.error }
-                    ]}>
+                    <Text style={[styles.activityAmount, { color: activity.amount > 0 ? colors.success : colors.error }]}>
                       {`${activity.amount > 0 ? '+' : ''}${safeNumber(activity.amount)} 🪙`}
                     </Text>
                   </View>
@@ -714,11 +705,14 @@ export default function Analytics() {
                     {safeString(activity.description, 'No description available')}
                   </Text>
                 </View>
-              ))}{recentActivity.length > 1 && (
+              ))}
+              {recentActivity.length > 1 && (
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
                     style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
-                    onPress={() => setShowAllActivity(!showAllActivity)}><View style={styles.viewMoreContent}>
+                    onPress={() => setShowAllActivity(!showAllActivity)}
+                  >
+                    <View style={styles.viewMoreContent}>
                       <Text style={[styles.viewMoreText, { color: colors.primary }]}>
                         {showAllActivity 
                           ? 'Show Less' 
@@ -732,13 +726,13 @@ export default function Analytics() {
                           <ChevronDown size={16} color={colors.primary} />
                         )}
                       </View>
-                    </View></TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
                 </View>
               )}
             </>
           )}
         </View>
-
       </ScrollView>
     </View>
   );
