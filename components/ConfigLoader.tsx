@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Platform, Image, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useConfig } from '../contexts/ConfigContext';
 import AdService from '../services/AdService';
@@ -16,6 +16,8 @@ export default function ConfigLoader({ children }: ConfigLoaderProps) {
   const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
   const [adBlockStatus, setAdBlockStatus] = useState<{ detected: boolean; failureCount: number }>({ detected: false, failureCount: 0 });
   const [forceRender, setForceRender] = useState(false);
+  const spinAnim = React.useRef(new Animated.Value(0)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.9)).current;
 
 
 
@@ -27,6 +29,25 @@ export default function ConfigLoader({ children }: ConfigLoaderProps) {
 
     return () => clearTimeout(timeout);
   }, []);
+
+  // Simple animated splash: rotate + scale the icon subtly
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      })
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 1.03, duration: 900, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 0.97, duration: 900, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, [scaleAnim, spinAnim]);
 
   useEffect(() => {
     if (config && isConfigValid) {
@@ -111,7 +132,12 @@ export default function ConfigLoader({ children }: ConfigLoaderProps) {
       >
         <View style={styles.content}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logo}>VidGro</Text>
+            <Animated.View style={{ transform: [
+              { rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['-2deg', '2deg'] }) },
+              { scale: scaleAnim }
+            ] }}>
+              <Image source={require('../assets/images/icon.png')} style={styles.icon} resizeMode="contain" />
+            </Animated.View>
             <Text style={styles.tagline}>Watch & Earn</Text>
           </View>
           
@@ -191,12 +217,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 60,
   },
-  logo: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    letterSpacing: 1,
+  icon: {
+    width: 120,
+    height: 120,
+    marginBottom: 12,
   },
   tagline: {
     fontSize: 18,
