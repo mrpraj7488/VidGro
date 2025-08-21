@@ -299,7 +299,7 @@ export default function Analytics() {
                   repromote_count: 0,
                   last_repromoted_at: video.repromoted_at,
                   repromote_cost: 0,
-                  is_repromoted: video.repromoted_at ? true : false,
+                  is_repromoted: (video.repromote_count && video.repromote_count > 0) && (video.repromoted_at ? true : false),
                 }));
                 setVideos(videosWithCompletion);
               } else {
@@ -328,7 +328,7 @@ export default function Analytics() {
             repromote_count: video.repromote_count || 0,
             last_repromoted_at: video.last_repromoted_at || video.repromoted_at,
             repromote_cost: video.repromote_cost || 0,
-            is_repromoted: video.is_repromoted || (video.last_repromoted_at ? true : false) || (video.repromoted_at ? true : false),
+            is_repromoted: (video.repromote_count && video.repromote_count > 0) && (video.is_repromoted || video.last_repromoted_at || video.repromoted_at),
           }));
           setVideos(transformedVideos);
         } else {
@@ -554,99 +554,13 @@ export default function Analytics() {
             </View>
           ) : (
             <>
-              {getDisplayedVideos().map((video) => {
-                const statusColor = getStatusColor(video.status, video.is_repromoted);
-                const displayStatus = video.is_repromoted ? 'Repromoted' : (video.status ? video.status.charAt(0).toUpperCase() + video.status.slice(1) : 'Unknown');
-                return (
-                  <TouchableOpacity
-                    key={video.video_id}
-                    style={[styles.videoCard, { backgroundColor: colors.surface }]}
-                    onPress={() => handleVideoPress(video)}
-                  >
-                    <View style={styles.videoHeader}>
-                      <View style={styles.videoTitleContainer}>
-                        <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
-                          {safeString(video.title, 'Untitled Video')}
-                        </Text>
-                        <Text style={[styles.videoDate, { color: colors.textSecondary }]}>
-                          {formatDate(video.created_at)}
-                        </Text>
-                      </View>
-                      <TouchableOpacity style={styles.editButton}>
-                        <View style={{ padding: 4 }}>
-                          <Edit3 size={16} color={colors.textSecondary} />
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.videoStats}>
-                      <View style={styles.videoStat}>
-                        <View style={{ marginRight: 4 }}>
-                          <Eye size={16} color={colors.textSecondary} />
-                        </View>
-                        <Text style={[styles.videoStatText, { color: colors.textSecondary }]}>
-                          {`${safeNumber(video.views_count)}/${safeNumber(video.target_views)}`}
-                        </Text>
-                      </View>
-                      <View style={styles.videoStat}>
-                        <View style={{ marginRight: 4 }}>
-                          <TrendingUp size={16} color={statusColor} />
-                        </View>
-                        <Text style={[styles.videoStatText, { color: statusColor }]}>
-                          {displayStatus}
-                        </Text>
-                      </View>
-                      {video.is_repromoted && typeof video.repromote_count === 'number' && video.repromote_count > 0 && (
-                        <View style={styles.videoStat}>
-                          <View style={{ marginRight: 4 }}>
-                            <TrendingUp size={14} color="#9B59B6" />
-                          </View>
-                          <Text style={[styles.videoStatText, { color: '#9B59B6' }]}>
-                            {`x${safeNumber(video.repromote_count)}`}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.progressContainer}>
-                      <View style={[styles.progressBar, { backgroundColor: isDark ? colors.border : colors.border }]}>
-                        <View 
-                          style={[
-                            styles.progressFill, 
-                            { 
-                              width: `${Math.min(safeNumber(video.completion_rate), 100)}%`,
-                              backgroundColor: statusColor,
-                            },
-                          ]} 
-                        />
-                      </View>
-                      <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-                        {`${safeNumber(video.completion_rate)}%`}
-                      </Text>
-                    </View>
-                    <View style={styles.videoCosts}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Text style={[styles.costText, { color: colors.textSecondary }]}>
-                          {`Spent: 🪙${safeNumber(video.coin_cost)}`}
-                        </Text>
-                        {video.repromote_cost && typeof video.repromote_cost === 'number' && video.repromote_cost > 0 && (
-                          <Text style={[styles.repromoteText, { color: '#9B59B6', marginLeft: 4 }]}>
-                            {`(+🪙${safeNumber(video.repromote_cost)} repromote)`}
-                          </Text>
-                        )}
-                      </View>
-                      {video.completed && (
-                        <Text style={[styles.completedText, { color: colors.success }]}>
-                          ✅ Target Reached!
-                        </Text>
-                      )}
-                      {video.is_repromoted && video.last_repromoted_at && (
-                        <Text style={[styles.repromoteDate, { color: '#9B59B6' }]}>
-                          {`🔄 Repromoted ${formatDate(video.last_repromoted_at)}`}
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+              {getDisplayedVideos().map((video) => (
+                <View key={video.video_id} style={[styles.videoCard, { backgroundColor: colors.surface }]}>
+                  <Text style={[styles.videoTitle, { color: colors.text }]}>
+                    {safeString(video.title, 'Untitled Video')}
+                  </Text>
+                </View>
+              ))}
               {videos.length > 1 && (
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
