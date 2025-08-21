@@ -15,7 +15,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { useFeatureFlag } from '@/hooks/useFeatureFlags';
 import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
-import { ChartBar as BarChart3, Eye, Coins, Play, Pause, CircleCheck as CheckCircle, Timer, CreditCard as Edit3, Activity, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ChartBar as BarChart3, Eye, Coins, Play, Pause, CircleCheck as CheckCircle, Timer, Pencil as Edit3, Activity, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getUserComprehensiveAnalytics, getUserVideosWithAnalytics, getUserRecentActivity } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -30,6 +30,8 @@ interface UserAnalytics {
   total_coins_distributed: number;
   average_completion_rate: number;
   current_coins: number;
+  repromoted_videos?: number;
+  total_repromotes?: number;
 }
 
 interface RecentActivity {
@@ -51,6 +53,12 @@ interface VideoAnalytics {
   completed: boolean;
   total_watch_time: number;
   coins_earned_total: number;
+  repromote_count?: number;
+  last_repromoted_at?: string;
+  repromote_cost?: number;
+  is_repromoted?: boolean;
+  can_repromote?: boolean;
+  estimated_repromote_cost?: number;
 }
 
 export default function Analytics() {
@@ -67,12 +75,140 @@ export default function Analytics() {
   const [videos, setVideos] = useState<VideoAnalytics[]>([]);
   const [showAllVideos, setShowAllVideos] = useState(false);
   const [showAllActivity, setShowAllActivity] = useState(false);
+  const [loadingStates, setLoadingStates] = useState({
+    analytics: true,
+    videos: true,
+    activity: true
+  });
+  const [hasError, setHasError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (user && user.id) {
       // Check if analytics are enabled
       if (!analyticsEnabled) {
         // Gracefully show empty analytics instead of an infinite loading skeleton
+        const emptyAnalytics = {
+          current_coins: profile?.coins || 0,
+          total_videos_promoted: 0,
+          completed_videos: 0,
+          total_views_received: 0,
+          total_watch_time_received: 0,
+          total_coins_distributed: 0,
+          average_completion_rate: 0,
+          active_videos: 0,
+          on_hold_videos: 0,
+          total_coins_earned: 0,
+        };
+        setAnalytics(emptyAnalytics);
+        setVideos([]);
+        setRecentActivity([]);
+        setLoadingStates({ analytics: false, videos: false, activity: false });
+        setLoading(false);
+        return;
+      }
+      
+      // Initialize with timeout protection
+      const initTimeout = setTimeout(() => {
+        if (loading) {
+          console.warn('Analytics loading timeout - showing fallback data');
+          setHasError(true);
+          setLoadingStates({ analytics: false, videos: false, activity: false });
+          setLoading(false);
+        }
+      }, 10000); // 10 second timeout
+      
+      fetchAnalytics().finally(() => {
+        clearTimeout(initTimeout);
+      });
+      
+      // Reduced interval for better performance (30 seconds instead of 5)
+      const statusCheckInterval = setInterval(async () => {
+        if (!loading && !refreshing) {
+          try {
+            const supabase = getSupabase();
+            if (supabase) {
+              const { data: updatedCount, error: holdsError } = await supabase.rpc('check_and_update_expired_holds');
+              if (!holdsError && updatedCount && updatedCount > 0) {
+                console.log(`${updatedCount} videos automatically activated from hold`);
+                // Only refresh if not currently loading
+                fetchAnalytics();
+              }
+            }
+          } catch (error) {
+            console.error('Error checking expired holds:', error);
+          }
+        }
+      }, 30000); // Reduced to 30 seconds
+      
+      return () => {
+        clearTimeout(initTimeout);
+        clearInterval(statusCheckInterval);
+      };
+    }
+  }, [user, analyticsEnabled]);
+
+  const fetchAnalytics = async () => {
+    if (!user || !user.id) return;
+
+    try {
+      setLoading(true);
+      setHasError(false);
+      setLoadingStates({ analytics: true, videos: true, activity: true });
+
+      // Use Promise.allSettled for concurrent loading with individual error handling
+      const [analyticsResult, videosResult, activityResult] = await Promise.allSettled([
+        getUserComprehensiveAnalytics(user.id),
+        getUserVideosWithAnalytics(user.id),
+        getUserRecentActivity(user.id)
+      ]);
+
+      // Handle analytics data
+      if (analyticsResult.status === 'fulfilled') {
+        const { data: analyticsData, error: analyticsError } = analyticsResult.value;
+
+        if (analyticsError) {
+          console.error('Analytics error:', analyticsError);
+          // Use fallback analytics
+          setAnalytics({
+            current_coins: profile?.coins || 0,
+            total_videos_promoted: 0,
+            completed_videos: 0,
+            total_views_received: 0,
+            total_watch_time_received: 0,
+            total_coins_distributed: 0,
+            average_completion_rate: 0,
+            active_videos: 0,
+            on_hold_videos: 0,
+            total_coins_earned: 0,
+            repromoted_videos: 0
+          });
+        } else if (analyticsData) {
+          // Extract the summary data from the response
+          const summary = analyticsData.summary || {};
+          // Count active videos properly - exclude completed and repromoted
+          const activeCount = analyticsData.videos?.filter((v: any) => 
+            v.status === 'active' && !v.completed && !v.is_repromoted
+          ).length || 0;
+          const repromoteCount = analyticsData.videos?.filter((v: any) => v.is_repromoted).length || 0;
+          const completedCount = analyticsData.videos?.filter((v: any) => v.completed).length || 0;
+          
+          setAnalytics({
+            current_coins: analyticsData.user?.coins || profile?.coins || 0,
+            total_videos_promoted: summary.total_videos || 0,
+            completed_videos: completedCount || summary.completed_videos || 0,
+            total_views_received: summary.total_views || 0,
+            total_watch_time_received: summary.total_watch_time_generated || 0,
+            total_coins_distributed: summary.total_coins_spent || 0,
+            average_completion_rate: summary.average_completion_rate || 0,
+            active_videos: activeCount,
+            on_hold_videos: summary.on_hold_videos || 0,
+            total_coins_earned: summary.total_coins_earned || 0,
+            repromoted_videos: repromoteCount
+          });
+        }
+      } else {
+        console.error('Analytics request failed:', analyticsResult.reason);
         setAnalytics({
           current_coins: profile?.coins || 0,
           total_videos_promoted: 0,
@@ -84,189 +220,137 @@ export default function Analytics() {
           active_videos: 0,
           on_hold_videos: 0,
           total_coins_earned: 0,
+          repromoted_videos: 0
         });
-        setVideos([]);
-        setRecentActivity([]);
-        setLoading(false);
-        return;
       }
-      
-      fetchAnalytics();
-      
-      // Set up periodic status checking for hold videos and real-time updates
-      const statusCheckInterval = setInterval(async () => {
-        try {
-          // Check for expired holds and update video metrics every 5 seconds
-          const supabase = getSupabase();
-          const { data: updatedCount, error: holdsError } = await supabase.rpc('check_and_update_expired_holds');
-          if (holdsError) {
-            console.error('Error checking expired holds:', holdsError);
-          } else if (updatedCount && updatedCount > 0) {
-            console.log(`${updatedCount} videos automatically activated from hold`);
-            fetchAnalytics();
-          }
-        } catch (error) {
-          console.error('Error checking expired holds:', error);
-        }
-      }, 5000);
-      
-      return () => clearInterval(statusCheckInterval);
-    }
-  }, [user]);
+      setLoadingStates(prev => ({ ...prev, analytics: false }));
 
-  const fetchAnalytics = async () => {
-    if (!user || !user.id) return;
-
-    try {
-      setLoading(true);
-
-      // Fetch user analytics using the current schema function
-      const { data: analyticsData, error: analyticsError } = await getUserComprehensiveAnalytics(user.id);
-
-      if (analyticsError) {
-        console.error('Analytics error:', analyticsError);
-        // If the function doesn't exist, create a basic analytics object
-        if (typeof analyticsError === 'object' && analyticsError !== null && 'message' in analyticsError && typeof analyticsError.message === 'string' && (analyticsError.message.includes('function') || analyticsError.message.includes('not found'))) {
-          console.log('Analytics function not found, using fallback data');
-          setAnalytics({
-            current_coins: profile?.coins || 0,
-            total_videos_promoted: 0,
-            completed_videos: 0,
-            total_views_received: 0,
-            total_watch_time_received: 0,
-            total_coins_distributed: 0,
-            average_completion_rate: 0,
-            active_videos: 0,
-            on_hold_videos: 0,
-            total_coins_earned: 0
-          });
+      // Handle activity data
+      if (activityResult.status === 'fulfilled') {
+        const { data: activityData, error: activityError } = activityResult.value;
+        if (activityError) {
+          console.error('Recent activity error:', activityError);
+          setRecentActivity([]);
+        } else if (activityData) {
+          // Ensure all activity items have the required fields
+          const validActivityData = activityData.filter((activity: any) => 
+            activity && 
+            typeof activity === 'object' && 
+            activity.activity_type && 
+            typeof activity.amount === 'number' &&
+            activity.description &&
+            activity.created_at
+          );
+          setRecentActivity(validActivityData);
         } else {
-          // Show empty analytics rather than blocking the screen
-          setAnalytics({
-            current_coins: profile?.coins || 0,
-            total_videos_promoted: 0,
-            completed_videos: 0,
-            total_views_received: 0,
-            total_watch_time_received: 0,
-            total_coins_distributed: 0,
-            average_completion_rate: 0,
-            active_videos: 0,
-            on_hold_videos: 0,
-            total_coins_earned: 0
-          });
+          setRecentActivity([]);
         }
-        // Continue to attempt loading activity/videos even if summary failed
-      }
-
-      if (analyticsData) {
-        setAnalytics(analyticsData);
-      }
-
-      // Fetch recent activity using the new function
-      const { data: activityData, error: activityError } = await getUserRecentActivity(user.id);
-      if (activityError) {
-        console.error('Recent activity error:', activityError);
-        setRecentActivity([]);
-      } else if (activityData) {
-        // Ensure all activity items have the required fields
-        const validActivityData = activityData.filter((activity: any) => 
-          activity && 
-          typeof activity === 'object' && 
-          activity.activity_type && 
-          typeof activity.amount === 'number' &&
-          activity.description &&
-          activity.created_at
-        );
-        setRecentActivity(validActivityData);
       } else {
+        console.error('Activity request failed:', activityResult.reason);
         setRecentActivity([]);
       }
+      setLoadingStates(prev => ({ ...prev, activity: false }));
 
-      // Fetch user's videos with enhanced analytics including completion status
-      const { data: videosData, error: videosError } = await getUserVideosWithAnalytics(user.id);
+      // Handle videos data
+      if (videosResult.status === 'fulfilled') {
+        const { data: videosData, error: videosError } = videosResult.value;
+        if (videosError) {
+          console.error('Videos error:', videosError);
+          // Fallback to direct query
+          try {
+            const supabase = getSupabase();
+            if (supabase) {
+              const { data: directVideosData, error: directVideosError } = await supabase
+                .from('videos')
+                .select(`
+                  id,
+                  title,
+                  views_count,
+                  target_views,
+                  status,
+                  created_at,
+                  coin_cost,
+                  completed,
+                  total_watch_time,
+                  completion_rate,
+                  coins_earned_total,
+                  repromoted_at
+                `)
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(10);
 
-      if (videosError) {
-        console.error('Videos error:', videosError);
-        // If the function doesn't exist, fetch directly from videos table
-        if (typeof videosError === 'object' && videosError !== null && 'message' in videosError && typeof videosError.message === 'string' && (videosError.message.includes('function') || videosError.message.includes('not found'))) {
-          console.log('User videos function not found, fetching directly from videos table');
-          const supabase = getSupabase();
-          if (!supabase) {
-            console.warn('Supabase not initialized for direct video fetch');
-          } else {
-            const { data: directVideosData, error: directVideosError } = await supabase
-            .from('videos')
-            .select(`
-              id,
-              title,
-              views_count,
-              target_views,
-              status,
-              created_at,
-              coin_cost,
-              completed,
-              total_watch_time,
-              completion_rate,
-              coins_earned_total
-            `)
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-            if (directVideosError) {
-              console.error('Direct videos error:', directVideosError);
-            } else if (directVideosData) {
-              const videosWithCompletion = directVideosData.map((video: any) => ({
-                video_id: video.id,
-                title: video.title,
-                views_count: video.views_count,
-                target_views: video.target_views,
-                status: video.status,
-                created_at: video.created_at,
-                coin_cost: video.coin_cost || 0,
-                completion_rate: video.completion_rate || (video.target_views > 0 
-                  ? Math.round((video.views_count / video.target_views) * 100)
-                  : 0),
-                completed: video.completed,
-                total_watch_time: video.total_watch_time || 0,
-                coins_earned_total: video.coins_earned_total || 0
-              }));
-              console.log('Direct videos data:', directVideosData);
-              console.log('Videos with completion:', videosWithCompletion);
-              console.log('Sample direct video coin_cost:', videosWithCompletion[0]?.coin_cost);
-              setVideos(videosWithCompletion);
+              if (!directVideosError && directVideosData) {
+                const videosWithCompletion = directVideosData.map((video: any) => ({
+                  video_id: video.id,
+                  title: video.title,
+                  views_count: video.views_count,
+                  target_views: video.target_views,
+                  status: video.status,
+                  created_at: video.created_at,
+                  coin_cost: video.coin_cost || 0,
+                  completion_rate: video.completion_rate || (video.target_views > 0 
+                    ? Math.round((video.views_count / video.target_views) * 100)
+                    : 0),
+                  completed: video.completed,
+                  total_watch_time: video.total_watch_time || 0,
+                  coins_earned_total: video.coins_earned_total || 0,
+                  repromote_count: 0, // Not tracked in database
+                  last_repromoted_at: video.repromoted_at,
+                  repromote_cost: 0, // Not tracked in database
+                  is_repromoted: video.repromoted_at ? true : false
+                }));
+                setVideos(videosWithCompletion);
+              } else {
+                setVideos([]);
+              }
+            } else {
+              setVideos([]);
             }
+          } catch (fallbackError) {
+            console.error('Fallback videos query failed:', fallbackError);
+            setVideos([]);
           }
-        }
-      } else if (videosData) {
-        // Transform the data to match the expected interface
-        const transformedVideos = videosData.map(video => {
-          console.log('Processing video:', video); // Debug log
-          return {
+        } else if (videosData) {
+          const transformedVideos = videosData.map((video: any) => ({
             video_id: video.video_id,
             title: video.title,
             views_count: video.views_count,
             target_views: video.target_views,
             status: video.status,
             created_at: video.created_at,
-            coin_cost: video.coin_cost || 0, // Use coin_cost from the function
-            completion_rate: video.completion_rate,
+            coin_cost: video.coin_cost || 0,
+            completion_rate: video.completion_rate || 0,
             completed: video.completed,
             total_watch_time: video.total_watch_time || 0,
-            coins_earned_total: video.coins_earned_total
-          };
-        });
-        console.log('Videos data from function:', videosData);
-        console.log('Transformed videos:', transformedVideos);
-        console.log('Sample video coin_cost:', transformedVideos[0]?.coin_cost);
-        setVideos(transformedVideos);
+            coins_earned_total: video.coins_earned_total || 0,
+            repromote_count: video.repromote_count || 0,
+            last_repromoted_at: video.last_repromoted_at || video.repromoted_at,
+            repromote_cost: video.repromote_cost || 0,
+            is_repromoted: video.is_repromoted || (video.last_repromoted_at ? true : false) || (video.repromoted_at ? true : false)
+          }));
+          setVideos(transformedVideos);
+        } else {
+          setVideos([]);
+        }
+      } else {
+        console.error('Videos request failed:', videosResult.reason);
+        setVideos([]);
       }
+      setLoadingStates(prev => ({ ...prev, videos: false }));
 
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      Alert.alert('Error', 'Something went wrong while loading analytics');
+      setHasError(true);
+      setRetryCount(prev => prev + 1);
+      
+      // Don't show alert on first few failures, just log
+      if (retryCount >= 2) {
+        Alert.alert('Error', 'Unable to load analytics. Please check your connection and try again.');
+      }
     } finally {
       setLoading(false);
+      setLoadingStates({ analytics: false, videos: false, activity: false });
     }
   };
 
@@ -276,24 +360,24 @@ export default function Analytics() {
     setRefreshing(false);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, isRepromoted?: boolean) => {
+    if (isRepromoted) return '#9B59B6'; // Purple for repromoted videos
     switch (status) {
       case 'active': return '#2ECC71';
       case 'completed': return '#3498DB';
       case 'paused': return '#E74C3C';
       case 'on_hold': return '#F39C12';
-      case 'repromoted': return '#9B59B6';
       default: return '#95A5A6';
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, isRepromoted?: boolean) => {
+    if (isRepromoted) return TrendingUp; // Trending up icon for repromoted
     switch (status) {
       case 'active': return Play;
       case 'completed': return CheckCircle;
       case 'paused': return Pause;
       case 'on_hold': return Timer;
-      case 'repromoted': return TrendingUp;
       default: return Play;
     }
   };
@@ -339,7 +423,19 @@ export default function Analytics() {
     return Math.max(0, total - displayed);
   };
 
-  if (loading) {
+  // Helper function to safely render numbers
+  const safeNumber = (value: any, fallback: number = 0) => {
+    const num = Number(value);
+    return isNaN(num) ? fallback : num;
+  };
+
+  // Helper function to safely render strings
+  const safeString = (value: any, fallback: string = '') => {
+    return value != null ? String(value) : fallback;
+  };
+
+  // Show loading only on initial load, not on refresh
+  if (loading && !refreshing) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <GlobalHeader 
@@ -351,6 +447,18 @@ export default function Analytics() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.text }]}>Loading analytics...</Text>
+          {hasError && (
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                setRetryCount(0);
+                setHasError(false);
+                fetchAnalytics();
+              }}
+            >
+              <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -383,7 +491,7 @@ export default function Analytics() {
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Videos Promoted</Text>
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {analytics?.total_videos_promoted || 0}
+                {safeNumber(analytics?.total_videos_promoted)}
               </Text>
             </View>
 
@@ -393,7 +501,7 @@ export default function Analytics() {
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Coins Earned</Text>
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {analytics?.total_coins_earned || 0}
+                {safeNumber(analytics?.total_coins_earned)}
               </Text>
             </View>
           </View>
@@ -405,18 +513,23 @@ export default function Analytics() {
           
           <View style={styles.statusGrid}>
             <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#2ECC71' }]}>
-              <Text style={[styles.statusNumber, { color: colors.text }]}>{analytics?.active_videos || 0}</Text>
+              <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.active_videos)}</Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Active</Text>
             </View>
             
             <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#3498DB' }]}>
-              <Text style={[styles.statusNumber, { color: colors.text }]}>{analytics?.completed_videos || 0}</Text>
+              <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.completed_videos)}</Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Completed</Text>
             </View>
             
             <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#F39C12' }]}>
-              <Text style={[styles.statusNumber, { color: colors.text }]}>{analytics?.on_hold_videos || 0}</Text>
+              <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.on_hold_videos)}</Text>
               <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>On Hold</Text>
+            </View>
+            
+            <View style={[styles.statusCard, { backgroundColor: colors.surface, borderLeftColor: '#9B59B6' }]}>
+              <Text style={[styles.statusNumber, { color: colors.text }]}>{safeNumber(analytics?.repromoted_videos)}</Text>
+              <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Repromoted</Text>
             </View>
           </View>
         </View>
@@ -439,7 +552,9 @@ export default function Analytics() {
           ) : (
             <>
               {getDisplayedVideos().map((video) => {
-                const StatusIcon = getStatusIcon(video.status);
+                const StatusIcon = getStatusIcon(video.status, video.is_repromoted);
+                const statusColor = getStatusColor(video.status, video.is_repromoted);
+                const displayStatus = video.is_repromoted ? 'Repromoted' : video.status.charAt(0).toUpperCase() + video.status.slice(1);
                 return (
                   <TouchableOpacity
                     key={video.video_id}
@@ -449,55 +564,81 @@ export default function Analytics() {
                     <View style={styles.videoHeader}>
                       <View style={styles.videoTitleContainer}>
                         <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
-                          {video.title}
+                          {safeString(video.title, 'Untitled Video')}
                         </Text>
                         <Text style={[styles.videoDate, { color: colors.textSecondary }]}>
                           {formatDate(video.created_at)}
                         </Text>
                       </View>
                       <TouchableOpacity style={styles.editButton}>
-                        <Edit3 size={16} color={colors.textSecondary} />
+                        <View style={{ padding: 4 }}>
+                          <Edit3 size={16} color={colors.textSecondary} />
+                        </View>
                       </TouchableOpacity>
                     </View>
-
                     <View style={styles.videoStats}>
                       <View style={styles.videoStat}>
-                        <Eye size={16} color={colors.textSecondary} />
+                        <View style={{ marginRight: 4 }}>
+                          <Eye size={16} color={colors.textSecondary} />
+                        </View>
                         <Text style={[styles.videoStatText, { color: colors.textSecondary }]}>
-                          {video.views_count}/{video.target_views}
+                          {`${safeNumber(video.views_count)}/${safeNumber(video.target_views)}`}
                         </Text>
                       </View>
-                      
                       <View style={styles.videoStat}>
-                        <StatusIcon size={16} color={getStatusColor(video.status)} />
-                        <Text style={[styles.videoStatText, { color: getStatusColor(video.status) }]}>
-                          {video.status.charAt(0).toUpperCase() + video.status.slice(1)}
+                        <View style={{ marginRight: 4 }}>
+                          {React.createElement(StatusIcon, { size: 16, color: statusColor })}
+                        </View>
+                        <Text style={[styles.videoStatText, { color: statusColor }]}>
+                          {displayStatus}
                         </Text>
                       </View>
+                      {video.is_repromoted && video.repromote_count && video.repromote_count > 0 && (
+                        <View style={styles.videoStat}>
+                          <View style={{ marginRight: 4 }}>
+                            <TrendingUp size={14} color="#9B59B6" />
+                          </View>
+                          <Text style={[styles.videoStatText, { color: '#9B59B6' }]}>
+                            {`x${safeNumber(video.repromote_count)}`}
+                          </Text>
+                        </View>
+                      )}
                     </View>
-
                     <View style={styles.progressContainer}>
                       <View style={[styles.progressBar, { backgroundColor: isDark ? colors.border : colors.border }]}>
                         <View 
                           style={[
                             styles.progressFill, 
                             { 
-                              width: `${Math.min(video.completion_rate, 100)}%`,
-                              backgroundColor: getStatusColor(video.status)
+                              width: `${Math.min(safeNumber(video.completion_rate), 100)}%`,
+                              backgroundColor: statusColor
                             }
                           ]} 
                         />
                       </View>
-                      <Text style={[styles.progressText, { color: colors.textSecondary }]}>{video.completion_rate}%</Text>
-                    </View>
-
-                    <View style={styles.videoCosts}>
-                      <Text style={[styles.costText, { color: colors.textSecondary }]}>
-                        Spent: 🪙{video.coin_cost}
+                      <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+                        {`${safeNumber(video.completion_rate)}%`}
                       </Text>
+                    </View>
+                    <View style={styles.videoCosts}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Text style={[styles.costText, { color: colors.textSecondary }]}>
+                          {`Spent: 🪙${safeNumber(video.coin_cost)}`}
+                        </Text>
+                        {video.repromote_cost && video.repromote_cost > 0 && (
+                          <Text style={[styles.repromoteText, { color: '#9B59B6', marginLeft: 4 }]}>
+                            {`(+🪙${safeNumber(video.repromote_cost)} repromote)`}
+                          </Text>
+                        )}
+                      </View>
                       {video.completed && (
                         <Text style={[styles.completedText, { color: colors.success }]}>
                           ✅ Target Reached!
+                        </Text>
+                      )}
+                      {video.is_repromoted && video.last_repromoted_at && (
+                        <Text style={[styles.repromoteDate, { color: '#9B59B6' }]}>
+                          {`🔄 Repromoted ${formatDate(video.last_repromoted_at)}`}
                         </Text>
                       )}
                     </View>
@@ -506,22 +647,28 @@ export default function Analytics() {
               })}
               
               {videos.length > 1 && (
-                <TouchableOpacity
-                  style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
-                  onPress={() => setShowAllVideos(!showAllVideos)}
-                >
-                  <Text style={[styles.viewMoreText, { color: colors.primary }]}>
-                    {showAllVideos 
-                      ? 'Show Less' 
-                      : `View More (${getRemainingCount(videos.length, 1)} more)`
-                    }
-                  </Text>
-                  {showAllVideos ? (
-                    <ChevronUp size={16} color={colors.primary} />
-                  ) : (
-                    <ChevronDown size={16} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
+                <View style={styles.viewMoreButtonContainer}>
+                  <TouchableOpacity
+                    style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
+                    onPress={() => setShowAllVideos(!showAllVideos)}
+                  >
+                    <View style={styles.viewMoreContent}>
+                      <Text style={[styles.viewMoreText, { color: colors.primary }]}>
+                        {showAllVideos 
+                          ? 'Show Less' 
+                          : `View More (${getRemainingCount(videos.length, 1)} more)`
+                        }
+                      </Text>
+                      <View style={{ marginLeft: 8 }}>
+                        {showAllVideos ? (
+                          <ChevronUp size={16} color={colors.primary} />
+                        ) : (
+                          <ChevronDown size={16} color={colors.primary} />
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               )}
             </>
           )}
@@ -559,32 +706,38 @@ export default function Analytics() {
                       styles.activityAmount,
                       { color: activity.amount > 0 ? colors.success : colors.error }
                     ]}>
-                      {activity.amount > 0 ? '+' : ''}{activity.amount} 🪙
+                      {activity.amount > 0 ? '+' : ''}{safeNumber(activity.amount)} 🪙
                     </Text>
                   </View>
                   <Text style={[styles.activityDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                    {activity.description}
+                    {safeString(activity.description, 'No description available')}
                   </Text>
                 </View>
               ))}
               
               {recentActivity.length > 1 && (
-                <TouchableOpacity
-                  style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
-                  onPress={() => setShowAllActivity(!showAllActivity)}
-                >
-                  <Text style={[styles.viewMoreText, { color: colors.primary }]}>
-                    {showAllActivity 
-                      ? 'Show Less' 
-                      : `View More (${getRemainingCount(recentActivity.length, 1)} more)`
-                    }
-                  </Text>
-                  {showAllActivity ? (
-                    <ChevronUp size={16} color={colors.primary} />
-                  ) : (
-                    <ChevronDown size={16} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
+                <View style={styles.viewMoreButtonContainer}>
+                  <TouchableOpacity
+                    style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
+                    onPress={() => setShowAllActivity(!showAllActivity)}
+                  >
+                    <View style={styles.viewMoreContent}>
+                      <Text style={[styles.viewMoreText, { color: colors.primary }]}>
+                        {showAllActivity 
+                          ? 'Show Less' 
+                          : `View More Activity (${getRemainingCount(recentActivity.length, 1)} more)`
+                        }
+                      </Text>
+                      <View style={{ marginLeft: 8 }}>
+                        {showAllActivity ? (
+                          <ChevronUp size={16} color={colors.primary} />
+                        ) : (
+                          <ChevronDown size={16} color={colors.primary} />
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               )}
             </>
           )}
@@ -611,6 +764,16 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 18,
@@ -659,10 +822,12 @@ const styles = StyleSheet.create({
   },
   statusGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
   statusCard: {
     flex: 1,
+    minWidth: '45%',
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
@@ -824,26 +989,36 @@ const styles = StyleSheet.create({
   },
   completedText: {
     fontSize: 11,
-    color: '#2ECC71',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  viewMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    gap: 8,
+    fontWeight: '500',
+    marginTop: 4,
   },
   viewMoreText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  viewMoreButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    width: '100%',
+  },
+  viewMoreButtonContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  viewMoreContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  repromoteText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  repromoteDate: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
 });
