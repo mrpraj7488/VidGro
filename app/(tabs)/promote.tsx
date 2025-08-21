@@ -6,13 +6,13 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import { useAlert } from '@/contexts/AlertContext';
 import { getSupabase, createVideoPromotion } from '@/lib/supabase';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useFeatureFlag } from '@/hooks/useFeatureFlags';
@@ -25,6 +25,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 export default function PromoteTab() {
   const { user, profile, refreshProfile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { showError, showSuccess, showConfirm } = useAlert();
   const { config } = useConfig();
   const coinsEnabled = useFeatureFlag('coinsEnabled');
   const router = useRouter();
@@ -85,48 +86,48 @@ export default function PromoteTab() {
 
   const handlePromoteVideo = async () => {
     if (!user || !profile) {
-      Alert.alert('Error', 'Please log in to promote videos');
+      showError('Error', 'Please log in to promote videos');
       return;
     }
 
     // Check if coins feature is enabled
     if (!coinsEnabled) {
-      Alert.alert('Feature Unavailable', 'Video promotion is currently disabled.');
+      showError('Feature Unavailable', 'Video promotion is currently disabled.');
       return;
     }
 
     const urlValidation = validateYouTubeUrl(youtubeUrl);
     if (!urlValidation.isValid) {
-      Alert.alert('Invalid URL', urlValidation.error || 'Please enter a valid YouTube URL');
+      showError('Invalid URL', urlValidation.error || 'Please enter a valid YouTube URL');
       return;
     }
 
     const titleValidation = validateVideoTitle(videoTitle);
     if (!titleValidation.isValid) {
-      Alert.alert('Invalid Title', titleValidation.error || 'Please enter a valid video title');
+      showError('Invalid Title', titleValidation.error || 'Please enter a valid video title');
       return;
     }
 
     if (!isValidVideo) {
-      Alert.alert('Video Not Ready', 'Please wait for video validation to complete');
+      showError('Video Not Ready', 'Please wait for video validation to complete');
       return;
     }
 
     const extractedVideoId = extractYouTubeVideoId(youtubeUrl);
     if (!extractedVideoId) {
-      Alert.alert('Invalid URL', 'Could not extract video ID from URL');
+      showError('Invalid URL', 'Could not extract video ID from URL');
       return;
     }
 
     const cost = calculateCost();
     if (profile.coins < cost) {
-      Alert.alert(
+      showConfirm(
         'Insufficient Coins',
         `You need ${cost} coins to promote this video. You currently have ${profile.coins} coins.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Buy Coins', onPress: () => router.push('/buy-coins') }
-        ]
+        () => router.push('/buy-coins'),
+        undefined,
+        'Buy Coins',
+        'Cancel'
       );
       return;
     }
@@ -160,35 +161,36 @@ export default function PromoteTab() {
         } else {
           errorMsg = JSON.stringify(result.error);
         }
-        Alert.alert('Error', errorMsg);
+        showError('Error', errorMsg);
         return;
       }
 
-      if (result.data && result.data.success) {
+      // Check for success in data object (based on logs showing result.data.success)
+      if (result.data?.success) {
         await refreshProfile();
         const vipDiscount = getVipDiscount();
         const discountText = vipDiscount > 0 ? `\n\n👑 VIP Discount Applied: ${vipDiscount} coins saved!` : '';
-        Alert.alert(
+        showSuccess(
           'Video Promoted Successfully!',
-          `Your video "${videoTitle}" has been submitted for promotion. It will be active in the queue after 10-minute hold period.${discountText}`,
-          [
-            { text: 'OK', onPress: () => {
-              setYoutubeUrl('');
-              setVideoTitle('');
-              setIsValidVideo(false);
-              router.push('/(tabs)/analytics');
-            }}
-          ]
+          `Your video "${videoTitle}" has been submitted for promotion. It will be active in the queue after 10-minute hold period.${discountText}`
         );
+        resetForm();
+        setTimeout(() => router.push('/(tabs)/analytics'), 1500);
       } else {
-        Alert.alert('Error', 'Failed to promote video. Please try again.');
+        showError('Error', 'Failed to promote video. Please try again.');
       }
     } catch (error) {
       console.error('Error promoting video:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      showError('Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setYoutubeUrl('');
+    setVideoTitle('');
+    setIsValidVideo(false);
   };
 
   const targetViewsOptions = [35, 50, 100, 200, 300, 400, 500, 750, 1000];
@@ -262,16 +264,10 @@ export default function PromoteTab() {
                     { backgroundColor: colors.surface, borderColor: colors.border },
                     targetViews === views && { backgroundColor: colors.primary, borderColor: colors.primary }
                   ]}
-                  onPress={() => setTargetViews(views)}
-                >
-                  <Eye size={16} color={targetViews === views ? 'white' : colors.primary} />
-                  <Text style={[
+                  onPress={() => setTargetViews(views)}><Eye size={16} color={targetViews === views ? 'white' : colors.primary} /><Text style={[
                     styles.optionText,
                     { color: targetViews === views ? 'white' : colors.primary }
-                  ]}>
-                    {views}
-                  </Text>
-                </TouchableOpacity>
+                  ]}>{views}</Text></TouchableOpacity>
               ))}
             </ScrollView>
           </View>
@@ -287,16 +283,10 @@ export default function PromoteTab() {
                     { backgroundColor: colors.surface, borderColor: colors.border },
                     videoDuration === duration && { backgroundColor: colors.primary, borderColor: colors.primary }
                   ]}
-                  onPress={() => setVideoDuration(duration)}
-                >
-                  <Clock size={16} color={videoDuration === duration ? 'white' : colors.primary} />
-                  <Text style={[
+                  onPress={() => setVideoDuration(duration)}><Clock size={16} color={videoDuration === duration ? 'white' : colors.primary} /><Text style={[
                     styles.optionText,
                     { color: videoDuration === duration ? 'white' : colors.primary }
-                  ]}>
-                    {duration}s
-                  </Text>
-                </TouchableOpacity>
+                  ]}>{duration}s</Text></TouchableOpacity>
               ))}
             </ScrollView>
           </View>
@@ -333,15 +323,9 @@ export default function PromoteTab() {
               </View>
             )}
             {!profile?.is_vip && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.vipUpgrade, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FFF8E1' }]}
-                onPress={() => router.push('/become-vip')}
-              >
-                <Crown size={16} color="#FFD700" />
-                <Text style={[styles.vipUpgradeText, { color: isDark ? colors.warning : '#F57C00' }]}>
-                  Upgrade to VIP and save 🪙{Math.ceil((targetViews * videoDuration) / 50 * 8 * 0.1)} on this promotion
-                </Text>
-              </TouchableOpacity>
+                onPress={() => router.push('/become-vip')}><Crown size={16} color="#FFD700" /><Text style={[styles.vipUpgradeText, { color: isDark ? colors.warning : '#F57C00' }]}>Upgrade to VIP and save 🪙{Math.ceil((targetViews * videoDuration) / 50 * 8 * 0.1)} on this promotion</Text></TouchableOpacity>
             )}
           </View>
 
@@ -352,17 +336,11 @@ export default function PromoteTab() {
               (!isValidVideo || loading) && styles.promoteButtonDisabled
             ]}
             onPress={handlePromoteVideo}
-            disabled={!isValidVideo || loading}
-          >
-            {loading ? (
+            disabled={!isValidVideo || loading}>{loading ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
               <Play size={20} color="white" />
-            )}
-            <Text style={styles.promoteButtonText}>
-              {loading ? 'Promoting...' : 'Promote Video'}
-            </Text>
-          </TouchableOpacity>
+            )}<Text style={styles.promoteButtonText}>{loading ? 'Promoting...' : 'Promote Video'}</Text></TouchableOpacity>
 
           <View style={[styles.infoSection, { backgroundColor: colors.surface }]}>
             <Text style={[styles.infoTitle, { color: colors.text }]}>How it works</Text>
