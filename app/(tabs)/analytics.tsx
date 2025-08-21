@@ -596,7 +596,7 @@ export default function Analytics() {
                       </View>
                       <View style={styles.videoStat}>
                         <View style={{ marginRight: 4 }}>
-                          {React.createElement(StatusIcon, { size: 16, color: statusColor })}
+                          <StatusIcon size={16} color={statusColor} />
                         </View>
                         <Text style={[styles.videoStatText, { color: statusColor }]}>
                           {displayStatus}
