@@ -4,7 +4,6 @@ import { getVideoQueue } from '../lib/supabase';
 interface Video {
   video_id: string;
   youtube_url?: string;
-  video_url?: string;
   title: string;
   duration_seconds: number;
   coin_reward: number;
@@ -15,6 +14,7 @@ interface Video {
   completed?: boolean;
   total_watch_time?: number;
   completion_rate?: number;
+  hold_until?: string;
 }
 
 interface VideoState {
@@ -54,27 +54,44 @@ export const useVideoStore = create<VideoState>((set, get) => ({
       console.log('🎬 VideoStore: Received videos from API:', videos?.length || 0);
       
       if (videos && videos.length > 0) {
-        // Normalize backend fields (some schemas use video_url instead of youtube_url)
+        // Normalize backend fields
         const normalized = videos.map((video: any) => ({
           ...video,
-          youtube_url: video.youtube_url || video.video_url || '',
+          youtube_url: video.youtube_url || '',
           duration_seconds: Number(video.duration_seconds || 0),
           coin_reward: Number(video.coin_reward ?? 0),
         }));
 
         // Enhanced safety filter for the new schema
-        const safeVideos = normalized.filter(video => 
-          Boolean(video.video_id) &&
-          Boolean(video.youtube_url) &&
-          Boolean(video.title) &&
-          video.duration_seconds > 0 &&
-          // Exclude completed videos and videos that have reached target views
-          video.completed !== true &&
-          video.views_count < video.target_views &&
-          // Only include videos with valid status
-          ['active', 'repromoted'].includes(video.status) ||
-          (video.status === 'on_hold' && new Date(video.hold_until || 0) <= new Date())
-        );
+        const safeVideos = normalized.filter(video => {
+          const isValid = Boolean(video.video_id) &&
+            Boolean(video.youtube_url) &&
+            Boolean(video.title) &&
+            video.duration_seconds > 0;
+          
+          const isNotCompleted = video.completed !== true && 
+            video.views_count < video.target_views &&
+            video.status !== 'completed';
+          
+          const hasValidStatus = ['active', 'repromoted'].includes(video.status) ||
+            (video.status === 'on_hold' && new Date(video.hold_until || 0) <= new Date());
+          
+          const shouldInclude = isValid && isNotCompleted && hasValidStatus;
+          
+          // Debug logging for videos that are filtered out
+          if (!shouldInclude) {
+            console.log('🚫 VideoStore: Filtering out video:', {
+              title: video.title,
+              status: video.status,
+              completed: video.completed,
+              views: video.views_count,
+              target: video.target_views,
+              reason: !isValid ? 'invalid' : !isNotCompleted ? 'completed' : 'invalid_status'
+            });
+          }
+          
+          return shouldInclude;
+        });
         console.log('🎬 VideoStore: Safe videos after validation:', safeVideos.length);
         
         // Log video details for debugging
@@ -185,6 +202,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     
     const shouldSkip = currentVideo.completed === true || 
                       currentVideo.views_count >= currentVideo.target_views ||
+                      currentVideo.status === 'completed' ||
                       !['active', 'repromoted'].includes(currentVideo.status) ||
                       (currentVideo.status === 'on_hold' && new Date(currentVideo.hold_until || 0) > new Date());
     
