@@ -7,13 +7,28 @@
     "scheme": "vidgro",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "assets/images/icon.png",
+    "splash": {
+      "image": "assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
     "ios": {
       "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "assets/images/icon.png",
+        "backgroundColor": "#0F172A"
+      }
     },
     "web": {
       "bundler": "webpack",
       "output": "single"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "plugins": ["expo-router", "expo-font", "expo-web-browser"],
     "experiments": {
       "typedRoutes": true
