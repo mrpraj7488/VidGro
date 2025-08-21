@@ -62,7 +62,7 @@ interface VideoAnalytics {
 }
 
 export default function Analytics() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { colors, isDark } = useTheme();
   const { config } = useConfig();
   const analyticsEnabled = useFeatureFlag('analyticsEnabled');
@@ -82,9 +82,23 @@ export default function Analytics() {
   });
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/(auth)/login');
+    }
+  }, [user, authLoading]);
 
   useEffect(() => {
-    if (user && user.id) {
+    if (authLoading) return;
+    
+    if (!user) {
+      router.replace('/(auth)/login');
+      return;
+    }
+
+    if (user?.id) {
       // Check if analytics are enabled
       if (!analyticsEnabled) {
         // Gracefully show empty analytics instead of an infinite loading skeleton
@@ -423,19 +437,25 @@ export default function Analytics() {
     return Math.max(0, total - displayed);
   };
 
+  // Helper function to safely render strings
+  const safeString = (value: any, fallback: string = '') => {
+    if (value == null) return fallback;
+    try {
+      return String(value);
+    } catch (e) {
+      return fallback;
+    }
+  };
+  
   // Helper function to safely render numbers
   const safeNumber = (value: any, fallback: number = 0) => {
+    if (value == null) return fallback;
     const num = Number(value);
     return isNaN(num) ? fallback : num;
   };
 
-  // Helper function to safely render strings
-  const safeString = (value: any, fallback: string = '') => {
-    return value != null ? String(value) : fallback;
-  };
-
   // Show loading only on initial load, not on refresh
-  if (loading && !refreshing) {
+  if (authLoading || (loading && !refreshing)) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <GlobalHeader 
