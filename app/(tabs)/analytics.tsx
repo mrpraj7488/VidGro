@@ -447,7 +447,7 @@ export default function Analytics() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.text }]}>Loading analytics...</Text>
-          {hasError && (
+          {hasError ? (
             <TouchableOpacity
               style={[styles.retryButton, { backgroundColor: colors.primary }]}
               onPress={() => {
@@ -457,7 +457,7 @@ export default function Analytics() {
             >
               <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
     );
