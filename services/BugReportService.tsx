@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface BugReport {
   title: string;
@@ -88,42 +89,53 @@ class BugReportService {
       // Get current user if authenticated
       const { data: { user } } = await supabase.auth.getUser();
       
-      const { data, error } = await supabase.rpc('insert_bug_report_from_mobile', {
-        p_title: report.title,
-        p_description: report.description,
-        p_priority: priority,
-        p_category: category,
-        p_user_id: user?.id || null,
-        p_user_email: user?.email || null,
-        p_device_info: deviceInfo,
-        p_app_version: appVersion,
-        p_issue_type: report.issue_type || 'technical'
-      });
+      // Generate unique bug ID
+      const bugId = `BUG_${Date.now()}_${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      
+      // Insert directly into bug_reports table
+      const { data, error } = await supabase
+        .from('bug_reports')
+        .insert({
+          bug_id: bugId,
+          title: report.title,
+          description: report.description,
+          status: 'new',
+          priority: priority,
+          category: category,
+          reported_by: user?.email || 'Anonymous User',
+          user_id: user?.id || null,
+          user_email: user?.email || null,
+          device_info: deviceInfo,
+          app_version: appVersion,
+          issue_type: report.issue_type || 'technical',
+          source: 'mobile_app',
+          estimated_response_time: this.getEstimatedResponseTime(priority)
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('Error submitting bug report:', error);
         throw new Error(error.message);
       }
 
-      if (data && data.length > 0) {
-        const result = data[0];
-        
+      if (data) {
         // Store the bug report ID locally for status tracking
-        this.storeBugReportLocally(result.bug_id, {
+        await this.storeBugReportLocally(data.bug_id, {
           title: report.title,
           description: report.description,
           priority,
           category,
           status: 'new',
           created_at: new Date().toISOString(),
-          estimated_response_time: result.estimated_response_time
+          estimated_response_time: data.estimated_response_time
         });
 
         return {
-          bug_id: result.bug_id,
-          success: result.success,
-          message: result.message,
-          estimated_response_time: result.estimated_response_time
+          bug_id: data.bug_id,
+          success: true,
+          message: 'Bug report submitted successfully',
+          estimated_response_time: data.estimated_response_time || this.getEstimatedResponseTime(priority)
         };
       }
 
@@ -187,19 +199,19 @@ class BugReportService {
   }
 
   // Local storage methods for offline support
-  private storeBugReportLocally(bugId: string, report: any) {
+  private async storeBugReportLocally(bugId: string, report: any) {
     try {
-      const storedReports = this.getStoredBugReports();
+      const storedReports = await this.getStoredBugReports();
       storedReports[bugId] = report;
-      localStorage.setItem('mobile_bug_reports', JSON.stringify(storedReports));
+      await AsyncStorage.setItem('mobile_bug_reports', JSON.stringify(storedReports));
     } catch (error) {
       console.error('Error storing bug report locally:', error);
     }
   }
 
-  private getStoredBugReports(): Record<string, any> {
+  private async getStoredBugReports(): Promise<Record<string, any>> {
     try {
-      const stored = localStorage.getItem('mobile_bug_reports');
+      const stored = await AsyncStorage.getItem('mobile_bug_reports');
       return stored ? JSON.parse(stored) : {};
     } catch (error) {
       console.error('Error getting stored bug reports:', error);
@@ -207,8 +219,8 @@ class BugReportService {
     }
   }
 
-  getStoredBugReport(bugId: string): any {
-    const storedReports = this.getStoredBugReports();
+  async getStoredBugReport(bugId: string): Promise<any> {
+    const storedReports = await this.getStoredBugReports();
     return storedReports[bugId] || null;
   }
 
