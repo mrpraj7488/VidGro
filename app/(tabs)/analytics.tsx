@@ -473,10 +473,7 @@ export default function Analytics() {
               onPress={() => {
                 setHasError(false);
                 fetchAnalytics();
-              }}
-            >
-              <Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text>
-            </TouchableOpacity>
+              }}><Text style={[styles.retryButtonText, { color: 'white' }]}>Retry</Text></TouchableOpacity>
           ) : null}
         </View>
       </View>
@@ -578,8 +575,7 @@ export default function Analytics() {
                   <TouchableOpacity
                     key={video.video_id}
                     style={[styles.videoCard, { backgroundColor: colors.surface }]}
-                    onPress={() => handleVideoPress(video)}
-                  >
+                    onPress={() => handleVideoPress(video)}>
                     <View style={styles.videoHeader}>
                       <View style={styles.videoTitleContainer}>
                         <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
@@ -589,11 +585,7 @@ export default function Analytics() {
                           {formatDate(video.created_at)}
                         </Text>
                       </View>
-                      <TouchableOpacity style={styles.editButton}>
-                        <View style={{ padding: 4 }}>
-                          <Edit3 size={16} color={colors.textSecondary} />
-                        </View>
-                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.editButton}><View style={{ padding: 4 }}><Edit3 size={16} color={colors.textSecondary} /></View></TouchableOpacity>
                     </View>
                     <View style={styles.videoStats}>
                       <View style={styles.videoStat}>
@@ -660,8 +652,7 @@ export default function Analytics() {
                           {`🔄 Repromoted ${formatDate(video.last_repromoted_at)}`}
                         </Text>
                       )}
-                    </View>
-                  </TouchableOpacity>
+                    </View></TouchableOpacity>
                 );
               })}
               
@@ -669,9 +660,7 @@ export default function Analytics() {
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
                     style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
-                    onPress={() => setShowAllVideos(!showAllVideos)}
-                  >
-                    <View style={styles.viewMoreContent}>
+                    onPress={() => setShowAllVideos(!showAllVideos)}><View style={styles.viewMoreContent}>
                       <Text style={[styles.viewMoreText, { color: colors.primary }]}>
                         {showAllVideos 
                           ? 'Show Less' 
@@ -685,8 +674,7 @@ export default function Analytics() {
                           <ChevronDown size={16} color={colors.primary} />
                         )}
                       </View>
-                    </View>
-                  </TouchableOpacity>
+                    </View></TouchableOpacity>
                 </View>
               )}
             </>
@@ -738,9 +726,7 @@ export default function Analytics() {
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
                     style={[styles.viewMoreButton, { backgroundColor: colors.surface }]}
-                    onPress={() => setShowAllActivity(!showAllActivity)}
-                  >
-                    <View style={styles.viewMoreContent}>
+                    onPress={() => setShowAllActivity(!showAllActivity)}><View style={styles.viewMoreContent}>
                       <Text style={[styles.viewMoreText, { color: colors.primary }]}>
                         {showAllActivity 
                           ? 'Show Less' 
@@ -754,8 +740,7 @@ export default function Analytics() {
                           <ChevronDown size={16} color={colors.primary} />
                         )}
                       </View>
-                    </View>
-                  </TouchableOpacity>
+                    </View></TouchableOpacity>
                 </View>
               )}
             </>
