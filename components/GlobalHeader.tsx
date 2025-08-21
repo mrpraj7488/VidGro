@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform, StatusBar } from 'react-native';
-import { Menu, X, User, Share2, Shield, FileText, Globe, Settings, MessageCircle, LogOut, Trash2, CreditCard as Edit3 } from 'lucide-react-native';
+import { Menu, X, User, Share2, Shield, FileText, Globe, Settings, MessageCircle, HelpCircle, LogOut, Trash2, CreditCard as Edit3 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ThemeToggle from './ThemeToggle';
@@ -51,6 +51,7 @@ export default function GlobalHeader({
     { icon: FileText, title: 'Terms of Service', route: '/terms' },
     { icon: Globe, title: 'Languages', route: '/languages' },
     { icon: MessageCircle, title: 'Contact Support', route: '/contact-support' },
+    { icon: HelpCircle, title: 'FAQ', route: '/faq' },
     { icon: LogOut, title: 'Log Out', action: 'logout', color: '#E74C3C' },
     { icon: Trash2, title: 'Delete Account', route: '/delete-account', color: '#E74C3C' },
   ];
