@@ -1422,7 +1422,6 @@ export default function ViewTab() {
                     'playsinline': 1,
                     'rel': 0,
                     'showinfo': 0,
-                    'mute': 1,
                     'origin': window.location.origin
                   },
                   events: {
