@@ -1003,9 +1003,6 @@ export default function ViewTab() {
           <Text style={[styles.loadingText, { color: colors.text }]}>
             {isInitializing ? 'Loading videos...' : 'Loading...'}
           </Text>
-          {storeError && (
-            <Text style={[styles.errorText, { color: colors.error }]}>Error: {storeError}</Text>
-          )}
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
             onPress={() => user && fetchVideos(user.id)}><Text style={styles.retryButtonText}>Retry</Text></TouchableOpacity>
@@ -1031,9 +1028,6 @@ export default function ViewTab() {
           <TouchableOpacity
             style={[styles.refreshButton, { backgroundColor: colors.primary }]}
             onPress={() => user && fetchVideos(user.id)}><Text style={styles.refreshButtonText}>Refresh</Text></TouchableOpacity>
-          {storeError && (
-            <Text style={[styles.errorText, { color: colors.error }]}>Error: {storeError}</Text>
-          )}
         </View>
       </View>
     );
