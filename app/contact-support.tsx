@@ -570,12 +570,12 @@ function ContactSupportScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={20} color="white" />
+            <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             Contact Support
           </Text>
-          <MessageCircle size={20} color="white" />
+          <MessageCircle size={24} color="white" />
         </View>
       </LinearGradient>
 
@@ -1132,7 +1132,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: isTinyScreen ? 18 : 22,
     fontWeight: 'bold',
     color: 'white',
     letterSpacing: 0.5,
