@@ -49,12 +49,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         const cachedData = await AsyncStorage.getItem(CONFIG_CACHE_KEY);
         if (cachedData && !cachedData.startsWith('{')) {
           // If cached data doesn't look like JSON, it's likely corrupted encrypted data
-          console.log('📱 Clearing potentially corrupted cache on startup');
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('📱 Clearing potentially corrupted cache on startup');
+          }
           await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
           await AsyncStorage.removeItem(CONFIG_HASH_KEY);
         }
       } catch (error) {
-        console.log('📱 Cache check failed, clearing cache');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Cache check failed, clearing cache');
+        }
         await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
         await AsyncStorage.removeItem(CONFIG_HASH_KEY);
       }
@@ -93,7 +97,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         
         // Fetch fresh config in background (don't await)
         fetchFreshConfig().catch(error => {
-          console.warn('📱 Background config refresh failed:', error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('📱 Background config refresh failed:', error);
+          }
         });
         return;
       }
@@ -101,7 +107,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       // No valid cached config, fetch fresh config
       await fetchFreshConfig();
     } catch (err) {
-      console.error('Config initialization error:', err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Config initialization error:', err);
+      }
       setError('Failed to initialize app configuration');
       setLoading(false);
     }
@@ -123,7 +131,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           parsedConfig = await decryptConfig(cachedData);
         }
       } catch (parseError) {
-        console.warn('📱 Cache parse/decrypt failed, clearing corrupted cache');
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('📱 Cache parse/decrypt failed, clearing corrupted cache');
+        }
         // Clear corrupted cache immediately
         await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
         await AsyncStorage.removeItem(CONFIG_HASH_KEY);
@@ -132,7 +142,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       
       // Validate config structure
       if (!isValidConfigStructure(parsedConfig)) {
-        console.log('📱 Cached config has invalid structure, clearing cache');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Cached config has invalid structure, clearing cache');
+        }
         await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
         await AsyncStorage.removeItem(CONFIG_HASH_KEY);
         return null;
@@ -140,14 +152,20 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
       return parsedConfig;
     } catch (error) {
-      console.error('Error loading cached config:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error loading cached config:', error);
+      }
       // Clear corrupted cache
       try {
         await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
         await AsyncStorage.removeItem(CONFIG_HASH_KEY);
-        console.log('📱 Cleared corrupted cache data');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Cleared corrupted cache data');
+        }
       } catch (clearError) {
-        console.error('Error clearing cache:', clearError);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Error clearing cache:', clearError);
+        }
       }
       return null;
     }
@@ -176,7 +194,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://admin-vidgro.netlify.app';
         const configUrl = `${apiBaseUrl}/api/client-runtime-config`;
 
-        console.log('📱 Fetching runtime config from:', configUrl);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Fetching runtime config from:', configUrl);
+        }
 
         const response = await axios.get(configUrl, {
           timeout: 10000,
@@ -202,14 +222,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         // Normalize and validate using shared validator (allows missing anonKey for public endpoint)
         const validated = validateRuntimeConfig(rawConfig);
         if (!validated) {
-          console.error('📱 Invalid config structure. Expected fields:', {
-            supabase: !!rawConfig?.supabase,
-            admob: !!rawConfig?.admob,
-            features: !!rawConfig?.features,
-            app: !!rawConfig?.app,
-            security: !!rawConfig?.security,
-            metadata: !!rawConfig?.metadata
-          });
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('📱 Invalid config structure. Expected fields:', {
+              supabase: !!rawConfig?.supabase,
+              admob: !!rawConfig?.admob,
+              features: !!rawConfig?.features,
+              app: !!rawConfig?.app,
+              security: !!rawConfig?.security,
+              metadata: !!rawConfig?.metadata
+            });
+          }
           throw new Error('Invalid config structure in response data');
         }
         freshConfig = validated;
@@ -223,7 +245,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const integrityValid = true;
       
       if (!integrityValid) {
-        console.warn('⚠️ Config integrity validation failed');
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('⚠️ Config integrity validation failed');
+        }
       }
       
       // Cache the fresh config
@@ -233,19 +257,25 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       setIsConfigValid(true);
       setError(null);
 
-      console.log('📱 Runtime config loaded successfully');
-      console.log('📱 Features enabled:', freshConfig.features);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📱 Runtime config loaded successfully');
+        console.log('📱 Features enabled:', freshConfig.features);
+      }
       
       // Initialize services with runtime config
       await initializeServicesWithConfig(freshConfig);
       
     } catch (err: any) {
-      console.error('Error fetching fresh config:', err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error fetching fresh config:', err);
+      }
       
       // Try to use cached config as fallback
       const cachedConfig = await loadCachedConfig();
       if (cachedConfig) {
-        console.log('📱 Using cached config as fallback');
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('📱 Using cached config as fallback');
+        }
         setConfig(cachedConfig);
         setIsConfigValid(true);
         setError('Using cached configuration');
@@ -276,7 +306,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         console.log('📱 Config cached (secrets not persisted)');
       }
     } catch (error) {
-      console.error('Error caching config:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error caching config:', error);
+      }
     }
   };
 
@@ -292,7 +324,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       // Use btoa for base64 encoding (React Native compatible)
       return btoa(combined);
     } catch (error) {
-      console.error('Config encryption error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Config encryption error:', error);
+      }
       return JSON.stringify(config);
     }
   };
@@ -304,13 +338,17 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const [storedKey, configString] = decoded.split(':');
       
       if (storedKey !== deviceKey) {
-        console.warn('⚠️ Device key mismatch, config may be from different device');
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('⚠️ Device key mismatch, config may be from different device');
+        }
         return null;
       }
       
       return JSON.parse(configString);
     } catch (error) {
-      console.error('Config decryption error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Config decryption error:', error);
+      }
       // Try to parse as unencrypted JSON
       try {
         return JSON.parse(encryptedConfig);
@@ -327,7 +365,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const fallbackAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || null;
       const anonKeyToUse = config.supabase.anonKey || fallbackAnonKey;
       initializeSupabase(config.supabase.url, anonKeyToUse);
-      console.log('📱 Supabase initialized with runtime config');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📱 Supabase initialized with runtime config');
+      }
 
       // Initialize AdMob with ad block detection callback
       if (config.features.adsEnabled) {
@@ -349,23 +389,35 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
                 handleAdBlockDetection
               );
               if (!adInitSuccess) {
-                console.warn('📱 AdMob initialization failed, continuing without ads');
+                if (process.env.NODE_ENV !== 'production') {
+                  console.warn('📱 AdMob initialization failed, continuing without ads');
+                }
               }
             } else {
-              console.warn('📱 AdMob appId missing in config; skipping ad initialization');
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn('📱 AdMob appId missing in config; skipping ad initialization');
+              }
             }
           } else {
-            console.log('📱 AdMob already initialized, skipping');
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('📱 AdMob already initialized, skipping');
+            }
           }
         } catch (adError) {
           const message = adError instanceof Error ? adError.message : String(adError);
-          console.warn('📱 AdMob initialization error, continuing without ads:', message);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('📱 AdMob initialization error, continuing without ads:', message);
+          }
         }
       }
       
-      console.log('📱 All services initialized with runtime config');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📱 All services initialized with runtime config');
+      }
     } catch (error) {
-      console.error('Service initialization error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Service initialization error:', error);
+      }
     }
   };
 
@@ -384,29 +436,39 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       setSecurityReport(securityService.getSecurityReport());
       
       if (securityResult.warnings.length > 0) {
-        console.warn('🔒 Security warnings:', securityResult.warnings);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('🔒 Security warnings:', securityResult.warnings);
+        }
       }
       
       if (securityResult.errors.length > 0) {
-        console.error('🔒 Security errors:', securityResult.errors);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('🔒 Security errors:', securityResult.errors);
+        }
         return false;
       }
       
       return securityResult.isValid;
     } catch (error) {
-      console.error('Security validation error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Security validation error:', error);
+      }
       return true; // Don't block app if security check fails
     }
   };
 
   const handleAdBlockDetection = (detected: boolean) => {
     if (detected) {
-      console.warn('🚫 Ad blocking detected by AdService');
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('🚫 Ad blocking detected by AdService');
+      }
       // You can implement user notification or feature restrictions here
       // For example:
       // Alert.alert('Ad Blocker Detected', 'Please disable ad blocking to earn coins');
     } else {
-      console.log('✅ Ads working normally');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('✅ Ads working normally');
+      }
     }
   };
 
@@ -419,7 +481,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       );
       return hash;
     } catch (error) {
-      console.error('Error generating config hash:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error generating config hash:', error);
+      }
       return '';
     }
   };
@@ -446,9 +510,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     try {
       await AsyncStorage.removeItem(CONFIG_CACHE_KEY);
       await AsyncStorage.removeItem(CONFIG_HASH_KEY);
-      console.log('📱 Configuration cache cleared');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('📱 Configuration cache cleared');
+      }
     } catch (error) {
-      console.error('Error clearing cache:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error clearing cache:', error);
+      }
     }
   };
 
