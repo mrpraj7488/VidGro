@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAlert } from '@/contexts/AlertContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeOff, Gift } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function SignupScreen() {
@@ -11,63 +12,66 @@ export default function SignupScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
   const { colors, isDark } = useTheme();
+  const { showError, showSuccess } = useAlert();
   const router = useRouter();
 
   const handleSignup = async () => {
     if (!email || !username || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showError('Error', 'Please fill in all fields');
       return;
     }
 
     // Minimal email validation - just check for @ symbol
     const trimmedEmail = email.trim();
     if (!trimmedEmail.includes('@')) {
-      Alert.alert('Error', 'Please enter an email address with @ symbol');
+      showError('Error', 'Please enter an email address with @ symbol');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      showError('Error', 'Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      showError('Error', 'Password must be at least 6 characters');
       return;
     }
 
     setLoading(true);
     try {
       console.log('Starting signup process...');
-      const { error } = await signUp(trimmedEmail, password, username.trim());
+      const { error } = await signUp(trimmedEmail, password, username.trim(), referralCode.trim() || null);
 
       if (error) {
         console.log('Signup error details:', error);
         
         // Simplified error handling
         if (error.message.includes('already registered')) {
-          Alert.alert('Account Exists', 'An account with this email already exists. Please try logging in instead.');
+          showError('Account Exists', 'An account with this email already exists. Please try logging in instead.');
         } else if (error.message.includes('Database error')) {
-          Alert.alert('Signup Successful', 'Your account has been created! Please try logging in now.');
+          showSuccess('Signup Successful', 'Your account has been created! Please try logging in now.');
         } else {
-          Alert.alert('Signup Error', 'Failed to create account. Please try again.');
+          showError('Signup Error', 'Failed to create account. Please try again.');
         }
       } else {
         console.log('Signup completed successfully');
-        Alert.alert(
-          'Account Created!',
-          'Your account has been created successfully. You can now start watching videos and earning coins!',
-          [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-        );
+        const successMessage = referralCode.trim() 
+          ? 'Your account has been created successfully! You received 200 bonus coins for using a referral code. You can now start watching videos and earning more coins!'
+          : 'Your account has been created successfully. You can now start watching videos and earning coins!';
+        
+        showSuccess('Account Created!', successMessage);
+        setTimeout(() => router.replace('/(tabs)'), 2000);
       }
     } catch (error) {
       console.error('Signup error:', error);
-      Alert.alert('Error', 'Something went wrong during signup. Please try again.');
+      showError('Error', 'Something went wrong during signup. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -109,6 +113,26 @@ export default function SignupScreen() {
                 autoCapitalize="none"
               />
             </View>
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input, { paddingRight: 50, backgroundColor: colors.inputBackground, color: colors.text }]}
+                placeholder="Referral Code (Optional) - Get 200 bonus coins!"
+                placeholderTextColor={colors.textSecondary}
+                value={referralCode}
+                onChangeText={setReferralCode}
+                autoCapitalize="characters"
+                maxLength={20}
+              />
+              <View style={styles.referralIcon}>
+                <Gift size={20} color={referralCode.trim() ? colors.accent : colors.textSecondary} />
+              </View>
+            </View>
+            {referralCode.trim() && (
+              <Text style={[styles.referralHint, { color: colors.success }]}>
+                🎁 You'll receive 200 bonus coins when you sign up!
+              </Text>
+            )}
 
             <View style={styles.inputContainer}>
               <TextInput
@@ -217,6 +241,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     top: 16,
+  },
+  referralIcon: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+  },
+  referralHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    fontWeight: '500',
   },
   button: {
     paddingVertical: 16,
