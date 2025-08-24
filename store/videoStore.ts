@@ -41,9 +41,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
   canLoop: true,
 
   fetchVideos: async (userId: string) => {
-    console.log('🎬 VideoStore: Starting to fetch looping videos for user:', userId);
     if (!userId) {
-      console.log('🎬 VideoStore: No user ID provided, skipping video fetch');
       set({ isLoading: false, error: 'User not authenticated' });
       return;
     }
@@ -51,52 +49,66 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     
     try {
       const videos = await getVideoQueue(userId);
-      console.log('🎬 VideoStore: Received videos from API:', videos?.length || 0);
       
       if (videos && videos.length > 0) {
         // Normalize backend fields
         const normalized = videos.map((video: any) => ({
           ...video,
+          // Use video_id if available, otherwise fall back to id
+          video_id: video.video_id || video.id,
           youtube_url: video.youtube_url || '',
-          duration_seconds: Number(video.duration_seconds || 0),
-          coin_reward: Number(video.coin_reward ?? 0),
+          duration_seconds: Number(video.duration_seconds || 30),
+          coin_reward: Number(video.coin_reward ?? 10),
+          // Ensure these fields have default values
+          views_count: video.views_count || 0,
+          target_views: video.target_views || 0,
+          completed: video.completed || false,
+          status: video.status || 'active'
         }));
 
         // Enhanced safety filter for the new schema
         const safeVideos = normalized.filter(video => {
-          const isValid = Boolean(video.video_id) &&
-            Boolean(video.youtube_url) &&
-            Boolean(video.title) &&
-            video.duration_seconds > 0;
+          // Check for required fields
+          const missingFields = [];
+          if (!video.video_id) missingFields.push('video_id');
+          if (!video.youtube_url) missingFields.push('youtube_url');
+          if (!video.title) missingFields.push('title');
           
+          const hasRequiredFields = missingFields.length === 0;
+          
+          // Check if video is not completed
           const isNotCompleted = video.completed !== true && 
-            video.views_count < video.target_views &&
-            video.status !== 'completed';
+                               video.views_count < (video.target_views || 0) &&
+                               video.status !== 'completed';
           
+          // Check if status is valid
           const hasValidStatus = ['active', 'repromoted'].includes(video.status) ||
-            (video.status === 'on_hold' && new Date(video.hold_until || 0) <= new Date());
+                              (video.status === 'on_hold' && new Date(video.hold_until || 0) <= new Date());
           
-          const shouldInclude = isValid && isNotCompleted && hasValidStatus;
+          const shouldInclude = hasRequiredFields && isNotCompleted && hasValidStatus;
           
           // Debug logging for videos that are filtered out
           if (!shouldInclude) {
-            console.log('🚫 VideoStore: Filtering out video:', {
-              title: video.title,
-              status: video.status,
-              completed: video.completed,
-              views: video.views_count,
-              target: video.target_views,
-              reason: !isValid ? 'invalid' : !isNotCompleted ? 'completed' : 'invalid_status'
-            });
+            // console.log('🚫 VideoStore: Filtering out video:', {
+            //   title: video.title || 'No title',
+            //   status: video.status,
+            //   completed: video.completed,
+            //   views: video.views_count,
+            //   target: video.target_views,
+            //   reason: !hasRequiredFields ? `missing_required_fields: ${missingFields.join(', ')}` : 
+            //              !isNotCompleted ? 'completed' : 
+            //              'invalid_status',
+            //   videoData: JSON.stringify({
+            //     video_id: video.video_id,
+            //     youtube_url: video.youtube_url ? 'present' : 'missing',
+            //     title: video.title ? 'present' : 'missing',
+            //     duration_seconds: video.duration_seconds,
+            //     coin_reward: video.coin_reward
+            //   }, null, 2)
+            // });
           }
           
           return shouldInclude;
-        });
-        console.log('🎬 VideoStore: Safe videos after validation:', safeVideos.length);
-        
-        // Log video details for debugging
-        safeVideos.forEach((video, index) => {
-          console.log(`🎬 VideoStore: Video ${index}:`, video.title, '(ID:', video.video_id + ')');
         });
         
         // Keep the current index if we're just refreshing the queue
@@ -111,9 +123,9 @@ export const useVideoStore = create<VideoState>((set, get) => ({
           canLoop: true
         });
         
-        console.log('🎬 VideoStore: Queue updated. Current index:', newIndex, 'Queue size:', safeVideos.length);
+        // console.log('🎬 VideoStore: Queue updated. Current index:', newIndex, 'Queue size:', safeVideos.length);
       } else {
-        console.log('🎬 VideoStore: No videos received from API');
+        // console.log('🎬 VideoStore: No videos received from API');
         set({ 
           videoQueue: [], 
           currentVideoIndex: 0, 
@@ -123,7 +135,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
         });
       }
     } catch (error) {
-      console.error('Error fetching videos:', error);
+      // console.error('Error fetching videos:', error);
       set({ 
         isLoading: false, 
         error: error instanceof Error ? error.message : 'Failed to load videos. Please check your connection.',
@@ -136,11 +148,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     const { videoQueue, currentVideoIndex } = get();
     const currentVideo = videoQueue[currentVideoIndex] || null;
     
-    if (currentVideo) {
-      console.log('🎬 VideoStore: Current video at index', currentVideoIndex, ':', currentVideo.title, '(ID:', currentVideo.video_id + ')');
-    } else {
-      console.log('🎬 VideoStore: No current video available at index', currentVideoIndex);
-    }
+    // console.log('🎬 VideoStore: Current video at index', currentVideoIndex, ':', currentVideo.title, '(ID:', currentVideo.video_id + ')');
     
     return currentVideo;
   },
@@ -148,20 +156,20 @@ export const useVideoStore = create<VideoState>((set, get) => ({
   moveToNextVideo: () => {
     const { videoQueue, currentVideoIndex } = get();
 
-    console.log('�� VideoStore: Moving to next video. Current index:', currentVideoIndex, 'Queue length:', videoQueue.length);
+    // console.log('�� VideoStore: Moving to next video. Current index:', currentVideoIndex, 'Queue length:', videoQueue.length);
 
     if (videoQueue.length === 0) {
-      console.log('🔄 VideoStore: No videos in queue');
+      // console.log('🔄 VideoStore: No videos in queue');
       return;
     }
 
     if (currentVideoIndex < videoQueue.length - 1) {
       const nextIndex = currentVideoIndex + 1;
-      console.log('🔄 VideoStore: Moving to next video at index:', nextIndex, 'Title:', videoQueue[nextIndex]?.title);
+      // console.log('🔄 VideoStore: Moving to next video at index:', nextIndex, 'Title:', videoQueue[nextIndex]?.title);
       set({ currentVideoIndex: nextIndex });
     } else {
       // Loop back to beginning for continuous playback
-      console.log('🔄 VideoStore: Looping back to first video');
+      // console.log('🔄 VideoStore: Looping back to first video');
       set({ currentVideoIndex: 0 });
     }
   },
@@ -182,14 +190,14 @@ export const useVideoStore = create<VideoState>((set, get) => ({
       set({ canLoop: hasVideos });
       return hasVideos;
     } catch (error) {
-      console.error('Error checking queue loop:', error);
+      // console.error('Error checking queue loop:', error);
       set({ canLoop: false });
       return false;
     }
   },
 
   refreshQueue: async (userId: string) => {
-    console.log('🔄 VideoStore: Refreshing video queue');
+    // console.log('🔄 VideoStore: Refreshing video queue');
     await get().fetchVideos(userId);
   },
 
@@ -206,16 +214,14 @@ export const useVideoStore = create<VideoState>((set, get) => ({
                       !['active', 'repromoted'].includes(currentVideo.status) ||
                       (currentVideo.status === 'on_hold' && new Date(currentVideo.hold_until || 0) > new Date());
     
-    if (shouldSkip) {
-      console.log('🎬 VideoStore: Current video should be skipped:', {
-        videoId: currentVideo.video_id,
-        title: currentVideo.title,
-        completed: currentVideo.completed,
-        views: currentVideo.views_count,
-        target: currentVideo.target_views,
-        status: currentVideo.status
-      });
-    }
+    // console.log('🎬 VideoStore: Current video should be skipped:', {
+    //   videoId: currentVideo.video_id,
+    //   title: currentVideo.title,
+    //   completed: currentVideo.completed,
+    //   views: currentVideo.views_count,
+    //   target: currentVideo.target_views,
+    //   status: currentVideo.status
+    // });
     
     return shouldSkip;
   },
@@ -225,12 +231,12 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     const { shouldSkipCurrentVideo, moveToNextVideo, refreshQueue } = get();
     
     if (shouldSkipCurrentVideo()) {
-      console.log('🎬 VideoStore: Current video should be skipped, moving to next');
+      // console.log('🎬 VideoStore: Current video should be skipped, moving to next');
       moveToNextVideo();
       
       // If the next video should also be skipped, refresh the queue
       if (shouldSkipCurrentVideo()) {
-        console.log('🎬 VideoStore: Next video also should be skipped, refreshing queue');
+        // console.log('🎬 VideoStore: Next video also should be skipped, refreshing queue');
         await refreshQueue(userId);
       }
     }
