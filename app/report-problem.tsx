@@ -6,16 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Dimensions,
   Platform,
   FlatList,
   Animated,
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAlert } from '@/contexts/AlertContext';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Search, Bug, Wifi, Play, Coins, Crown, Shield, RefreshCw, Smartphone, TriangleAlert as AlertTriangle, Send, ChevronRight, Clock, Database, Settings, Eye, Volume2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import BugReportService from '@/services/BugReportService';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 380;
@@ -33,6 +34,7 @@ interface TechnicalIssue {
 
 export default function ReportProblemScreen() {
   const { colors, isDark } = useTheme();
+  const { showSuccess, showError, showWarning } = useAlert();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -136,7 +138,7 @@ export default function ReportProblemScreen() {
       title: 'VIP Features Not Working',
       description: 'VIP benefits not applying correctly',
       icon: Crown,
-      color: '#9B59B6',
+      color: '#800080',
       category: 'common',
       keywords: ['vip', 'premium', 'benefits', 'discount', 'features']
     },
@@ -267,27 +269,38 @@ export default function ReportProblemScreen() {
 
     setLoading(true);
     
-    // Simulate report submission
-    setTimeout(() => {
-      Alert.alert(
-        '✅ Report Submitted',
-        `Your report for "${issue.title}" has been submitted successfully. Our technical team will investigate this issue.\n\nTicket ID: #${Math.random().toString(36).substr(2, 9).toUpperCase()}\n\nExpected response time: 2-4 hours`,
-        [{ 
-          text: 'OK', 
-          onPress: () => {
-            setSelectedIssue(null);
-            setSearchQuery('');
-            router.back();
-          }
-        }]
+    try {
+      const response = await BugReportService.submitBugReport({
+        title: issue.title,
+        description: issue.description,
+        priority: issue.category === 'critical' ? 'critical' : issue.category === 'common' ? 'medium' : 'low',
+        category: 'Mobile App Technical',
+        issue_type: 'technical'
+      });
+
+      showSuccess(
+        'Report Submitted',
+        `Your report for "${issue.title}" has been submitted successfully. Our technical team will investigate this issue.\n\nTicket ID: ${response.bug_id}\n\nExpected response time: ${response.estimated_response_time}`
       );
+      
+      setTimeout(() => {
+        setSelectedIssue(null);
+        router.back();
+      }, 2000);
+    } catch (error) {
+      console.error('Error submitting bug report:', error);
+      showError(
+        'Submission Failed',
+        'There was an error submitting your bug report. Please check your internet connection and try again.'
+      );
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const handleCustomReport = async () => {
     if (!customDescription.trim()) {
-      Alert.alert('Description Required', 'Please describe the technical issue you\'re experiencing');
+      showWarning('Description Required', 'Please describe the technical issue you\'re experiencing');
       return;
     }
 
@@ -297,28 +310,40 @@ export default function ReportProblemScreen() {
 
     setLoading(true);
     
-    setTimeout(() => {
-      Alert.alert(
-        '✅ Custom Report Submitted',
-        `Your detailed technical report has been submitted successfully.\n\nTicket ID: #${Math.random().toString(36).substr(2, 9).toUpperCase()}\n\nOur technical team will review your description and respond within 2-4 hours.`,
-        [{ 
-          text: 'OK', 
-          onPress: () => {
-            setCustomDescription('');
-            setSearchQuery('');
-            router.back();
-          }
-        }]
+    try {
+      const response = await BugReportService.submitBugReport({
+        title: 'Custom Technical Issue',
+        description: customDescription,
+        priority: 'medium',
+        category: 'Mobile App Technical',
+        issue_type: 'technical'
+      });
+
+      showSuccess(
+        'Custom Report Submitted',
+        `Your detailed technical report has been submitted successfully.\n\nTicket ID: ${response.bug_id}\n\nOur technical team will review your description and respond within ${response.estimated_response_time}.`
       );
+      
+      setTimeout(() => {
+        setCustomDescription('');
+        router.back();
+      }, 2000);
+    } catch (error) {
+      console.error('Error submitting custom bug report:', error);
+      showError(
+        'Submission Failed',
+        'There was an error submitting your bug report. Please check your internet connection and try again.'
+      );
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const getCategoryColor = (categoryId: string) => {
     switch (categoryId) {
       case 'video': return '#E74C3C';
       case 'coins': return '#FFD700';
-      case 'account': return '#9B59B6';
+      case 'account': return '#800080';
       case 'connection': return '#3498DB';
       case 'performance': return '#2ECC71';
       default: return colors.primary;
