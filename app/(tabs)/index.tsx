@@ -134,7 +134,12 @@ export default function ViewTab() {
         }
         if (webViewRef.current) {
           console.log('⏸️ SENDING pauseVideo (app background)');
-          webViewRef.current.postMessage(JSON.stringify({ type: 'pauseVideo' }));
+          const jsCode = `
+            (function() {
+              window.postMessage(JSON.stringify({ type: 'pauseVideo' }), '*');
+            })();
+          `;
+          webViewRef.current.injectJavaScript(jsCode);
         }
       } else if (isTabFocusedRef.current && currentVideo) {
         console.log('🔄 APP RETURNING TO FOREGROUND - attempting auto resume');
@@ -147,7 +152,12 @@ export default function ViewTab() {
         // App returning to foreground and tab is focused - force auto resume
         if (webViewRef.current) {
           console.log('▶️ SENDING playVideo (app foreground)');
-          webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+          const jsCode = `
+            (function() {
+              window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+            })();
+          `;
+          webViewRef.current.injectJavaScript(jsCode);
           
           if (!isVideoPlayingRef.current) {
             setIsVideoPlaying(true);
@@ -192,7 +202,12 @@ export default function ViewTab() {
       // Simple auto-play when tab becomes focused
       if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
         console.log('▶️ SENDING playVideo message to WebView');
-        webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+        const jsCode = `
+          (function() {
+            window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+          })();
+        `;
+        webViewRef.current.injectJavaScript(jsCode);
       } else {
         console.log('❌ CANNOT auto-play:', {
           hasCurrentVideo: !!currentVideo,
@@ -208,7 +223,12 @@ export default function ViewTab() {
         // Pause when tab loses focus
         if (webViewRef.current) {
           console.log('⏸️ SENDING pauseVideo message to WebView');
-          webViewRef.current.postMessage(JSON.stringify({ type: 'pauseVideo' }));
+          const jsCode = `
+            (function() {
+              window.postMessage(JSON.stringify({ type: 'pauseVideo' }), '*');
+            })();
+          `;
+          webViewRef.current.injectJavaScript(jsCode);
         }
         
         console.log('🔄 UPDATING state: timer paused, video stopped');
@@ -311,7 +331,12 @@ export default function ViewTab() {
     if (!currentVideo || !videoLoadedRef.current) return;
 
     if (webViewRef.current) {
-      webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+      const jsCode = `
+        (function() {
+          window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+        })();
+      `;
+      webViewRef.current.injectJavaScript(jsCode);
     }
 
     startTimer();
@@ -355,7 +380,12 @@ export default function ViewTab() {
 
     // Notify WebView
     if (webViewRef.current) {
-      webViewRef.current.postMessage(JSON.stringify({ type: 'timerComplete' }));
+      const jsCode = `
+        (function() {
+          window.postMessage(JSON.stringify({ type: 'timerComplete' }), '*');
+        })();
+      `;
+      webViewRef.current.injectJavaScript(jsCode);
     }
 
     try {
@@ -480,7 +510,12 @@ export default function ViewTab() {
           if (isTabFocusedRef.current && !rewardProcessedRef.current) {
             console.log('▶️ AUTO-PLAYING video after load');
             if (webViewRef.current) {
-              webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+              const jsCode = `
+                (function() {
+                  window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+                })();
+              `;
+              webViewRef.current.injectJavaScript(jsCode);
             }
             
             // Also start timer and update state immediately for auto-play
