@@ -221,7 +221,7 @@ export default function EditProfileScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <LinearGradient
-        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#9B59B6']}
+        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#800080']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
