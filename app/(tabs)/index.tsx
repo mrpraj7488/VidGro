@@ -202,19 +202,30 @@ export default function ViewTab() {
           console.log('📱 WebView ref exists:', !!webViewRef.current);
           
           // Always try to play when tab is focused, regardless of current state
-          webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+          const playMessage = JSON.stringify({ type: 'playVideo' });
+          console.log('📤 Sending message:', playMessage);
+          webViewRef.current.postMessage(playMessage);
           
-          // Always ensure timer can run and video state is updated
-          console.log('🔄 UPDATING state: timer unpaused, video playing');
-          setTimerPaused(false);
-          timerPausedRef.current = false;
-          setIsVideoPlaying(true);
-          isVideoPlayingRef.current = true;
+          // Wait for WebView response before updating React state
+          console.log('⏳ Waiting for WebView to respond with videoPlaying...');
           
-          console.log('✅ State updated:', {
-            timerPaused: false,
-            isVideoPlaying: true
-          });
+          // Set a timeout to check if WebView responds
+          setTimeout(() => {
+            if (!isVideoPlayingRef.current) {
+              console.log('⚠️ WebView did not respond with videoPlaying, forcing state update');
+              console.log('🔄 FORCE UPDATING state: timer unpaused, video playing');
+              setTimerPaused(false);
+              timerPausedRef.current = false;
+              setIsVideoPlaying(true);
+              isVideoPlayingRef.current = true;
+              
+              // Try sending play message again
+              console.log('🔄 RETRY: Sending playVideo message again');
+              if (webViewRef.current) {
+                webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+              }
+            }
+          }, 1000); // Wait 1 second for WebView response
         } else {
           console.log('❌ CANNOT auto-play:', {
             hasCurrentVideo: !!currentVideo,
@@ -527,7 +538,8 @@ export default function ViewTab() {
           break;
 
         case 'videoPlaying':
-          console.log('▶️ VIDEO IS NOW PLAYING - updating React state');
+          console.log('🎉 SUCCESS: VIDEO IS NOW PLAYING - updating React state');
+          console.log('📊 WebView confirmed video is playing');
           setIsVideoPlaying(true);
           isVideoPlayingRef.current = true;
           setTimerPaused(false);
@@ -754,8 +766,24 @@ export default function ViewTab() {
                   forceVideoPause();
                 }
                 
-                if (data.type === 'playVideo' && playerReady && player && !timerCompleted) {
-                  player.playVideo();
+                if (data.type === 'playVideo') {
+                  console.log('🎬 WebView received playVideo message');
+                  console.log('📊 WebView state:', {
+                    playerReady: playerReady,
+                    hasPlayer: !!player,
+                    timerCompleted: timerCompleted
+                  });
+                  
+                  if (playerReady && player && !timerCompleted) {
+                    console.log('✅ All conditions met, calling player.playVideo()');
+                    player.playVideo();
+                  } else {
+                    console.log('❌ Cannot play video:', {
+                      playerReady: playerReady,
+                      hasPlayer: !!player,
+                      timerCompleted: timerCompleted
+                    });
+                  }
                 }
                 
                 if (data.type === 'pauseVideo' && playerReady && player) {
