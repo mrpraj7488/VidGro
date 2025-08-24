@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Dimensions, AppState } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '@/contexts/AuthContext';
@@ -634,9 +634,15 @@ export default function ViewTab() {
     return '';
   }, []);
   
+  // Memoize HTML content to prevent unnecessary regeneration
+  const htmlContent = useMemo(() => {
+    const videoId = extractVideoId(currentVideo?.youtube_url || '');
+    console.log('🎬 Creating HTML content for video ID:', videoId);
+    return createHtmlContent(videoId);
+  }, [currentVideo?.youtube_url]);
+  
   // Create HTML content
   const createHtmlContent = useCallback((youtubeVideoId: string) => {
-    console.log('🎬 Creating HTML content for video ID:', youtubeVideoId);
     if (!youtubeVideoId || youtubeVideoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(youtubeVideoId)) {
       return `
         <!DOCTYPE html>
@@ -779,7 +785,6 @@ export default function ViewTab() {
             let player = null;
             let timerCompleted = false;
             let playerReady = false;
-            let player = null;
             
             console.log('🌐 WebView JavaScript loaded and ready');
             
@@ -1195,7 +1200,7 @@ export default function ViewTab() {
       ]}>
         <WebView
           ref={webViewRef}
-          source={{ html: createHtmlContent(extractVideoId(currentVideo?.youtube_url || '')) }}
+          source={{ html: htmlContent }}
           style={[
             styles.webView,
             isVideoTransitioning && styles.webViewTransitioning
