@@ -779,9 +779,14 @@ export default function ViewTab() {
               }
             }
             
-            // Add both event listeners for cross-platform compatibility
-            document.addEventListener('message', handleMessage);
+            // React Native WebView message handling
             window.addEventListener('message', handleMessage);
+            document.addEventListener('message', handleMessage);
+            
+            // Direct React Native WebView message handler
+            if (typeof window !== 'undefined') {
+              window.onmessage = handleMessage;
+            }
             
             if (!window.YT) {
               const tag = document.createElement('script');
