@@ -193,6 +193,13 @@ export default function ViewTab() {
       if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
         console.log('▶️ SENDING playVideo message to WebView');
         webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+        
+        // Also update state immediately to restart timer
+        setIsVideoPlaying(true);
+        isVideoPlayingRef.current = true;
+        setTimerPaused(false);
+        timerPausedRef.current = false;
+        startTimer();
       } else {
         console.log('❌ CANNOT auto-play:', {
           hasCurrentVideo: !!currentVideo,
