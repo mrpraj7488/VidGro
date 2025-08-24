@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share, Dimensions, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share, Dimensions, Platform } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Share2, Copy, Gift, Users, Coins, Star, TrendingUp, Crown } from 'lucide-react-native';
+import { ArrowLeft, Share2, Copy, Gift, Users, Coins, Star, TrendingUp, Crown, Check } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,6 +12,8 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { supabase } from '@/lib/supabase';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 380;
@@ -25,6 +27,14 @@ function ReferFriendScreen() {
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [referralStats, setReferralStats] = useState({
+    friendsReferred: 0,
+    coinsEarned: 0
+  });
+
+  // Copy functionality
+  const { copied: copiedCode, copyToClipboard: copyCode, opacity: codeSuccessOpacity } = useCopyToClipboard();
+  const { copied: copiedLink, copyToClipboard: copyLink, opacity: linkSuccessOpacity } = useCopyToClipboard();
 
   // Animation values
   const buttonScale = useSharedValue(1);
@@ -33,30 +43,71 @@ function ReferFriendScreen() {
   const referralCode = profile?.referral_code || 'VIDGRO123';
   const referralLink = `https://vidgro.app/join?ref=${referralCode}`;
 
-  const handleCopyCode = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+  // Fetch referral statistics
+  useEffect(() => {
+    const fetchReferralStats = async () => {
+      if (!profile?.id) return;
 
+      try {
+        // Get referral stats from the profile directly
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('total_referrals, referral_coins_earned')
+          .eq('id', profile.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching referral stats:', profileError);
+          return;
+        }
+
+        setReferralStats({
+          friendsReferred: profileData?.total_referrals || 0,
+          coinsEarned: profileData?.referral_coins_earned || 0
+        });
+      } catch (error) {
+        console.error('Error fetching referral stats:', error);
+      }
+    };
+
+    fetchReferralStats();
+
+    // Set up real-time subscription for updates
+    const subscription = supabase
+      .channel('referral-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile?.id}`
+        },
+        () => {
+          fetchReferralStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [profile?.id]);
+
+  const handleCopyCode = async () => {
     buttonScale.value = withSequence(
       withSpring(0.95, { damping: 15, stiffness: 400 }),
       withSpring(1, { damping: 15, stiffness: 400 })
     );
-
-    Alert.alert('✅ Copied!', 'Referral code copied to clipboard');
+    await copyCode(referralCode);
   };
 
   const handleCopyLink = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-
     buttonScale.value = withSequence(
       withSpring(0.95, { damping: 15, stiffness: 400 }),
       withSpring(1, { damping: 15, stiffness: 400 })
     );
-
-    Alert.alert('✅ Copied!', 'Referral link copied to clipboard');
+    await copyLink(referralLink);
   };
 
   const handleShare = async () => {
@@ -106,11 +157,19 @@ function ReferFriendScreen() {
     transform: [{ scale: statsScale.value }],
   }));
 
+  const codeSuccessAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: codeSuccessOpacity.value,
+  }));
+
+  const linkSuccessAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: linkSuccessOpacity.value,
+  }));
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Enhanced Header */}
       <LinearGradient
-        colors={isDark ? ['#1E293B', '#334155'] : ['#800080', '#9B59B6']}
+        colors={isDark ? ['#1E293B', '#334155'] : ['#800080', '#800080']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -141,7 +200,7 @@ function ReferFriendScreen() {
                 style={styles.statGradient}
               >
                 <Users size={isVerySmallScreen ? 20 : 24} color={colors.primary} />
-                <Text style={[styles.statNumber, { color: colors.text }]}>0</Text>
+                <Text style={[styles.statNumber, { color: colors.text }]}>{referralStats.friendsReferred}</Text>
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Friends Referred</Text>
               </LinearGradient>
             </View>
@@ -152,7 +211,7 @@ function ReferFriendScreen() {
                 style={styles.statGradient}
               >
                 <Coins size={isVerySmallScreen ? 20 : 24} color={colors.accent} />
-                <Text style={[styles.statNumber, { color: colors.text }]}>0</Text>
+                <Text style={[styles.statNumber, { color: colors.text }]}>{referralStats.coinsEarned}</Text>
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Coins Earned</Text>
               </LinearGradient>
             </View>
@@ -168,12 +227,23 @@ function ReferFriendScreen() {
               style={styles.codeGradient}
             >
               <Text style={[styles.codeText, { color: colors.primary }]}>{referralCode}</Text>
-              <AnimatedTouchableOpacity 
-                style={[styles.copyButton, { backgroundColor: colors.primary + '20' }, buttonAnimatedStyle]} 
-                onPress={handleCopyCode}
-              >
-                <Copy size={isVerySmallScreen ? 16 : 18} color={colors.primary} />
-              </AnimatedTouchableOpacity>
+              <View style={styles.copyButtonContainer}>
+                <AnimatedTouchableOpacity 
+                  style={[styles.copyButton, { backgroundColor: colors.primary + '20' }, buttonAnimatedStyle]} 
+                  onPress={handleCopyCode}
+                >
+                  {copiedCode ? (
+                    <Check size={isVerySmallScreen ? 16 : 18} color={colors.success} />
+                  ) : (
+                    <Copy size={isVerySmallScreen ? 16 : 18} color={colors.primary} />
+                  )}
+                </AnimatedTouchableOpacity>
+                {copiedCode && (
+                  <Animated.View style={[styles.successIndicator, codeSuccessAnimatedStyle]}>
+                    <Text style={[styles.successText, { color: colors.success }]}>Copied!</Text>
+                  </Animated.View>
+                )}
+              </View>
             </LinearGradient>
           </View>
         </View>
@@ -189,12 +259,23 @@ function ReferFriendScreen() {
               <Text style={[styles.linkText, { color: colors.textSecondary }]} numberOfLines={1}>
                 {referralLink}
               </Text>
-              <AnimatedTouchableOpacity 
-                style={[styles.copyButton, { backgroundColor: colors.primary + '20' }, buttonAnimatedStyle]} 
-                onPress={handleCopyLink}
-              >
-                <Copy size={isVerySmallScreen ? 16 : 18} color={colors.primary} />
-              </AnimatedTouchableOpacity>
+              <View style={styles.copyButtonContainer}>
+                <AnimatedTouchableOpacity 
+                  style={[styles.copyButton, { backgroundColor: colors.primary + '20' }, buttonAnimatedStyle]} 
+                  onPress={handleCopyLink}
+                >
+                  {copiedLink ? (
+                    <Check size={isVerySmallScreen ? 16 : 18} color={colors.success} />
+                  ) : (
+                    <Copy size={isVerySmallScreen ? 16 : 18} color={colors.primary} />
+                  )}
+                </AnimatedTouchableOpacity>
+                {copiedLink && (
+                  <Animated.View style={[styles.successIndicator, linkSuccessAnimatedStyle]}>
+                    <Text style={[styles.successText, { color: colors.success }]}>Copied!</Text>
+                  </Animated.View>
+                )}
+              </View>
             </LinearGradient>
           </View>
         </View>
@@ -202,7 +283,7 @@ function ReferFriendScreen() {
         {/* Share Button */}
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
           <LinearGradient
-            colors={isDark ? ['#4A90E2', '#6366F1'] : ['#800080', '#9B59B6']}
+            colors={isDark ? ['#4A90E2', '#6366F1'] : ['#800080', '#800080']}
             style={styles.shareButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -318,7 +399,7 @@ function ReferFriendScreen() {
             </View>
           </View>
           
-          <Text style={[styles.successText, { color: colors.success }]}>
+          <Text style={[styles.successStoryText, { color: colors.success }]}>
             "I've earned over 10,000 coins just by sharing VidGro with my friends!" - Top Referrer
           </Text>
         </View>
@@ -495,6 +576,37 @@ const styles = StyleSheet.create({
         boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
       },
     }),
+  },
+  copyButtonContainer: {
+    position: 'relative',
+    alignItems: 'center',
+  },
+  successIndicator: {
+    position: 'absolute',
+    top: -30,
+    backgroundColor: 'rgba(46, 204, 113, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+      },
+    }),
+  },
+  successText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: 'white',
   },
 
   // Link Section
@@ -749,7 +861,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.3,
   },
-  successText: {
+  successStoryText: {
     fontSize: isVerySmallScreen ? 11 : 13,
     textAlign: 'center',
     lineHeight: isVerySmallScreen ? 16 : 18,
