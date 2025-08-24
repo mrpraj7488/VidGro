@@ -482,6 +482,13 @@ export default function ViewTab() {
             if (webViewRef.current) {
               webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
             }
+            
+            // Also start timer and update state immediately for auto-play
+            setIsVideoPlaying(true);
+            isVideoPlayingRef.current = true;
+            setTimerPaused(false);
+            timerPausedRef.current = false;
+            startTimer();
           } else {
             console.log('❌ NOT auto-playing on load:', {
               tabFocused: isTabFocusedRef.current,
@@ -838,25 +845,23 @@ export default function ViewTab() {
             }
             
             function onPlayerStateChange(event) {
-              if (videoUnavailable) return;
-              
-              const state = event.data;
-              
-              switch (state) {
-                case YT.PlayerState.PLAYING:
-                  updatePlayerState(true);
-                  notifyReactNative('videoPlaying');
-                  break;
-                  
-                case YT.PlayerState.PAUSED:
-                  updatePlayerState(false);
-                  notifyReactNative('videoPaused');
-                  break;
-                  
-                case YT.PlayerState.ENDED:
-                  updatePlayerState(false);
-                  notifyReactNative('videoEnded');
-                  break;
+              if (event.data === YT.PlayerState.PLAYING) {
+                console.log('🎬 YouTube player state: PLAYING');
+                updatePlayerState(true);
+                notifyReactNative('videoPlaying');
+                
+                // Execute pending play request if any
+                if (window.pendingPlayRequest) {
+                  window.pendingPlayRequest = false;
+                }
+              } else if (event.data === YT.PlayerState.PAUSED) {
+                console.log('⏸️ YouTube player state: PAUSED');
+                updatePlayerState(false);
+                notifyReactNative('videoPaused');
+              } else if (event.data === YT.PlayerState.ENDED) {
+                console.log('🏁 YouTube player state: ENDED');
+                updatePlayerState(false);
+                notifyReactNative('videoEnded');
               }
             }
             
