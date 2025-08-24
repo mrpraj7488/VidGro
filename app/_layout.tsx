@@ -37,6 +37,7 @@ function RootStack() {
         <Stack.Screen name="contact-support" />
         <Stack.Screen name="delete-account" />
         <Stack.Screen name="edit-video" />
+        <Stack.Screen name="ticket-detail" />
         <Stack.Screen name="faq" />
       </Stack>
       <StatusBar style={isDark ? "light" : "dark"} />
