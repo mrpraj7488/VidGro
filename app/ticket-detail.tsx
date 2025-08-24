@@ -27,7 +27,7 @@ import CustomAlert from '@/components/CustomAlert';
 import * as DocumentPicker from 'expo-document-picker';
 import FileUploadService from '@/services/FileUploadService';
 import * as Haptics from 'expo-haptics';
-import Animated as ReAnimated, {
+import ReAnimated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
