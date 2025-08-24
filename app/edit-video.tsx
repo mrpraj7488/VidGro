@@ -8,15 +8,14 @@ import {
   Platform,
   Dimensions,
   Pressable,
-  Clipboard,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAlert } from '@/contexts/AlertContext';
 import { useVideoStore } from '../store/videoStore';
-import { getSupabase, createVideoPromotion, deleteVideo } from '@/lib/supabase';
-import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown, Edit3, Copy } from 'lucide-react-native';
+import { getSupabase, deleteVideo } from '@/lib/supabase';
+import { ArrowLeft, Eye, Clock, Trash2, Play, Timer, ChevronDown, Edit3, Copy, Check } from 'lucide-react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 480;
@@ -55,7 +54,9 @@ export default function EditVideoScreen() {
   const [repromoting, setRepromoting] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Memoized helper functions for better performance
+  // Simple copy state without reanimated to avoid hook order issues
+  const [videoIdCopied, setVideoIdCopied] = useState(false);
+
   const formatEngagementTime = useCallback((seconds: number): string => {
     const safeSeconds = Number(seconds) || 0;
     if (safeSeconds === 0) return '0s';
@@ -73,182 +74,78 @@ export default function EditVideoScreen() {
     }
   }, []);
 
-  // Extract YouTube video ID from the youtube_url column
   const extractYouTubeVideoId = useCallback((video: VideoData): string => {
-    console.log('🔍 Extracting video ID from:', {
-      hasYouTubeUrl: !!video.youtube_url,
-      youtube_url: video.youtube_url,
-      videoTitle: video.title
-    });
+    if (!video.youtube_url) return 'No YouTube URL';
     
-    if (!video.youtube_url) {
-      return 'No YouTube URL';
-    }
-    
+    // Direct return if it's already a video ID (most common case)
     const url = video.youtube_url.trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
     
-    // Check if it's already just a video ID (11 characters, alphanumeric with - and _)
-    if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
-      return url;
-    }
-    
-    // Comprehensive YouTube URL patterns to extract the 11-character video ID
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/, // Standard watch URL
-      /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/, // Short URL
-      /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/, // Embed URL
-      /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/, // Old format
-      /[?&]v=([a-zA-Z0-9_-]{11})/ // Any URL with v= parameter
-    ];
-    
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-    
-    return 'Invalid YouTube URL';
+    // Quick extraction for common patterns
+    const match = url.match(/(?:v=|\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : url.length <= 15 ? url : 'Invalid URL';
   }, []);
 
-  // Copy YouTube video ID to clipboard
   const copyYouTubeVideoId = useCallback(async (videoId: string) => {
+    if (!videoId || videoId === 'Loading...') {
+      showError('Cannot Copy', 'No video ID available to copy');
+      return;
+    }
+    
     try {
-      if (videoId === 'Invalid YouTube URL' || videoId === 'No YouTube URL') {
-        showError('Cannot Copy', 'No valid YouTube video ID available to copy');
-        return;
+      const { Clipboard } = require('react-native');
+      Clipboard.setString(videoId);
+      
+      // Haptic feedback
+      if (Platform.OS !== 'web') {
+        const Haptics = require('expo-haptics');
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-      await Clipboard.setString(videoId);
-      showSuccess('Copied!', `YouTube video ID "${videoId}" copied to clipboard`);
+
+      // Show success indicator
+      setVideoIdCopied(true);
+      
+      // Hide after 2 seconds
+      setTimeout(() => {
+        setVideoIdCopied(false);
+      }, 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
-      showError('Error', 'Failed to copy YouTube video ID');
+      console.error('Failed to copy to clipboard:', error);
+      showError('Copy Failed', 'Could not copy to clipboard');
     }
-  }, [showError, showSuccess]);
+  }, [showError]);
 
-  useEffect(() => {
-    if (params.videoId && user && user.id) {
-      fetchVideoData();
-    } else if (params.videoData) {
-      try {
-        const video = JSON.parse(params.videoData as string);
-        setVideoData(video);
-        
-        // Calculate hold timer if video is on hold
-        if (video.status === 'on_hold') {
-          let holdUntilTime: Date;
-          
-          if (video.hold_until) {
-            // Use the exact hold_until timestamp from database
-            holdUntilTime = new Date(video.hold_until);
-          } else {
-            // Fallback: calculate exactly 10 minutes from creation
-            holdUntilTime = new Date(video.created_at);
-            holdUntilTime.setMinutes(holdUntilTime.getMinutes() + 10);
-          }
-          
-          const remainingMs = holdUntilTime.getTime() - new Date().getTime();
-          setHoldTimer(Math.max(0, Math.floor(remainingMs / 1000)));
-        }
-        
-        setLoading(false);
-        setupRealTimeUpdates(video);
-      } catch (error) {
-        console.error('Error parsing video data:', error);
-        router.back();
-      }
+  const calculateHoldTimer = useCallback((video: VideoData) => {
+    if (video.status !== 'on_hold') return 0;
+    
+    let holdUntilTime: Date;
+    if (video.hold_until) {
+      holdUntilTime = new Date(video.hold_until);
+    } else {
+      holdUntilTime = new Date(video.created_at);
+      holdUntilTime.setMinutes(holdUntilTime.getMinutes() + 10);
     }
-  }, [params.videoData, params.videoId, user]);
+    
+    const remainingMs = holdUntilTime.getTime() - new Date().getTime();
+    return Math.max(0, Math.floor(remainingMs / 1000));
+  }, []);
 
-  const fetchVideoData = async () => {
-    if (!params.videoId || !user || !user.id) return;
-
-    try {
-      // Enhanced query to get engagement metrics with new schema
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('videos')
-        .select(`
-          *,
-          total_watch_time,
-          youtube_url
-        `)
-        .eq('id', params.videoId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching video:', error);
-        showError('Error', 'Failed to load video data');
-        router.back();
-        return;
-      }
-
-      if (!data) {
-        showError('Error', 'Video not found');
-        router.back();
-        return;
-      }
-
-      // Calculate completion rate from current data
-      const videoWithCompletion = {
-        ...data,
-        completion_rate: data.target_views > 0 
-          ? Math.round((data.views_count / data.target_views) * 100)
-          : 0
-      };
-      
-      // Debug log to check youtube_url
-      console.log('📹 Video data fetched:', {
-        id: data.id,
-        title: data.title,
-        youtube_url: data.youtube_url,
-        hasYouTubeUrl: !!data.youtube_url
-      });
-      
-      setVideoData(videoWithCompletion);
-      
-      // Calculate hold timer if video is on hold
-      if (videoWithCompletion.status === 'on_hold') {
-        let holdUntilTime: Date;
-        
-        if (videoWithCompletion.hold_until) {
-          holdUntilTime = new Date(videoWithCompletion.hold_until);
-        } else {
-          holdUntilTime = new Date(videoWithCompletion.created_at);
-          holdUntilTime.setMinutes(holdUntilTime.getMinutes() + 10);
-        }
-        
-        const remainingMs = holdUntilTime.getTime() - new Date().getTime();
-        setHoldTimer(Math.max(0, Math.floor(remainingMs / 1000)));
-      }
-      
-      setupRealTimeUpdates(videoWithCompletion);
-    } catch (error) {
-      console.error('Error:', error);
-      showError('Error', 'Something went wrong');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const setupRealTimeUpdates = (video: VideoData) => {
-    const videoId = video.id || video.video_id;
-    if (!video || !videoId) return;
+  const setupRealTimeUpdates = useCallback((video: VideoData) => {
+    const id = video.id || video.video_id;
+    if (!id) return;
+    
     if (intervalRef.current) clearInterval(intervalRef.current);
+    
     intervalRef.current = setInterval(async () => {
-      if (!video || !videoId) return;
       try {
         const supabase = getSupabase();
-        const { data: freshData, error: statusError } = await supabase
+        const { data: freshData, error } = await supabase
           .from('videos')
-          .select(`
-            views_count, status, hold_until, updated_at, total_watch_time, completed, target_views, youtube_url
-          `)
-          .eq('id', videoId)
+          .select('views_count, status, hold_until, updated_at, total_watch_time, completed, target_views, youtube_url, coin_cost, coin_reward, duration_seconds')
+          .eq('id', id)
           .single();
 
-        if (!statusError && freshData) {
+        if (!error && freshData) {
           const updatedVideo = {
             ...freshData,
             completion_rate: freshData.target_views > 0 
@@ -256,67 +153,94 @@ export default function EditVideoScreen() {
               : 0
           };
           
-          // Debug logging for real-time updates
-          console.log('🔄 Real-time update:', {
-            coin_cost: freshData.coin_cost,
-            coin_reward: freshData.coin_reward,
-            views_count: freshData.views_count,
-            status: freshData.status
-          });
-          setVideoData(prev => prev ? {
-            ...prev,
-            views_count: updatedVideo.views_count,
-            status: updatedVideo.status,
-            hold_until: updatedVideo.hold_until,
-            updated_at: updatedVideo.updated_at,
-            total_watch_time: updatedVideo.total_watch_time,
-            completion_rate: updatedVideo.completion_rate,
-            completed: updatedVideo.completed,
-            coin_cost: updatedVideo.coin_cost,
-            coin_reward: updatedVideo.coin_reward,
-            target_views: updatedVideo.target_views,
-            duration_seconds: updatedVideo.duration_seconds,
-            youtube_url: freshData.youtube_url
-          } : null);
-                     if (updatedVideo.status === 'on_hold' && updatedVideo.hold_until) {
-             const holdUntilTime = new Date(updatedVideo.hold_until);
-             if (holdUntilTime.getTime() <= new Date().getTime()) {
-               await supabase
-                 .from('videos')
-                 .update({ status: 'active', hold_until: null })
-                 .eq('id', videoId);
-             }
-           } else if (updatedVideo.status === 'active') {
-             setHoldTimer(0);
-           }
-        } else if (statusError && statusError.code === 'PGRST116') {
-          // Video no longer exists, clear interval
+          setVideoData(prev => prev ? { ...prev, ...updatedVideo } : null);
+          
+          if (updatedVideo.status === 'on_hold' && updatedVideo.hold_until) {
+            const holdUntilTime = new Date(updatedVideo.hold_until);
+            if (holdUntilTime.getTime() <= new Date().getTime()) {
+              await supabase
+                .from('videos')
+                .update({ status: 'active', hold_until: null })
+                .eq('id', id);
+            }
+          } else if (updatedVideo.status === 'active') {
+            setHoldTimer(0);
+          }
+        } else if (error && error.code === 'PGRST116') {
           if (intervalRef.current) clearInterval(intervalRef.current);
-        } else {
-          console.error('Error in real-time update:', statusError);
         }
       } catch (error) {
         console.error('Error refreshing video data:', error);
       }
-    }, 2000);
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    const initializeVideo = async () => {
+      if (params.id && user?.id) {
+        await fetchVideoData();
+      } else if (params.videoData) {
+        try {
+          const video = JSON.parse(params.videoData as string);
+          setVideoData(video);
+          setHoldTimer(calculateHoldTimer(video));
+          setLoading(false);
+          setupRealTimeUpdates(video);
+        } catch (error) {
+          router.back();
+        }
+      }
+    };
+
+    initializeVideo();
+    
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [params.videoData, params.id, user]);
+
+  const fetchVideoData = async () => {
+    if (!params.id || !user?.id) return;
+
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*, total_watch_time, youtube_url')
+        .eq('id', params.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !data) {
+        showError('Error', 'Failed to load video data');
+        router.back();
+        return;
+      }
+
+      const videoWithCompletion = {
+        ...data,
+        completion_rate: data.target_views > 0 
+          ? Math.round((data.views_count / data.target_views) * 100)
+          : 0
+      };
+      
+      setVideoData(videoWithCompletion);
+      setHoldTimer(calculateHoldTimer(videoWithCompletion));
+      setupRealTimeUpdates(videoWithCompletion);
+    } catch (error) {
+      showError('Error', 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Update hold timer every second
   useEffect(() => {
     if (holdTimer > 0) {
       const interval = setInterval(() => {
         setHoldTimer(prev => {
           if (prev <= 1) {
             clearInterval(interval);
-            // Handle timer completion
-            setTimeout(() => {
-              // Refresh the video data to get updated status
-              if (videoData) {
-                console.log('📊 Hold period completed for video:', videoData.youtube_url);
-                // Refresh video data
-                setVideoData(prev => prev ? { ...prev, status: 'active' } : null);
-              }
-            }, 100);
+            setVideoData(prev => prev ? { ...prev, status: 'active' } : null);
             return 0;
           }
           return prev - 1;
@@ -325,7 +249,7 @@ export default function EditVideoScreen() {
       
       return () => clearInterval(interval);
     }
-  }, [holdTimer, videoData]);
+  }, [holdTimer]);
 
   const getMinutesSinceCreation = useCallback(() => {
     if (!videoData) return 0;
@@ -337,23 +261,52 @@ export default function EditVideoScreen() {
   const refundInfo = useMemo(() => {
     if (!videoData) return { refundPercentage: 0, refundAmount: 0, isWithin10Minutes: false };
     
-    console.log('💰 Video coin_cost:', videoData.coin_cost);
-    console.log('📊 Full video data:', videoData);
-    
     const minutesSinceCreation = getMinutesSinceCreation();
     const isWithin10Minutes = minutesSinceCreation <= 10;
     const refundPercentage = isWithin10Minutes ? 100 : 50;
-    // Use coin_cost from database lookup if UI data doesn't have it
-    const coinCost = videoData.coin_cost || 168; // Fallback to known value from logs
-    const refundAmount = Math.floor(coinCost * refundPercentage / 100);
-    
-    console.log('💸 Calculated refund:', { refundPercentage, refundAmount, isWithin10Minutes });
+    const refundAmount = Math.floor((videoData.coin_cost || 0) * refundPercentage / 100);
     
     return { refundPercentage, refundAmount, isWithin10Minutes };
   }, [videoData, getMinutesSinceCreation]);
 
+  const canRepromote = useMemo(() => {
+    if (!videoData) return false;
+    
+    // Only allow repromotion if video is completed OR has reached target views
+    const hasReachedTarget = videoData.views_count >= videoData.target_views;
+    const isCompleted = videoData.status === 'completed' || videoData.completed === true;
+    
+    // For repromoted videos, they must reach target again before next repromotion
+    if (videoData.status === 'repromoted') {
+      return hasReachedTarget && isCompleted;
+    }
+    
+    // For other statuses, follow original logic
+    return ['completed', 'paused'].includes(videoData.status) && (isCompleted || hasReachedTarget);
+  }, [videoData]);
+
+  const getRepromoteDisabledReason = useCallback(() => {
+    if (!videoData) return 'Video data not available';
+    
+    if (videoData.status === 'repromoted') {
+      const hasReachedTarget = videoData.views_count >= videoData.target_views;
+      if (!hasReachedTarget) {
+        return `Video must reach target views (${videoData.views_count}/${videoData.target_views}) before repromotion`;
+      }
+      if (!videoData.completed) {
+        return 'Video must complete before repromotion';
+      }
+    }
+    
+    if (!['completed', 'paused', 'repromoted'].includes(videoData.status)) {
+      return 'Repromote is only available for completed, paused, or previously repromoted videos';
+    }
+    
+    return '';
+  }, [videoData]);
+
   const handleDeleteVideo = async () => {
-    if (!videoData || !user || !user.id) return;
+    if (!videoData || !user?.id) return;
 
     const message = `Deleting now refunds ${refundInfo.refundPercentage}% coins (🪙${refundInfo.refundAmount}). This action cannot be undone. Confirm?`;
 
@@ -362,21 +315,16 @@ export default function EditVideoScreen() {
       message,
       async () => {
         try {
-          console.log('🎬 Video data for deletion:', videoData);
-          console.log('🔑 Using video ID:', videoData.id || videoData.video_id);
-          
           const { data: deleteResult, error } = await deleteVideo(
             videoData.id || videoData.video_id!,
             user.id
           );
 
           if (error) {
-            console.error('Error deleting video:', error);
             showError('Error', 'Failed to delete video. Please try again.');
             return;
           }
 
-          // Refresh profile to update coins
           await refreshProfile();
           clearQueue();
 
@@ -386,7 +334,6 @@ export default function EditVideoScreen() {
           );
           setTimeout(handleNavigateBack, 1500);
         } catch (error) {
-          console.error('Error deleting video:', error);
           showError('Error', 'Failed to delete video. Please try again.');
         }
       },
@@ -402,9 +349,8 @@ export default function EditVideoScreen() {
   }, [clearQueue]);
 
   const handleRepromoteVideo = async () => {
-    if (!videoData || !user || !user.id || repromoting) return;
+    if (!videoData || !user?.id || repromoting || !canRepromote) return;
 
-    // Check if video can be repromoted
     if (!['completed', 'paused', 'repromoted'].includes(videoData.status)) {
       showError(
         'Cannot Repromote',
@@ -416,48 +362,30 @@ export default function EditVideoScreen() {
     setRepromoting(true);
     
     try {
-      // Use the new repromote_video function
       const supabase = getSupabase();
       const { data: result, error } = await supabase.rpc('repromote_video', {
         p_video_id: videoData.id || videoData.video_id,
         p_user_id: user.id
       });
 
-      console.log('🎯 Repromote result:', { result, error });
+      if (error) throw new Error(error.message);
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Check if result indicates failure (more flexible success checking)
       if (result && result.success === false) {
-        showError(
-          'Cannot Repromote', 
-          result?.error || 'Failed to repromote video'
-        );
-        setRepromoting(false);
+        showError('Cannot Repromote', result?.error || 'Failed to repromote video');
         return;
       }
 
-      // If we get here, consider it successful (no error and no explicit failure)
-
-      // Refresh profile and clear queue
       await refreshProfile();
       clearQueue();
 
-      showSuccess(
-        'Success',
-        result.message || 'Video repromoted successfully!'
-      );
+      showSuccess('Success', result.message || 'Video repromoted successfully!');
       setTimeout(handleNavigateBack, 1500);
     } catch (error) {
-      console.error('Error repromoting video:', error);
       showError('Error', 'Failed to repromote video. Please try again.');
     } finally {
       setRepromoting(false);
     }
   };
-
 
   const formatHoldTimer = useCallback((seconds: number): string => {
     const safeSeconds = Number(seconds) || 0;
@@ -472,32 +400,29 @@ export default function EditVideoScreen() {
       completed: { color: '#3498DB', text: 'COMPLETED' },
       paused: { color: '#E74C3C', text: 'PAUSED' },
       on_hold: { color: '#F39C12', text: 'PENDING' },
-      repromoted: { color: '#9B59B6', text: 'REPROMOTED' }
+      repromoted: { color: '#800080', text: 'REPROMOTED' }
     };
     return configs[videoData?.status as keyof typeof configs] || { color: '#95A5A6', text: videoData?.status?.toUpperCase() || 'UNKNOWN' };
   }, [videoData?.status]);
 
-  if (loading || !videoData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>Loading video details...</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
       <View style={[styles.header, { backgroundColor: isDark ? colors.headerBackground : '#800080' }]}>
         <View style={styles.headerContent}>
-          <TouchableOpacity onPress={handleNavigateBack}><ArrowLeft size={24} color="white" /></TouchableOpacity>
+          <TouchableOpacity onPress={handleNavigateBack}>
+            <ArrowLeft size={24} color="white" />
+          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: 'white' }]}>Edit Video</Text>
           <Edit3 size={24} color="white" />
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Video Status */}
+      {loading || !videoData ? (
+        <View style={styles.loadingContainer}>
+          <Text>Loading video details...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
           <View style={styles.statusHeader}>
             <View style={[styles.statusBadge, { backgroundColor: statusConfig.color }]}>
@@ -507,15 +432,28 @@ export default function EditVideoScreen() {
               <Text style={[styles.videoId, { color: colors.textSecondary }]} numberOfLines={1}>
                 Video ID: {extractYouTubeVideoId(videoData)}
               </Text>
-              <TouchableOpacity 
-                style={[styles.copyButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => copyYouTubeVideoId(extractYouTubeVideoId(videoData))}
-                activeOpacity={0.7}><Copy size={14} color={colors.primary} /></TouchableOpacity>
+              <View style={styles.copyButtonContainer}>
+                <TouchableOpacity 
+                  style={[styles.copyButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => copyYouTubeVideoId(extractYouTubeVideoId(videoData))}
+                  activeOpacity={0.7}
+                >
+                  {videoIdCopied ? (
+                    <Check size={14} color={colors.success} />
+                  ) : (
+                    <Copy size={14} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+                {videoIdCopied && (
+                  <View style={[styles.copySuccessIndicator, { opacity: videoIdCopied ? 1 : 0 }]}>
+                    <Text style={[styles.copySuccessText, { color: colors.success }]}>Copied!</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </View>
 
-        {/* Video Title Container */}
         <View style={[styles.titleCard, { backgroundColor: colors.surface }]}>
           <Text style={[styles.titleLabel, { color: colors.textSecondary }]}>Video Title</Text>
           <Text style={[styles.titleText, { color: colors.text }]} numberOfLines={3}>
@@ -523,7 +461,6 @@ export default function EditVideoScreen() {
           </Text>
         </View>
 
-        {/* Pending Status Timeline */}
         {videoData.status === 'on_hold' && holdTimer > 0 && (
           <View style={[styles.pendingCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
             <View style={styles.pendingHeader}>
@@ -537,12 +474,10 @@ export default function EditVideoScreen() {
           </View>
         )}
 
-        {/* Main Metrics */}
         <View style={styles.metricsSection}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Video Metrics</Text>
           
           <View style={styles.metricsGrid}>
-            {/* Total Views */}
             <View style={[styles.metricCard, { backgroundColor: colors.surface }]}>
               <View style={styles.metricHeaderCentered}>
                 <Eye color="#3498DB" size={isSmallScreen ? 22 : 28} />
@@ -553,7 +488,6 @@ export default function EditVideoScreen() {
               </Text>
             </View>
 
-            {/* Received Watch Time */}
             <View style={[styles.metricCard, { backgroundColor: colors.surface }]}>
               <View style={styles.metricHeaderCentered}>
                 <Clock color="#F39C12" size={isSmallScreen ? 22 : 28} />
@@ -566,21 +500,22 @@ export default function EditVideoScreen() {
           </View>
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.actionSection}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Actions</Text>
 
-          {/* Delete Button */}
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error }]} 
-            onPress={handleDeleteVideo}><Trash2 color="white" size={20} /><View style={styles.actionContent}>
+            onPress={handleDeleteVideo}
+          >
+            <Trash2 color="white" size={20} />
+            <View style={styles.actionContent}>
               <Text style={[styles.actionButtonText, { color: 'white' }]}>Delete Video</Text>
               <Text style={[styles.actionSubtext, { color: 'rgba(255, 255, 255, 0.8)' }]}>
-                {`Refund: 🪙${refundInfo.refundAmount || 0} (${refundInfo.refundPercentage || 0}%)`}
+                {`Refund: ${refundInfo.refundAmount || 0} (${refundInfo.refundPercentage || 0}%)`}
               </Text>
-            </View></TouchableOpacity>
+            </View>
+          </TouchableOpacity>
 
-          {/* Repromote Section */}
           <View style={[styles.repromoteSection, { backgroundColor: colors.surface }]}>
             <Pressable 
               style={styles.repromoteToggle}
@@ -600,24 +535,15 @@ export default function EditVideoScreen() {
             
             {showRepromoteOptions && (
               <View style={styles.repromoteOptions}>
-                {!['completed', 'paused', 'repromoted'].includes(videoData.status) && (
-                  <View style={[styles.repromoteDisabledNotice, { backgroundColor: colors.warning + '20' }]}>
-                    <Text style={[styles.disabledNoticeText, { color: colors.warning }]}>
-                      Repromote is only available for completed, paused, or previously repromoted videos.
-                    </Text>
-                  </View>
-                )}
-
-                {/* Repromote Button */}
                 <Pressable 
                   style={[
                     styles.actionButton, 
                     styles.repromoteButton,
                     { backgroundColor: colors.primary },
-                    (repromoting || !['completed', 'paused', 'repromoted'].includes(videoData.status)) && styles.buttonDisabled
+                    (repromoting || !canRepromote) && styles.buttonDisabled
                   ]} 
                   onPress={handleRepromoteVideo}
-                  disabled={repromoting || !['completed', 'paused', 'repromoted'].includes(videoData.status)}
+                  disabled={repromoting || !canRepromote}
                   android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
                 >
                   <Play color="white" size={20} />
@@ -630,12 +556,19 @@ export default function EditVideoScreen() {
                     </Text>
                   </View>
                 </Pressable>
+                {!canRepromote && getRepromoteDisabledReason() !== '' && (
+                  <View style={[styles.repromoteDisabledNotice, { backgroundColor: colors.warning + '20' }]}>
+                    <Text style={[styles.disabledNoticeText, { color: colors.warning }]}>
+                      {getRepromoteDisabledReason()}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
         </View>
-      </ScrollView>
-
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -722,6 +655,24 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 6,
     borderWidth: 1,
+  },
+  copyButtonContainer: {
+    position: 'relative',
+    alignItems: 'center',
+  },
+  copySuccessIndicator: {
+    position: 'absolute',
+    top: -25,
+    backgroundColor: 'rgba(46, 204, 113, 0.9)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    zIndex: 1000,
+  },
+  copySuccessText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: 'white',
   },
   pendingCard: {
     margin: 16,
