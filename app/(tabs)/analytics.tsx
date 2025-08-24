@@ -226,7 +226,6 @@ export default function Analytics() {
         .limit(10);
 
       console.log(' Raw transaction data received:', JSON.stringify(activityData, null, 2));
-      console.log(' Transaction fetch error:', activityError);
 
       if (!activityError && activityData && activityData.length > 0) {
         setRecentActivity(activityData.map(tx => {
