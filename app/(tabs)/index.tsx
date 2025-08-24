@@ -1006,7 +1006,19 @@ export default function ViewTab() {
             
             function onPlayerStateChange(event) {
               if (event.data === YT.PlayerState.PLAYING) {
-                console.log('🎬 YouTube player state: PLAYING');
+                // Unmute the video once it starts playing
+                if (player && player.isMuted && player.isMuted()) {
+                  player.unMute();
+                  console.log('🔊 Video unmuted immediately');
+                  
+                  // Fallback unmute after short delay for stubborn devices
+                  setTimeout(function() {
+                    if (player && player.isMuted && player.isMuted()) {
+                      player.unMute();
+                      console.log('🔊 Video unmuted after delay');
+                    }
+                  }, 100);
+                }
                 updatePlayerState(true);
                 notifyReactNative('videoPlaying');
                 
@@ -1475,8 +1487,26 @@ export default function ViewTab() {
             }
             
             function onPlayerStateChange(event) {
+              if (videoUnavailable) return;
+              
+              console.log('🎮 Player state changed:', event.data);
+              
               if (event.data === YT.PlayerState.PLAYING) {
-                console.log('🎬 YouTube player state: PLAYING');
+                // Unmute the video once it starts playing
+                if (player && player.isMuted && player.isMuted()) {
+                  player.unMute();
+                  console.log('🔊 Video unmuted immediately');
+                  
+                  // Fallback unmute after short delay for stubborn devices
+                  setTimeout(function() {
+                    if (player && player.isMuted && player.isMuted()) {
+                      player.unMute();
+                      console.log('🔊 Video unmuted after delay');
+                    }
+                  }, 100);
+                }
+                updatePlayerState(true);
+                notifyReactNative('videoPlaying');
                 updatePlayerState(true);
                 notifyReactNative('videoPlaying');
                 
