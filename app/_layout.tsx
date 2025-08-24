@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, useColorScheme } from 'react-native';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { ConfigProvider } from '../contexts/ConfigContext';
@@ -18,10 +17,11 @@ function RootStack() {
         screenOptions={{ 
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
-          animation: 'fade_from_bottom'
+          animation: 'fade',
+          animationDuration: 200
         }}
       >
-        <Stack.Screen name="index" />
+        <Stack.Screen name="index" options={{ animation: 'none' }} />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="edit-profile" />
@@ -39,31 +39,25 @@ function RootStack() {
         <Stack.Screen name="edit-video" />
         <Stack.Screen name="faq" />
       </Stack>
-      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
+      <StatusBar style={isDark ? "light" : "dark"} />
     </View>
   );
 }
 
 export default function RootLayout() {
-  useFrameworkReady();
   const colorScheme = useColorScheme();
 
   return (
-    <View style={{ 
-      flex: 1, 
-      backgroundColor: colorScheme === 'dark' ? '#0A0E1A' : '#F5F5F5' 
-    }}>
-      <ConfigProvider>
-        <ThemeProvider>
-          <AlertProvider>
+    <ConfigProvider>
+      <ThemeProvider>
+        <AlertProvider>
+          <AuthProvider>
             <ConfigLoader>
-              <AuthProvider>
-                <RootStack />
-              </AuthProvider>
+              <RootStack />
             </ConfigLoader>
-          </AlertProvider>
-        </ThemeProvider>
-      </ConfigProvider>
-    </View>
+          </AuthProvider>
+        </AlertProvider>
+      </ThemeProvider>
+    </ConfigProvider>
   );
 }
