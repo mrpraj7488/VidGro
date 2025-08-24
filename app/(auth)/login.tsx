@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -14,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAlert } from '@/contexts/AlertContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -22,11 +22,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const { colors, isDark } = useTheme();
+  const { showError, showSuccess } = useAlert();
   const router = useRouter();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both email and password');
+      showError('Error', 'Please enter both email and password');
       return;
     }
 
@@ -35,14 +36,14 @@ export default function Login() {
     try {
       const { error } = await signIn(trimmedEmail, password);
               if (error) {
-          Alert.alert('Login Failed', error.message || 'Invalid email or password');
+          showError('Login Failed', error.message || 'Invalid email or password');
           return;
         }
         
         // If no error, login was successful
         router.replace('/(tabs)');
           } catch (error) {
-        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+        showError('Error', 'An unexpected error occurred. Please try again.');
       } finally {
         setLoading(false);
       }
