@@ -740,13 +740,9 @@ export default function ViewTab() {
             
             function handleMessage(event) {
               try {
+                console.log('📨 WebView received message:', event.data);
                 const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-                console.log('📨 WebView received message:', data);
-                
-                if (data.type === 'timerComplete') {
-                  timerCompleted = true;
-                  forceVideoPause();
-                }
+                console.log('📨 Parsed message data:', data);
                 
                 if (data.type === 'playVideo') {
                   console.log('🎬 WebView received playVideo message');
@@ -770,13 +766,16 @@ export default function ViewTab() {
                   }
                 }
                 
-                if (data.type === 'pauseVideo' && playerReady && player) {
-                  player.pauseVideo();
-                  // Immediately update overlay state
-                  updatePlayerState(false);
+                if (data.type === 'pauseVideo') {
+                  console.log('⏸️ WebView received pauseVideo message');
+                  if (playerReady && player) {
+                    player.pauseVideo();
+                    // Immediately update overlay state
+                    updatePlayerState(false);
+                  }
                 }
               } catch (e) {
-                // Silent error handling
+                console.log('❌ WebView message handling error:', e);
               }
             }
             
