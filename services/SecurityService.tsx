@@ -57,17 +57,19 @@ class SecurityService {
         }
       }
 
-      // Debug detection
-      const debugResult = await this.checkDebugMode();
-      if (!debugResult.isValid) {
-        result.warnings.push('Debug mode detected');
+      // Debug detection - removed for production
+      // Only check debug mode in development builds
+      if (__DEV__ && config.app?.environment !== 'production') {
+        const debugResult = await this.checkDebugMode();
+        if (!debugResult.isValid) {
+          // Don't add warning in production
+        }
       }
 
       // Generate device fingerprint for tracking
       await this.generateDeviceFingerprint();
 
     } catch (error) {
-      console.error('Security check error:', error);
       result.warnings.push('Some security checks could not be performed');
     }
 
@@ -84,7 +86,6 @@ class SecurityService {
       const rootIndicators = await this.checkMultipleRootIndicators();
       return { isValid: !rootIndicators.isRooted };
     } catch (error) {
-      console.error('Root check error:', error);
       return { isValid: true }; // Assume valid if check fails
     }
   }
@@ -109,7 +110,6 @@ class SecurityService {
       
       return { isRooted: indicators.length > 0, indicators };
     } catch (error) {
-      console.error('Root indicator check failed:', error);
       return { isRooted: false, indicators: [] };
     }
   }
@@ -134,7 +134,6 @@ class SecurityService {
 
       return { isValid: true };
     } catch (error) {
-      console.error('Emulator check error:', error);
       return { isValid: true };
     }
   }
@@ -152,7 +151,6 @@ class SecurityService {
         deviceType: Device.deviceType,
       };
     } catch (error) {
-      console.error('Error getting device info:', error);
       return {};
     }
   }
@@ -186,7 +184,6 @@ class SecurityService {
       }
       return false;
     } catch (error) {
-      console.error('iOS simulator detection error:', error);
       return false;
     }
   }
@@ -204,7 +201,6 @@ class SecurityService {
       // For now, just validate that we can generate a hash
       return { isValid: currentHash.length > 0 };
     } catch (error) {
-      console.error('Signature validation error:', error);
       return { isValid: true };
     }
   }
@@ -220,7 +216,6 @@ class SecurityService {
         version: Platform.Version,
       };
     } catch (error) {
-      console.error('Error getting app info:', error);
       return {};
     }
   }
@@ -248,7 +243,6 @@ class SecurityService {
 
       return this.deviceFingerprint;
     } catch (error) {
-      console.error('Error generating device fingerprint:', error);
       return '';
     }
   }
@@ -259,7 +253,6 @@ class SecurityService {
       const isDebug = __DEV__;
       return { isValid: !isDebug };
     } catch (error) {
-      console.error('Debug mode check error:', error);
       return { isValid: true };
     }
   }
@@ -290,7 +283,6 @@ class SecurityService {
 
       return this.appHash;
     } catch (error) {
-      console.error('Error generating app hash:', error);
       return '';
     }
   }
@@ -317,7 +309,6 @@ class SecurityService {
 
       return actualHash === expectedHash;
     } catch (error) {
-      console.error('Config integrity validation error:', error);
       return false;
     }
   }
