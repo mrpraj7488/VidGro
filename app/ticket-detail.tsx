@@ -514,7 +514,7 @@ function TicketDetailScreen() {
               style={styles.backButton}
               onPress={() => router.back()}
             >
-              <ArrowLeft size={isTinyScreen ? 20 : 22} color="white" />
+              <ArrowLeft size={24} color="white" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Loading...</Text>
             <View style={styles.headerSpacer} />
@@ -570,7 +570,7 @@ function TicketDetailScreen() {
             onPress={() => router.back()}
             activeOpacity={0.7}
           >
-            <ArrowLeft size={isTinyScreen ? 20 : 22} color="white" />
+            <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
           
           <View style={styles.headerTitleContainer}>
@@ -593,7 +593,7 @@ function TicketDetailScreen() {
             onPress={onRefresh}
             activeOpacity={0.7}
           >
-            <RefreshCw size={isTinyScreen ? 16 : 18} color="white" />
+            <RefreshCw size={24} color="white" />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: isTinyScreen ? 36 : 40,
+    height: 40,
   },
   backButton: {
     padding: isTinyScreen ? 6 : 8,
@@ -836,10 +836,10 @@ const styles = StyleSheet.create({
     marginHorizontal: isTinyScreen ? 8 : 12,
   },
   headerTitle: {
-    fontSize: isTinyScreen ? 16 : 18,
+    fontSize: isTinyScreen ? 18 : 22,
     fontWeight: 'bold',
     color: 'white',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 0.5,
   },
   headerSpacer: {
     width: isTinyScreen ? 36 : 40,
