@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Dimensions, AppState } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoStore } from '@/store/videoStore';
-import { watchVideoAndEarnCoins } from '@/lib/supabase';
-import GlobalHeader from '@/components/GlobalHeader';
-import { ExternalLink } from 'lucide-react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { AppState } from 'react-native';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { useRealtimeVideoUpdates } from '@/hooks/useRealtimeVideoUpdates';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useRouter } from 'expo-router';
+import { ExternalLink } from 'lucide-react-native';
+import GlobalHeader from '@/components/GlobalHeader';
 
 // Responsive helpers
 const { width: screenWidth } = Dimensions.get('window');
@@ -19,21 +18,22 @@ const isSmallScreen = screenWidth < 380;
 const isTablet = screenWidth >= 768;
 
 export default function ViewTab() {
-  const { user, profile, refreshProfile } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { user, refreshProfile } = useAuth();
+  const { showSuccess, showError, showInfo } = useCustomAlert();
   const { 
     videoQueue, 
-    currentVideoIndex, 
-    isLoading, 
-    error: storeError, 
     fetchVideos, 
     getCurrentVideo, 
     moveToNextVideo, 
-    refreshQueue, 
-    shouldSkipCurrentVideo, 
-    moveToNextIfNeeded 
+    clearQueue,
+    shouldSkipCurrentVideo,
+    refreshQueue,
+    isLoading,
+    storeError
   } = useVideoStore();
   const router = useRouter();
+  const searchParams = useLocalSearchParams();
+  const { colors, isDark } = useTheme();
 
   // Core state
   const [menuVisible, setMenuVisible] = useState(false);
@@ -42,27 +42,55 @@ export default function ViewTab() {
   const [isProcessingReward, setIsProcessingReward] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [timerPaused, setTimerPaused] = useState(true);
+  const [timerPaused, setTimerPaused] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [showSkipButton, setShowSkipButton] = useState(false);
+  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  const [showRefreshButton, setShowRefreshButton] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [suppressAutoPlay, setSuppressAutoPlay] = useState(false);
   const [videoLoadedSuccessfully, setVideoLoadedSuccessfully] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
   const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
-
-  // Refs for consistent state tracking
-  const watchTimerRef = useRef(0);
+  const [isInitializing, setIsInitializing] = useState(false);
+  
+  // Function to watch video and earn coins
+  const watchVideoAndEarnCoins = async (videoId: string, userId: string) => {
+    // This function will be implemented to handle coin earning logic
+    console.log('Watching video:', videoId, 'for user:', userId);
+  };
+  
+  // Refs
   const isVideoPlayingRef = useRef(false);
-  const videoLoadedRef = useRef(false);
-  const timerPausedRef = useRef(true);
-  const autoSkipEnabledRef = useRef(autoSkipEnabled);
-  const webViewRef = useRef<WebView>(null);
-  const timerRef = useRef<number | null>(null);
-  const currentVideoRef = useRef<string | null>(null);
+  const timerPausedRef = useRef(false);
+  const isTabFocusedRef = useRef(false);
+  const isAppForegroundRef = useRef(true);
   const rewardProcessedRef = useRef(false);
-  const isTabFocusedRef = useRef(true);
+  const webViewRef = useRef<WebView>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastVideoIdRef = useRef<string | null>(null);
+  const suppressAutoPlayRef = useRef(false);
   const videoLoadTimeoutRef = useRef<number | null>(null);
-
+  const videoLoadedRef = useRef(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const watchTimerRef = useRef(0);
+  const autoSkipEnabledRef = useRef(true);
+  const currentVideoRef = useRef<any>(null);
+  
   // Get current video
   const currentVideo = getCurrentVideo();
+  
+  // Check for suppress auto-play parameter
+  useEffect(() => {
+    if (searchParams?.suppressAutoPlay === 'true') {
+      suppressAutoPlayRef.current = true;
+      setSuppressAutoPlay(true);
+      // Clear the parameter to avoid persisting it
+      router.setParams({ suppressAutoPlay: undefined });
+    }
+  }, [searchParams, router]);
   
   // Real-time updates
   const { videoUpdates, coinTransactions, isConnected } = useRealtimeVideoUpdates(
@@ -77,7 +105,7 @@ export default function ViewTab() {
       return;
     }
   }, [user, router]);
-
+  
   // Update refs when state changes
   useEffect(() => {
     autoSkipEnabledRef.current = autoSkipEnabled;
@@ -135,9 +163,16 @@ export default function ViewTab() {
     useCallback(() => {
       isTabFocusedRef.current = true;
       
+      // Check if we should suppress auto-play (coming back from edit/promote/delete)
+      if (suppressAutoPlayRef.current) {
+        suppressAutoPlayRef.current = false;
+        setSuppressAutoPlay(false);
+        return; // Skip auto-play this time
+      }
+      
       // Aggressive auto-play when tab becomes focused
       const focusTimeout = setTimeout(() => {
-        if (currentVideo && webViewRef.current) {
+        if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
           // Always try to play when tab is focused, regardless of current state
           webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
           
@@ -155,24 +190,16 @@ export default function ViewTab() {
         isTabFocusedRef.current = false;
         clearTimeout(focusTimeout);
         
-        // Pause video when leaving tab
+        // Pause when tab loses focus
         if (webViewRef.current) {
           webViewRef.current.postMessage(JSON.stringify({ type: 'pauseVideo' }));
         }
-        
-        // Stop timer when leaving tab
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        
-        // Mark as paused when leaving tab
         setTimerPaused(true);
         timerPausedRef.current = true;
         setIsVideoPlaying(false);
         isVideoPlayingRef.current = false;
       };
-    }, [currentVideo])
+    }, [currentVideo, suppressAutoPlay])
   );
 
   // Initialize videos
