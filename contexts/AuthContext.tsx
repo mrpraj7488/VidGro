@@ -12,6 +12,8 @@ interface Profile {
   vip_expires_at: string | null;
   referral_code: string;
   referred_by: string | null;
+  referral_coins_earned: number;
+  total_referrals: number;
   created_at: string;
   updated_at: string;
 }
@@ -21,7 +23,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, username: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, username: string, referralCode?: string | null) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -144,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (email: string, password: string, username: string, referralCode?: string | null) => {
     const supabaseClient = getSupabase();
     if (!supabaseClient) {
       return { error: new Error('Supabase not initialized') };
@@ -157,6 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailRedirectTo: undefined,
         data: {
           username,
+          referral_code: referralCode,
         },
       },
     });
@@ -177,22 +180,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profileError && profileError.code === 'PGRST116') {
           // Profile doesn't exist, create it manually
           console.log('Profile not found, creating manually...');
+          console.log('Referral code being passed:', referralCode);
           
           const { data: createResult, error: createError } = await supabaseClient
             .rpc('create_missing_profile', {
-              user_id: data.user.id,
-              user_email: email,
-              user_username: username
+              p_user_id: data.user.id,
+              p_email: email,
+              p_username: username,
+              p_referral_code: referralCode
             });
           
           if (createError) {
             console.error('Failed to create profile manually:', createError);
+            return { error: createError };
           } else {
             console.log('Profile created manually:', createResult);
           }
         }
+        
+        // Wait for profile to be fully created before continuing
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Manually fetch and set the profile to ensure it's loaded
+        let profileAttempts = 0;
+        const maxAttempts = 5;
+        
+        while (profileAttempts < maxAttempts) {
+          try {
+            const { data: newProfile, error: profileFetchError } = await supabaseClient
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .single();
+            
+            if (!profileFetchError && newProfile) {
+              setProfile(newProfile);
+              console.log('Profile loaded successfully:', newProfile);
+              break;
+            }
+            
+            profileAttempts++;
+            if (profileAttempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (fetchError) {
+            console.error('Error fetching profile:', fetchError);
+            profileAttempts++;
+            if (profileAttempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+        }
+        
+        if (profileAttempts >= maxAttempts) {
+          console.error('Failed to load profile after multiple attempts');
+          return { error: new Error('Failed to load profile') };
+        }
+        
       } catch (profileCreationError) {
         console.error('Error ensuring profile creation:', profileCreationError);
+        return { error: profileCreationError };
       }
     }
     
