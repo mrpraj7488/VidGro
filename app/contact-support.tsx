@@ -20,38 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  ArrowLeft, 
-  MessageCircle, 
-  Send, 
-  Phone, 
-  Mail, 
-  HelpCircle,
-  AlertCircle,
-  CreditCard,
-  User,
-  Video,
-  Coins,
-  MoreHorizontal,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Star,
-  Copy,
-  Paperclip,
-  X,
-  FileText,
-  Image,
-  RefreshCw,
-  MessageSquare,
-  Check,
-  History,
-  ChevronRight,
-  ArrowRight
-} from 'lucide-react-native';
+import { ArrowLeft, MessageCircle, Send, Phone, Mail, CircleHelp as HelpCircle, CircleAlert as AlertCircle, CreditCard, User, Video, Coins, MoveHorizontal as MoreHorizontal, ChevronDown, ChevronUp, Clock, CircleCheck as CheckCircle, Circle as XCircle, TriangleAlert as AlertTriangle, Star, Copy, Paperclip, X, FileText, Image, RefreshCw, MessageSquare, Check, History, ChevronRight, ArrowRight } from 'lucide-react-native';
 import { getSupabase } from '@/lib/supabase';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import CustomAlert from '@/components/CustomAlert';
