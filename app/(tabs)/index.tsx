@@ -733,17 +733,24 @@ export default function ViewTab() {
             
             function checkIframeAvailability() {
               const iframe = document.getElementById('youtube-player');
-              if (!iframe || !iframe.src) {
+              if (!iframe) {
+                // Only mark unavailable if iframe element doesn't exist at all
+                console.log('❌ No iframe element found');
                 markVideoUnavailable();
                 return;
               }
               
-              iframe.onerror = () => markVideoUnavailable();
-              
-              // Remove timeout - let videos load naturally
+              // Don't check src - YouTube API creates iframe without src initially
+              iframe.onerror = () => {
+                console.log('❌ Iframe error occurred');
+                markVideoUnavailable();
+              };
             }
             
-            checkIframeAvailability();
+            // Delay check to allow YouTube API to initialize
+            setTimeout(() => {
+              checkIframeAvailability();
+            }, 1000);
             
             function handleMessage(event) {
               try {
@@ -878,12 +885,16 @@ export default function ViewTab() {
             
             function onPlayerError(event) {
               const errorCode = event.data;
-              const unavailableErrors = [2, 5, 100, 101, 150];
+              // Error codes: 2=invalid param, 5=HTML5 error, 100=not found, 101=not allowed, 150=same as 101
+              const unavailableErrors = [100, 101, 150]; // Only truly unavailable videos
+              
+              console.log('❌ YouTube player error:', errorCode);
               
               if (unavailableErrors.includes(errorCode)) {
+                console.log('❌ Video is truly unavailable, error code:', errorCode);
                 markVideoUnavailable();
               } else {
-                notifyReactNative('videoError', { errorCode });
+                console.log('⚠️ Recoverable error, not marking as unavailable:', errorCode);
               }
             }
             
