@@ -11,7 +11,6 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
-  Animated,
   Clipboard,
   RefreshControl,
   Alert
