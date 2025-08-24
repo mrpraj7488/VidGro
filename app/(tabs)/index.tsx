@@ -54,6 +54,7 @@ export default function ViewTab() {
   const [videoLoadedSuccessfully, setVideoLoadedSuccessfully] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
+  const [webViewReady, setWebViewReady] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   
   // Note: watchVideoAndEarnCoins is now imported from @/lib/supabase
@@ -212,7 +213,7 @@ export default function ViewTab() {
       }
       
       // Simple auto-play when tab becomes focused
-      if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
+      if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current && webViewReady) {
         console.log('▶️ SENDING playVideo message to WebView');
         const jsCode = `
           (function() {
@@ -224,6 +225,7 @@ export default function ViewTab() {
               console.log('❌ handleMessage not found');
             }
           })();
+          true;
         `;
         webViewRef.current.injectJavaScript(jsCode);
       } else {
@@ -239,7 +241,7 @@ export default function ViewTab() {
         isTabFocusedRef.current = false;
         
         // Pause when tab loses focus
-        if (webViewRef.current) {
+        if (webViewRef.current && webViewReady) {
           console.log('⏸️ SENDING pauseVideo message to WebView');
           const jsCode = `
             (function() {
@@ -251,6 +253,7 @@ export default function ViewTab() {
                 console.log('❌ handleMessage not found');
               }
             })();
+            true;
           `;
           webViewRef.current.injectJavaScript(jsCode);
         }
@@ -328,26 +331,19 @@ export default function ViewTab() {
     // Reset state
     setWatchTimer(0);
     watchTimerRef.current = 0;
-    setIsProcessingReward(false);
-    setVideoError(false);
-    setIsVideoPlaying(false);
-    isVideoPlayingRef.current = false;
-    setTimerPaused(false); // Changed from true to false for auto-resume
-    timerPausedRef.current = false; // Changed from true to false for auto-resume
-    setVideoLoadedSuccessfully(false);
-    videoLoadedRef.current = false;
-    rewardProcessedRef.current = false;
-    setIsTransitioning(false);
-    setIsVideoTransitioning(false);
-  }, []);
 
   // Initialize new video
-  const initializeNewVideo = useCallback((video: any) => {
-    setIsTransitioning(true);
-    currentVideoRef.current = video.video_id;
+  initializeNewVideo(currentVideo);
+}
+}, [currentVideo?.video_id, shouldSkipCurrentVideo, moveToNextVideo]);
 
-    // End transition
-    setIsTransitioning(false);
+// Clean up previous video
+const cleanupVideo = useCallback(() => {
+// Clear timers
+if (timerRef.current) {
+  clearInterval(timerRef.current);
+  timerRef.current = null;
+}
   }, []);
 
   // Start video playback
@@ -516,6 +512,29 @@ export default function ViewTab() {
       switch (data.type) {
         case 'webViewReady':
           console.log('🌐 WEBVIEW IS READY - can now send messages safely');
+          setWebViewReady(true);
+          
+          // If tab is focused, auto-play now that WebView is ready
+          if (isTabFocusedRef.current && !rewardProcessedRef.current && currentVideo) {
+            console.log('🎬 Auto-playing after WebView ready');
+            setTimeout(() => {
+              if (webViewRef.current) {
+                const jsCode = `
+                  (function() {
+                    console.log('🔵 Injected JS executing playVideo after WebView ready');
+                    if (typeof window.handleMessage === 'function') {
+                      console.log('✅ handleMessage found, calling it');
+                      window.handleMessage({ data: JSON.stringify({ type: 'playVideo' }) });
+                    } else {
+                      console.log('❌ handleMessage not found');
+                    }
+                  })();
+                  true;
+                `;
+                webViewRef.current.injectJavaScript(jsCode);
+              }
+            }, 100);
+          }
           break;
           
         case 'videoLoaded':
