@@ -332,10 +332,6 @@ export default function EditVideoScreen() {
             'Success', 
             deleteResult.message || `Video deleted and 🪙${deleteResult.refund_amount} coins refunded!`
           );
-          // Navigate back with suppress auto-play flag
-          setTimeout(() => {
-            router.push('/(tabs)?suppressAutoPlay=true');
-          }, 1500);
         } catch (error) {
           showError('Error', 'Failed to delete video. Please try again.');
         }
@@ -347,10 +343,8 @@ export default function EditVideoScreen() {
   };
 
   const handleNavigateBack = useCallback(() => {
-    clearQueue();
-    // Set flag to suppress auto-play when returning to video tab
-    router.push('/(tabs)?suppressAutoPlay=true');
-  }, [clearQueue, router]);
+    router.back();
+  }, [router]);
 
   const handleRepromoteVideo = async () => {
     if (!videoData || !user?.id || repromoting || !canRepromote) return;
@@ -383,10 +377,6 @@ export default function EditVideoScreen() {
       clearQueue();
 
       showSuccess('Success', result.message || 'Video repromoted successfully!');
-      // Navigate back with suppress auto-play flag
-      setTimeout(() => {
-        router.push('/(tabs)?suppressAutoPlay=true');
-      }, 1500);
     } catch (error) {
       showError('Error', 'Failed to repromote video. Please try again.');
     } finally {
