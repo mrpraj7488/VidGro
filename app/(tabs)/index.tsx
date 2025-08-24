@@ -808,6 +808,7 @@ export default function ViewTab() {
             let player = null;
             let timerCompleted = false;
             let playerReady = false;
+            let isPlaying = false;
             
             console.log('🌐 WebView JavaScript loaded and ready');
             
@@ -833,20 +834,54 @@ export default function ViewTab() {
             
             function markVideoUnavailable() {
               if (videoUnavailable) return;
+              console.log('🚨 Marking video as unavailable');
               videoUnavailable = true;
               notifyReactNative('videoUnavailable');
             }
             
+            function notifyReactNative(type, data = {}) {
+              try {
+                const message = { type, ...data };
+                console.log('📤 Sending to React Native:', message);
+                window.ReactNativeWebView.postMessage(JSON.stringify(message));
+              } catch (e) {
+                console.log('❌ Failed to notify React Native:', e);
+              }
+            }
+            
             function checkIframeAvailability() {
               const iframe = document.getElementById('youtube-player');
-              if (!iframe || !iframe.src) {
+              console.log('🔍 Checking iframe availability:', {
+                hasIframe: !!iframe,
+                iframeSrc: iframe?.src || 'none',
+                iframeLoaded: iframe?.contentWindow ? 'yes' : 'no'
+              });
+              
+              if (!iframe) {
+                console.log('❌ No iframe found');
                 markVideoUnavailable();
                 return;
               }
               
-              iframe.onerror = () => markVideoUnavailable();
+              if (!iframe.src) {
+                console.log('❌ Iframe has no src');
+                markVideoUnavailable();
+                return;
+              }
               
-              // Remove timeout - let videos load naturally
+              console.log('✅ Iframe looks good, setting up error handler');
+              iframe.onerror = () => {
+                console.log('❌ Iframe onerror triggered');
+                markVideoUnavailable();
+              };
+              
+              // Give iframe time to load before checking
+              setTimeout(() => {
+                if (!videoUnavailable && !playerReady) {
+                  console.log('⏰ Iframe load check after 5s - player not ready yet');
+                  // Don't mark as unavailable immediately, let YouTube API try to load
+                }
+              }, 5000);
             }
             
             checkIframeAvailability();
@@ -902,20 +937,28 @@ export default function ViewTab() {
             }
             
             if (!window.YT) {
+              console.log('📦 Loading YouTube API script');
               const tag = document.createElement('script');
               tag.src = 'https://www.youtube.com/iframe_api';
-              tag.onerror = () => markVideoUnavailable();
+              tag.onerror = () => {
+                console.log('❌ YouTube API script failed to load');
+                markVideoUnavailable();
+              };
+              tag.onload = () => {
+                console.log('✅ YouTube API script loaded');
+              };
               
               const firstScriptTag = document.getElementsByTagName('script')[0];
               firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-              
-              // Remove timeout - let YouTube API load naturally
             } else {
+              console.log('✅ YouTube API already available');
               window.onYouTubeIframeAPIReady();
             }
             
             window.onYouTubeIframeAPIReady = function() {
               if (videoUnavailable) return;
+              
+              console.log('🚀 YouTube API ready, initializing player');
               
               try {
                 player = new YT.Player('youtube-player', {
@@ -925,7 +968,9 @@ export default function ViewTab() {
                     'onError': onPlayerError
                   }
                 });
+                console.log('✅ YouTube player created successfully');
               } catch (e) {
+                console.log('❌ Error creating YouTube player:', e);
                 markVideoUnavailable();
               }
             };
@@ -933,13 +978,16 @@ export default function ViewTab() {
             function onPlayerReady(event) {
               if (videoUnavailable) return;
               
+              console.log('🎬 YouTube player ready event triggered');
               playerReady = true;
               
               try {
                 const videoData = event.target.getVideoData();
+                console.log('📊 Video data:', videoData);
                 
-                if (!videoData || !videoData.title || videoData.title === '' || 
-                    videoData.title === 'YouTube' || videoData.errorCode) {
+                // Be more lenient with video data validation
+                if (!videoData) {
+                  console.log('❌ No video data available');
                   markVideoUnavailable();
                   return;
                 }
@@ -954,9 +1002,11 @@ export default function ViewTab() {
                   notifyReactNative('videoPlaying');
                 }
                 
+                console.log('✅ Video loaded successfully');
                 notifyReactNative('videoLoaded');
                 
               } catch (e) {
+                console.log('❌ Error in onPlayerReady:', e);
                 markVideoUnavailable();
               }
             }
