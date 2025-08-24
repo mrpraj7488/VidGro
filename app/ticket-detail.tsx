@@ -20,24 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  Send, 
-  Paperclip, 
-  X, 
-  ArrowLeft, 
-  Shield, 
-  User as UserIcon,
-  FileText,
-  Image as ImageIcon,
-  Download,
-  Check,
-  RefreshCw,
-  AlertCircle,
-  Clock,
-  MessageSquare,
-  CheckCircle,
-  XCircle
-} from 'lucide-react-native';
+import { Send, Paperclip, X, ArrowLeft, Shield, User as UserIcon, FileText, Image as ImageIcon, Download, Check, RefreshCw, CircleAlert as AlertCircle, Clock, MessageSquare, CircleCheck as CheckCircle, Circle as XCircle } from 'lucide-react-native';
 import { getSupabase } from '@/lib/supabase';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import CustomAlert from '@/components/CustomAlert';
