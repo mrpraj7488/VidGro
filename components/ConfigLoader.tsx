@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useConfig } from '../contexts/ConfigContext';
-import { Shield, TriangleAlert as AlertTriangle, RefreshCw } from 'lucide-react-native';
+import { Shield, AlertTriangle, RefreshCw } from 'lucide-react-native';
 
 interface ConfigLoaderProps {
   children: React.ReactNode;
@@ -42,10 +42,10 @@ export default function ConfigLoader({ children }: ConfigLoaderProps) {
             </Text>
             
             <View style={styles.errorActions}>
-              <Text style={styles.retryButton} onPress={() => refreshConfig()}>
+              <TouchableOpacity style={styles.retryButton} onPress={() => refreshConfig()}>
                 <RefreshCw size={16} color="#4A90E2" />
                 <Text style={styles.retryText}>Retry</Text>
-              </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
