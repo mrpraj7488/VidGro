@@ -35,9 +35,9 @@ const isTinyScreen = screenWidth < 350;
 const isSmallScreen = screenWidth < 380;
 const isTablet = screenWidth >= 768;
 
-const AnimatedTouchableOpacity = AnimatedComponent.create(TouchableOpacity);
+const AnimatedTouchableOpacity = AnimatedComponent.createAnimatedComponent(TouchableOpacity);
 
-function ContactSupportScreen() {
+export default function ContactSupportScreen() {
   const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
   const router = useRouter();
@@ -1464,5 +1464,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
-export default ContactSupportScreen;
