@@ -69,9 +69,9 @@ export default function ViewTab() {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastVideoIdRef = useRef<string | null>(null);
   const suppressAutoPlayRef = useRef(false);
-  const videoLoadTimeoutRef = useRef<number | null>(null);
+  const videoLoadTimeoutRef = useRef<any>(null);
   const videoLoadedRef = useRef(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<any>(null);
   const watchTimerRef = useRef(0);
   const autoSkipEnabledRef = useRef(true);
   const currentVideoRef = useRef<any>(null);
@@ -356,14 +356,37 @@ export default function ViewTab() {
     setWebViewReady(false);
     
     // Set up video load timeout
-    videoLoadTimeoutRef.current = window.setTimeout(() => {
+    videoLoadTimeoutRef.current = setTimeout(() => {
       if (!videoLoadedRef.current) {
         console.log('⏰ Video load timeout - showing error');
         setVideoError(true);
         setShowRefreshButton(true);
       }
-    }, 15000);
+    }, 15000) as any;
   }, []);
+
+  // Timer management
+  const startTimer = useCallback(() => {
+    if (timerRef.current) return; // Already running
+
+    timerRef.current = setInterval(() => {
+      const isPaused = timerPausedRef.current;
+      const isLoaded = videoLoadedRef.current;
+      const isPlaying = isVideoPlayingRef.current;
+      const isFocused = isTabFocusedRef.current;
+      
+      if (!isPaused && isLoaded && isPlaying && isFocused) {
+        watchTimerRef.current += 1;
+        setWatchTimer(watchTimerRef.current);
+        
+        const targetDuration = currentVideo?.duration_seconds || 0;
+        
+        if (watchTimerRef.current >= targetDuration && !rewardProcessedRef.current) {
+          handleVideoCompletion();
+        }
+      }
+    }, 1000);
+  }, [currentVideo]);
 
   // Start video playback
   const startVideoPlayback = useCallback(() => {
@@ -387,29 +410,6 @@ export default function ViewTab() {
 
     startTimer();
   }, [currentVideo, webViewReady, startTimer]);
-
-  // Timer management
-  const startTimer = useCallback(() => {
-    if (timerRef.current) return; // Already running
-
-    timerRef.current = setInterval(() => {
-      const isPaused = timerPausedRef.current;
-      const isLoaded = videoLoadedRef.current;
-      const isPlaying = isVideoPlayingRef.current;
-      const isFocused = isTabFocusedRef.current;
-      
-      if (!isPaused && isLoaded && isPlaying && isFocused) {
-        watchTimerRef.current += 1;
-        setWatchTimer(watchTimerRef.current);
-        
-        const targetDuration = currentVideo?.duration_seconds || 0;
-        
-        if (watchTimerRef.current >= targetDuration && !rewardProcessedRef.current) {
-          handleVideoCompletion();
-        }
-      }
-    }, 1000);
-  }, [currentVideo, handleVideoCompletion]);
 
   // Handle video completion
   const handleVideoCompletion = useCallback(async () => {
@@ -1080,12 +1080,37 @@ export default function ViewTab() {
     `;
   }, []);
 
+  // Extract YouTube video ID from URL
+  const extractYouTubeId = useCallback((url: string): string => {
+    if (!url) return '';
+    
+    // If it's already just an ID (11 characters), return it
+    if (url.length === 11 && !/[^a-zA-Z0-9_-]/.test(url)) {
+      return url;
+    }
+    
+    // Extract from various YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+      /^([a-zA-Z0-9_-]{11})$/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
+    
+    return '';
+  }, []);
+
   // Memoize HTML content to prevent unnecessary regeneration
   const htmlContent = useMemo(() => {
-    const videoId = currentVideo?.youtube_url || '';
-    console.log('🎬 Creating HTML content for video ID:', videoId);
+    const videoId = extractYouTubeId(currentVideo?.youtube_url || '');
+    console.log('🎬 Creating HTML content for video ID:', videoId, 'from URL:', currentVideo?.youtube_url);
     return createHtmlContent(videoId);
-  }, [currentVideo?.youtube_url, createHtmlContent]);
+  }, [currentVideo?.youtube_url, createHtmlContent, extractYouTubeId]);
 
   // Handle real-time updates
   useEffect(() => {
@@ -1110,7 +1135,18 @@ export default function ViewTab() {
   // Utility functions
   const handleOpenYouTube = () => {
     if (currentVideo?.youtube_url) {
-      const youtubeUrl = `https://www.youtube.com/watch?v=${currentVideo.youtube_url}`;
+      let youtubeUrl = currentVideo.youtube_url;
+      
+      // If it's just a video ID, construct the full URL
+      if (youtubeUrl.length === 11 && !/[^a-zA-Z0-9_-]/.test(youtubeUrl)) {
+        youtubeUrl = `https://www.youtube.com/watch?v=${youtubeUrl}`;
+      }
+      // If it doesn't start with http, assume it needs the full URL
+      else if (!youtubeUrl.startsWith('http')) {
+        const videoId = extractYouTubeId(youtubeUrl);
+        youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      }
+      
       Linking.openURL(youtubeUrl).catch(() => {
         Alert.alert('Error', 'Could not open YouTube video');
       });
