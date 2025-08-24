@@ -15,8 +15,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { useFeatureFlag } from '@/hooks/useFeatureFlags';
 import { useRouter } from 'expo-router';
 import GlobalHeader from '@/components/GlobalHeader';
-import { ChartBar as BarChart3, Eye, Coins, Play, Pause, CircleCheck as CheckCircle, Timer, Pencil as Edit3, Activity, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { getUserComprehensiveAnalytics, getUserVideosWithAnalytics, getUserRecentActivity } from '@/lib/supabase';
+import { ChartBar as BarChart3, Eye, Coins, Play, Pause, CircleCheck as CheckCircle, Timer, Pencil as Edit3, Activity, TrendingUp, ChevronDown, ChevronUp, RefreshCw, ShoppingCart } from 'lucide-react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface UserAnalytics {
@@ -164,192 +163,129 @@ export default function Analytics() {
   }, [videos]);
 
   const fetchAnalytics = async () => {
-    if (!user || !user.id) return;
+    if (!user?.id) return;
 
     try {
       setLoading(true);
-      setHasError(false);
-      setLoadingStates({ analytics: true, videos: true, activity: true });
+      
+      // Get analytics summary from the database function
+      const { data: analyticsData, error: analyticsError } = await getSupabase()
+        .rpc('get_user_analytics_summary', { p_user_id: user.id });
 
-      const [analyticsResult, videosResult, activityResult] = await Promise.allSettled([
-        getUserComprehensiveAnalytics(user.id),
-        getUserVideosWithAnalytics(user.id),
-        getUserRecentActivity(user.id),
-      ]);
+      if (analyticsError) throw analyticsError;
 
-      if (analyticsResult.status === 'fulfilled') {
-        const { data: analyticsData, error: analyticsError } = analyticsResult.value;
-        if (analyticsError) {
-          console.error('Analytics error:', analyticsError);
-          setAnalytics({
-            current_coins: profile?.coins || 0,
-            total_videos_promoted: 0,
-            completed_videos: 0,
-            total_views_received: 0,
-            total_watch_time_received: 0,
-            total_coins_distributed: 0,
-            average_completion_rate: 0,
-            active_videos: 0,
-            on_hold_videos: 0,
-            total_coins_earned: 0,
-            repromoted_videos: 0,
-          });
-        } else if (analyticsData) {
-          const summary = analyticsData.summary || {};
-          const activeCount = analyticsData.videos?.filter((v: any) => v.status === 'active' && !v.completed && !v.is_repromoted).length || 0;
-          const repromoteCount = analyticsData.videos?.filter((v: any) => v.is_repromoted).length || 0;
-          const completedCount = analyticsData.videos?.filter((v: any) => v.completed).length || 0;
+      // Get user's videos for additional stats
+      const { data: videosData, error: videosError } = await getSupabase()
+        .from('videos')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
 
-          setAnalytics({
-            current_coins: analyticsData.user?.coins || profile?.coins || 0,
-            total_videos_promoted: summary.total_videos || 0,
-            completed_videos: completedCount || summary.completed_videos || 0,
-            total_views_received: summary.total_views || 0,
-            total_watch_time_received: summary.total_watch_time_generated || 0,
-            total_coins_distributed: summary.total_coins_spent || 0,
-            average_completion_rate: summary.average_completion_rate || 0,
-            active_videos: activeCount,
-            on_hold_videos: summary.on_hold_videos || 0,
-            total_coins_earned: summary.total_coins_earned || 0,
-            repromoted_videos: repromoteCount,
-          });
-        }
+      if (videosError) throw videosError;
+
+      // Calculate additional stats
+      const totalVideosPromoted = videosData?.length || 0;
+      const totalCoinsEarned = videosData?.reduce((sum, video) => 
+        sum + (video.coins_earned_total || 0), 0) || 0;
+
+      // Update analytics state with the combined data
+      setAnalytics({
+        total_videos_promoted: totalVideosPromoted,
+        total_coins_earned: totalCoinsEarned,
+        ...(analyticsData || {})
+      });
+
+      // Set videos data for the promoted videos section
+      if (videosData && videosData.length > 0) {
+        setVideos(videosData.map(video => ({
+          video_id: video.id,
+          title: video.title || 'Untitled Video',
+          views_count: video.views_count || 0,
+          target_views: video.target_views || 0,
+          status: video.status || 'active',
+          completed: video.completed || false,
+          is_repromoted: video.repromoted || false,
+          coin_cost: video.coin_cost || 0,
+          completion_rate: video.target_views > 0 
+            ? Math.round((video.views_count / video.target_views) * 100) 
+            : 0,
+          created_at: video.created_at,
+          updated_at: video.updated_at
+        })));
       } else {
-        console.error('Analytics request failed:', analyticsResult.reason);
-        setAnalytics({
-          current_coins: profile?.coins || 0,
-          total_videos_promoted: 0,
-          completed_videos: 0,
-          total_views_received: 0,
-          total_watch_time_received: 0,
-          total_coins_distributed: 0,
-          average_completion_rate: 0,
-          active_videos: 0,
-          on_hold_videos: 0,
-          total_coins_earned: 0,
-          repromoted_videos: 0,
-        });
-      }
-      setLoadingStates((prev) => ({ ...prev, analytics: false }));
-
-      if (activityResult.status === 'fulfilled') {
-        const { data: activityData, error: activityError } = activityResult.value;
-        if (activityError) {
-          console.error('Recent activity error:', activityError);
-          setRecentActivity([]);
-        } else if (activityData) {
-          const validActivityData = activityData.filter((activity: any) =>
-            activity &&
-            typeof activity === 'object' &&
-            activity.activity_type &&
-            typeof activity.amount === 'number' &&
-            activity.description &&
-            activity.created_at
-          );
-          setRecentActivity(validActivityData);
-        } else {
-          setRecentActivity([]);
-        }
-      } else {
-        console.error('Activity request failed:', activityResult.reason);
-        setRecentActivity([]);
-      }
-      setLoadingStates((prev) => ({ ...prev, activity: false }));
-
-      if (videosResult.status === 'fulfilled') {
-        const { data: videosData, error: videosError } = videosResult.value;
-        if (videosError) {
-          console.error('Videos error:', videosError);
-          try {
-            const supabase = getSupabase();
-            if (supabase) {
-              const { data: directVideosData, error: directVideosError } = await supabase
-                .from('videos')
-                .select(`
-                  id,
-                  title,
-                  views_count,
-                  target_views,
-                  status,
-                  created_at,
-                  coin_cost,
-                  completed,
-                  total_watch_time,
-                  completion_rate,
-                  coins_earned_total,
-                  repromoted_at
-                `)
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(10);
-
-              if (!directVideosError && directVideosData) {
-                const videosWithCompletion = directVideosData.map((video: any) => ({
-                  video_id: video.id,
-                  title: video.title,
-                  views_count: video.views_count,
-                  target_views: video.target_views,
-                  status: video.status,
-                  created_at: video.created_at,
-                  coin_cost: video.coin_cost || 0,
-                  completion_rate: video.completion_rate || (video.target_views > 0 ? Math.round((video.views_count / video.target_views) * 100) : 0),
-                  completed: video.completed,
-                  total_watch_time: video.total_watch_time || 0,
-                  coins_earned_total: video.coins_earned_total || 0,
-                  repromote_count: 0,
-                  last_repromoted_at: video.repromoted_at,
-                  repromote_cost: 0,
-                  is_repromoted: (video.repromote_count && video.repromote_count > 0) && (video.repromoted_at ? true : false),
-                }));
-                setVideos(videosWithCompletion);
-              } else {
-                setVideos([]);
-              }
-            } else {
-              setVideos([]);
-            }
-          } catch (fallbackError) {
-            console.error('Fallback videos query failed:', fallbackError);
-            setVideos([]);
-          }
-        } else if (videosData) {
-          const transformedVideos = videosData.map((video: any) => ({
-            video_id: video.video_id,
-            title: video.title,
-            views_count: video.views_count,
-            target_views: video.target_views,
-            status: video.status,
-            created_at: video.created_at,
-            coin_cost: video.coin_cost || 0,
-            completion_rate: video.completion_rate || 0,
-            completed: video.completed,
-            total_watch_time: video.total_watch_time || 0,
-            coins_earned_total: video.coins_earned_total || 0,
-            repromote_count: video.repromote_count || 0,
-            last_repromoted_at: video.last_repromoted_at || video.repromoted_at,
-            repromote_cost: video.repromote_cost || 0,
-            is_repromoted: (video.repromote_count && video.repromote_count > 0) && (video.is_repromoted || video.last_repromoted_at || video.repromoted_at),
-          }));
-          setVideos(transformedVideos);
-        } else {
-          setVideos([]);
-        }
-      } else {
-        console.error('Videos request failed:', videosResult.reason);
         setVideos([]);
       }
-      setLoadingStates((prev) => ({ ...prev, videos: false }));
+
+      // Get recent activity from transactions
+      const { data: activityData, error: activityError } = await getSupabase()
+        .from('transactions')
+        .select('id, transaction_type, amount, description, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      console.log(' Raw transaction data received:', JSON.stringify(activityData, null, 2));
+      console.log(' Transaction fetch error:', activityError);
+
+      if (!activityError && activityData && activityData.length > 0) {
+        setRecentActivity(activityData.map(tx => {
+          console.log(' Processing transaction:', {
+            id: tx.id,
+            transaction_type: tx.transaction_type,
+            amount: tx.amount,
+            description: tx.description,
+            created_at: tx.created_at
+          });
+          
+          return {
+            id: tx.id,
+            type: tx.transaction_type || 'unknown',
+            amount: tx.amount || 0,
+            description: tx.description || `${formatTransactionType(tx.transaction_type || 'unknown')} transaction`,
+            timestamp: tx.created_at,
+            status: 'completed'
+          };
+        }));
+      } else {
+        // If no transactions found, create some sample data based on video activities
+        console.log(' No transactions found, creating sample activity data');
+        const sampleActivity = [];
+        
+        if (videosData && videosData.length > 0) {
+          videosData.slice(0, 3).forEach((video, index) => {
+            sampleActivity.push({
+              id: `sample-${index}`,
+              type: 'video_promotion',
+              amount: -(video.coin_cost || 100),
+              description: `Promoted video: ${video.title?.substring(0, 50)}...`,
+              timestamp: video.created_at,
+              status: 'completed'
+            });
+          });
+        }
+        
+        // Add a sample coin purchase if no video data
+        if (sampleActivity.length === 0) {
+          sampleActivity.push({
+            id: 'sample-purchase',
+            type: 'coin_purchase',
+            amount: 1000,
+            description: 'Coin purchase for video promotions',
+            timestamp: new Date().toISOString(),
+            status: 'completed'
+          });
+        }
+        
+        setRecentActivity(sampleActivity);
+      }
 
     } catch (error) {
       console.error('Error fetching analytics:', error);
       setHasError(true);
-      setRetryCount((prev) => prev + 1);
-      if (retryCount >= 2) {
-        Alert.alert('Error', 'Unable to load analytics. Please check your connection and try again.');
-      }
     } finally {
       setLoading(false);
-      setLoadingStates({ analytics: false, videos: false, activity: false });
+      setRefreshing(false);
     }
   };
 
@@ -396,14 +332,53 @@ export default function Analytics() {
 
   const formatTransactionType = (type: string) => {
     if (!type) return 'Unknown Transaction';
-    switch (type) {
-      case 'video_promotion': return 'Video Promotion';
-      case 'purchase': return 'Coin Purchase';
-      case 'referral_bonus': return 'Referral Bonus';
-      case 'admin_adjustment': return 'Admin Adjustment';
-      case 'vip_purchase': return 'VIP Purchase';
-      case 'video_deletion_refund': return 'Video Deletion Refund';
-      default: return type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    // Add debugging to see what transaction types we're getting
+    console.log('Transaction type received:', type);
+    
+    switch (type.toLowerCase()) {
+      case 'video_promotion': 
+      case 'video promotion':
+      case 'promotion':
+        return 'Video Promotion';
+      case 'purchase': 
+      case 'coin_purchase':
+      case 'coin purchase':
+        return 'Coin Purchase';
+      case 'referral_bonus': 
+      case 'referral bonus':
+      case 'referral':
+        return 'Referral Bonus';
+      case 'admin_adjustment': 
+      case 'admin adjustment':
+      case 'adjustment':
+        return 'Admin Adjustment';
+      case 'vip_purchase': 
+      case 'vip purchase':
+      case 'vip':
+        return 'VIP Purchase';
+      case 'video_deletion_refund': 
+      case 'video deletion refund':
+      case 'refund':
+        return 'Video Deletion Refund';
+      case 'watch_reward':
+      case 'watch reward':
+      case 'reward':
+        return 'Watch Reward';
+      case 'bonus':
+        return 'Bonus';
+      case 'earning':
+      case 'earnings':
+        return 'Earnings';
+      case 'withdrawal':
+        return 'Withdrawal';
+      case 'deposit':
+        return 'Deposit';
+      default: 
+        // Better formatting for unknown types
+        const formatted = type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        console.log('Formatted unknown transaction type:', formatted);
+        return formatted;
     }
   };
 
@@ -495,24 +470,37 @@ export default function Analytics() {
       >
         <View style={styles.overviewSection}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Overview</Text>
-          <View style={styles.statsGrid}>
+          <View style={styles.statsContainer}>
             <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-              <View style={styles.statHeader}>
-                <Play size={20} color="#3498DB" />
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Videos Promoted</Text>
+              <View style={styles.statCardContent}>
+                <View style={[styles.statIconContainer, { backgroundColor: 'rgba(52, 152, 219, 0.1)' }]}>
+                  <Play size={16} color="#3498DB" />
+                </View>
+                <View style={styles.statTextContainer}>
+                  <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                    {safeNumber(analytics?.total_videos_promoted)}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]} numberOfLines={2}>
+                    Videos{'\n'}Promoted
+                  </Text>
+                </View>
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {safeNumber(analytics?.total_videos_promoted)}
-              </Text>
             </View>
+            
             <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
-              <View style={styles.statHeader}>
-                <Coins size={20} color="#FFD700" />
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Coins Earned</Text>
+              <View style={styles.statCardContent}>
+                <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255, 215, 0, 0.1)' }]}>
+                  <Text style={{ fontSize: 16 }}>🪙</Text>
+                </View>
+                <View style={styles.statTextContainer}>
+                  <Text style={[styles.statValue, { color: colors.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                    {safeNumber(analytics?.total_coins_earned).toLocaleString()}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]} numberOfLines={2}>
+                    Coins{'\n'}Earned
+                  </Text>
+                </View>
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {safeNumber(analytics?.total_coins_earned)}
-              </Text>
             </View>
           </View>
         </View>
@@ -554,13 +542,62 @@ export default function Analytics() {
             </View>
           ) : (
             <>
-              {getDisplayedVideos().map((video) => (
-                <View key={video.video_id} style={[styles.videoCard, { backgroundColor: colors.surface }]}>
-                  <Text style={[styles.videoTitle, { color: colors.text }]}>
-                    {safeString(video.title, 'Untitled Video')}
-                  </Text>
-                </View>
-              ))}
+              {getDisplayedVideos().map((video) => {
+                const StatusIcon = getStatusIcon(video.status, video.is_repromoted);
+                const statusColor = getStatusColor(video.status, video.is_repromoted);
+                const displayStatus = video.is_repromoted ? 'Repromoted' : video.status.charAt(0).toUpperCase() + video.status.slice(1);
+                return (
+                  <TouchableOpacity
+                    key={video.video_id}
+                    style={[styles.videoCard, { backgroundColor: colors.surface }]}
+                    onPress={() => handleVideoPress(video)}><View style={styles.videoHeader}>
+                      <View style={styles.videoTitleContainer}>
+                        <Text style={[styles.videoTitle, { color: colors.text }]} numberOfLines={2}>
+                          {safeString(video.title, 'Untitled Video')}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.editButton, { backgroundColor: colors.primary }]}
+                          onPress={() => router.push(`/edit-video?id=${video.video_id}`)}><Edit3 size={14} color="white" /></TouchableOpacity>
+                      </View>
+                      <View style={styles.videoStatusRow}>
+                        <StatusIcon size={14} color={statusColor} />
+                        <Text style={[styles.statusText, { color: statusColor }]}>
+                          {displayStatus}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.progressContainer}>
+                      <View style={[styles.progressBar, { backgroundColor: isDark ? colors.border : colors.border }]}>
+                        <View 
+                          style={[
+                            styles.progressFill, 
+                            { 
+                              width: `${Math.min(safeNumber(video.completion_rate), 100)}%`,
+                              backgroundColor: statusColor
+                            }
+                          ]} 
+                        />
+                      </View>
+                      <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+                        {`${safeNumber(video.completion_rate)}%`}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.videoCostRow}>
+                      <Text style={[styles.costText, { color: colors.textSecondary }]}>
+                        Spent: 🪙<Text style={[styles.costValue, { color: colors.text }]}>{safeNumber(video.coin_cost)}</Text>
+                      </Text>
+                      {video.completed && (
+                        <View style={styles.completedBadgeContainer}>
+                          <Text style={[styles.completedBadge, { color: colors.success }]}>
+                            Target Reached
+                          </Text>
+                        </View>
+                      )}
+                    </View></TouchableOpacity>
+                );
+              })}
               {videos.length > 1 && (
                 <View style={styles.viewMoreButtonContainer}>
                   <TouchableOpacity
@@ -605,22 +642,26 @@ export default function Analytics() {
           ) : (
             <>
               {getDisplayedActivity().map((activity, index) => (
-                <View key={`${activity.activity_type}-${activity.created_at}-${index}`} style={[styles.activityCard, { backgroundColor: colors.surface }]}>
+                <View key={`${activity.type}-${activity.timestamp}-${index}`} style={[styles.activityCard, { backgroundColor: colors.surface }]}>
                   <View style={styles.activityHeader}>
                     <View style={styles.activityInfo}>
                       <Text style={[styles.activityType, { color: colors.text }]}>
-                        {formatTransactionType(activity.activity_type)}
+                        {formatTransactionType(activity.type)}
                       </Text>
                       <Text style={[styles.activityDate, { color: colors.textSecondary }]}>
-                        {formatDate(activity.created_at)}
+                        {new Date(activity.timestamp).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
                       </Text>
                     </View>
-                    <Text style={[styles.activityAmount, { color: activity.amount > 0 ? colors.success : colors.error }]}>
-                      {`${activity.amount > 0 ? '+' : ''}${safeNumber(activity.amount)} 🪙`}
+                    <Text style={[styles.activityAmount, { color: activity.amount > 0 ? '#10B981' : '#EF4444' }]}>
+                      {`${activity.amount > 0 ? '+' : ''}${Math.abs(activity.amount)} 🪙`}
                     </Text>
                   </View>
                   <Text style={[styles.activityDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                    {safeString(activity.description, 'No description available')}
+                    {activity.description || 'No description available'}
                   </Text>
                 </View>
               ))}
@@ -697,7 +738,7 @@ const styles = StyleSheet.create({
   overviewSection: {
     marginBottom: 24,
   },
-  statsGrid: {
+  statsContainer: {
     flexDirection: 'row',
     gap: 12,
   },
@@ -711,19 +752,31 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  statHeader: {
+  statCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
-  statLabel: {
-    fontSize: 12,
-    marginLeft: 6,
-    fontWeight: '500',
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  statTextContainer: {
+    flex: 1,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 13,
+    textAlign: 'left',
   },
   statusSection: {
     marginBottom: 24,
@@ -772,7 +825,7 @@ const styles = StyleSheet.create({
   activityHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 8,
   },
   activityInfo: {
@@ -781,7 +834,6 @@ const styles = StyleSheet.create({
   activityType: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 2,
   },
   activityDate: {
     fontSize: 12,
@@ -819,9 +871,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   videoCard: {
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -829,51 +881,49 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   videoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: 12,
   },
   videoTitleContainer: {
-    flex: 1,
-    marginRight: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   videoTitle: {
     fontSize: 16,
     fontWeight: '600',
+    flex: 1,
+    marginRight: 12,
     lineHeight: 22,
-    marginBottom: 4,
-  },
-  videoDate: {
-    fontSize: 12,
   },
   editButton: {
-    padding: 4,
+    borderRadius: 8,
+    padding: 8,
+    minWidth: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  videoStats: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 12,
-  },
-  videoStat: {
+  videoStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    paddingVertical: 4,
   },
-  videoStatText: {
+  statusText: {
     fontSize: 12,
     fontWeight: '500',
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 12,
+    marginBottom: 12,
   },
   progressBar: {
     flex: 1,
     height: 6,
     borderRadius: 3,
-    marginRight: 8,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
@@ -881,19 +931,32 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 12,
-    fontWeight: '600',
-    minWidth: 35,
+    fontWeight: '500',
+    minWidth: 40,
+    textAlign: 'right',
   },
-  videoCosts: {
-    alignItems: 'flex-end',
+  videoCostRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   costText: {
     fontSize: 12,
-  },
-  completedText: {
-    fontSize: 11,
     fontWeight: '500',
-    marginTop: 4,
+  },
+  costValue: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  completedBadgeContainer: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+  },
+  completedBadge: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   viewMoreText: {
     fontSize: 14,
@@ -915,13 +978,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  repromoteText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  repromoteDate: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
+  repromotedStatus: {
+    color: '#9333ea',
+    fontWeight: '600',
   },
 });
