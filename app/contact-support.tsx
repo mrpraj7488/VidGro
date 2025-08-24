@@ -1195,16 +1195,16 @@ const styles = StyleSheet.create({
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
     justifyContent: 'space-between',
   },
   categoryCard: {
-    width: (screenWidth - 56) / 2, // Proper 2-column layout with margins
+    width: '48%', // Ensures exactly 2 cards per row with proper spacing
     padding: 10,
     borderRadius: 12,
     alignItems: 'center',
     minHeight: 85,
     justifyContent: 'center',
+    marginBottom: 8,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
