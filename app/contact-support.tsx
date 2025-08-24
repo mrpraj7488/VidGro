@@ -785,9 +785,11 @@ function ContactSupportScreen() {
                 maxLength={100}
                 selectionColor={colors.primary}
               />
-              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
-                {subject.length}/100
-              </Text>
+              <View style={styles.charCountContainer}>
+                <Text style={[styles.charCount, { color: colors.textSecondary }]}>
+                  {subject.length}/100
+                </Text>
+              </View>
             </View>
           </LinearGradient>
         </Animated.View>
@@ -1197,11 +1199,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   categoryCard: {
-    width: (screenWidth - 48) / 2, // Consistent 2-column layout
-    padding: 12,
+    width: (screenWidth - 56) / 2, // Proper 2-column layout with margins
+    padding: 10,
     borderRadius: 12,
     alignItems: 'center',
-    minHeight: 90,
+    minHeight: 85,
     justifyContent: 'center',
     ...Platform.select({
       ios: {
@@ -1383,9 +1385,19 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: 8,
   },
+  charCountContainer: {
+    position: 'absolute',
+    bottom: 8,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
   charCount: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 10,
+    fontWeight: '600',
+    opacity: 0.7,
   },
 
   // Submit Button - Enhanced
