@@ -211,8 +211,14 @@ export default function ViewTab() {
         console.log('❌ CANNOT auto-play:', {
           hasCurrentVideo: !!currentVideo,
           hasWebViewRef: !!webViewRef.current,
-          suppressAutoPlay: suppressAutoPlayRef.current
+          suppressAutoPlay: suppressAutoPlayRef.current,
+          reason: !currentVideo ? 'no video' : !webViewRef.current ? 'webview not ready' : 'suppressed'
         });
+        
+        // If WebView isn't ready yet, the webViewReady handler will trigger auto-play
+        if (currentVideo && !webViewRef.current) {
+          console.log('⏳ WebView not ready yet, will auto-play when webViewReady message received');
+        }
       }
 
       return () => {
@@ -478,6 +484,25 @@ export default function ViewTab() {
       switch (data.type) {
         case 'webViewReady':
           console.log('🌐 WEBVIEW IS READY - can now send messages safely');
+          
+          // If tab is focused and we have a video, auto-play now that WebView is ready
+          if (isTabFocusedRef.current && currentVideo && !rewardProcessedRef.current && webViewRef.current) {
+            console.log('▶️ AUTO-PLAYING video now that WebView is ready');
+            webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+            webViewRef.current.injectJavaScript(`
+              if (window.handleReactNativeMessage) {
+                window.handleReactNativeMessage('{"type":"playVideo"}');
+              }
+              true;
+            `);
+            
+            // Update state immediately
+            setIsVideoPlaying(true);
+            isVideoPlayingRef.current = true;
+            setTimerPaused(false);
+            timerPausedRef.current = false;
+            startTimer();
+          }
           break;
           
         case 'videoLoaded':
