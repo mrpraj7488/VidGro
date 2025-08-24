@@ -192,7 +192,14 @@ export default function ViewTab() {
       // Simple auto-play when tab becomes focused
       if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
         console.log('▶️ SENDING playVideo message to WebView');
+        // Try both methods to send message
         webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+        webViewRef.current.injectJavaScript(`
+          if (window.handleReactNativeMessage) {
+            window.handleReactNativeMessage('{"type":"playVideo"}');
+          }
+          true;
+        `);
         
         // Also update state immediately to restart timer
         setIsVideoPlaying(true);
@@ -216,6 +223,12 @@ export default function ViewTab() {
         if (webViewRef.current) {
           console.log('⏸️ SENDING pauseVideo message to WebView');
           webViewRef.current.postMessage(JSON.stringify({ type: 'pauseVideo' }));
+          webViewRef.current.injectJavaScript(`
+            if (window.handleReactNativeMessage) {
+              window.handleReactNativeMessage('{"type":"pauseVideo"}');
+            }
+            true;
+          `);
         }
         
         console.log('🔄 UPDATING state: timer paused, video stopped');
@@ -488,6 +501,12 @@ export default function ViewTab() {
             console.log('▶️ AUTO-PLAYING video after load');
             if (webViewRef.current) {
               webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+              webViewRef.current.injectJavaScript(`
+                if (window.handleReactNativeMessage) {
+                  window.handleReactNativeMessage('{"type":"playVideo"}');
+                }
+                true;
+              `);
             }
             
             // Also start timer and update state immediately for auto-play
@@ -720,37 +739,34 @@ export default function ViewTab() {
             notifyWebViewReady();
             
             let videoUnavailable = false;
+            let playerInitialized = false;
             
             const securityOverlay = document.getElementById('security-overlay');
             const playPauseButton = document.getElementById('play-pause-button');
             const videoContainer = document.getElementById('video-container');
             
             function markVideoUnavailable() {
-              if (videoUnavailable) return;
+              if (videoUnavailable || playerInitialized) return; // Don't mark unavailable if player initialized
               videoUnavailable = true;
+              console.log('❌ Marking video as unavailable');
               notifyReactNative('videoUnavailable');
             }
             
             function checkIframeAvailability() {
+              // Skip this check entirely - let YouTube API handle errors
               const iframe = document.getElementById('youtube-player');
-              if (!iframe) {
-                // Only mark unavailable if iframe element doesn't exist at all
-                console.log('❌ No iframe element found');
-                markVideoUnavailable();
-                return;
+              if (iframe) {
+                iframe.onerror = () => {
+                  if (!playerInitialized) {
+                    console.log('❌ Iframe error occurred before player init');
+                    markVideoUnavailable();
+                  }
+                };
               }
-              
-              // Don't check src - YouTube API creates iframe without src initially
-              iframe.onerror = () => {
-                console.log('❌ Iframe error occurred');
-                markVideoUnavailable();
-              };
             }
             
-            // Delay check to allow YouTube API to initialize
-            setTimeout(() => {
-              checkIframeAvailability();
-            }, 1000);
+            // Don't check immediately - wait for player to initialize
+            checkIframeAvailability();
             
             function handleMessage(event) {
               try {
@@ -794,13 +810,33 @@ export default function ViewTab() {
             }
             
             // React Native WebView message handling
-            window.addEventListener('message', handleMessage);
-            document.addEventListener('message', handleMessage);
+            console.log('🔧 Setting up message listeners');
             
-            // Direct React Native WebView message handler
-            if (typeof window !== 'undefined') {
-              window.onmessage = handleMessage;
+            // Create a global function that React Native can call directly
+            window.handleReactNativeMessage = function(data) {
+              console.log('📬 Direct message from React Native:', data);
+              try {
+                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                handleMessage({ data: parsed });
+              } catch (e) {
+                console.log('❌ Error parsing direct message:', e);
+              }
+            };
+            
+            // Also listen for standard message events
+            window.addEventListener('message', (event) => {
+              console.log('📬 Message via addEventListener:', event.data);
+              handleMessage(event);
+            });
+            
+            // Check for ReactNativeWebView
+            if (window.ReactNativeWebView) {
+              console.log('✅ ReactNativeWebView object exists');
+            } else {
+              console.log('❌ ReactNativeWebView object not found');
             }
+            
+            console.log('✅ Message handlers ready');
             
             if (!window.YT) {
               const tag = document.createElement('script');
@@ -835,15 +871,20 @@ export default function ViewTab() {
               if (videoUnavailable) return;
               
               playerReady = true;
+              playerInitialized = true; // Mark player as initialized
+              console.log('✅ YouTube player is ready');
               
               try {
                 const videoData = event.target.getVideoData();
                 
                 if (!videoData || !videoData.title || videoData.title === '' || 
                     videoData.title === 'YouTube' || videoData.errorCode) {
+                  console.log('❌ Invalid video data:', videoData);
                   markVideoUnavailable();
                   return;
                 }
+                
+                console.log('📹 Video loaded successfully:', videoData.title);
                 
                 // Check if there's a pending play request
                 if (window.pendingPlayRequest) {
@@ -858,6 +899,7 @@ export default function ViewTab() {
                 notifyReactNative('videoLoaded');
                 
               } catch (e) {
+                console.log('❌ Error in onPlayerReady:', e);
                 markVideoUnavailable();
               }
             }
@@ -1156,11 +1198,18 @@ export default function ViewTab() {
           javaScriptEnabled={true}
           domStorageEnabled={true}
           allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          scrollEnabled={false}
-          bounces={false}
-          cacheEnabled={true}
-          cacheMode="LOAD_DEFAULT"
+          injectedJavaScript={`
+            (function() {
+              const originalPostMessage = window.postMessage;
+              window.postMessage = function(data) {
+                console.log('📨 Injected JS received postMessage:', data);
+                window.dispatchEvent(new MessageEvent('message', { data: data }));
+                return originalPostMessage.apply(this, arguments);
+              };
+              console.log('✅ Injected JavaScript message handler ready');
+            })();
+            true;
+          `}
           onError={() => {
             setVideoError(true);
             if (autoSkipEnabledRef.current) {
