@@ -669,8 +669,7 @@ export default function ViewTab() {
     console.log('🎬 Creating HTML content for video ID:', youtubeVideoId);
     // Simple validation - just check if we have a video ID
     if (!youtubeVideoId) {
-      return `
-      <!DOCTYPE html>
+      return `<!DOCTYPE html>
       <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -714,9 +713,9 @@ export default function ViewTab() {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 68px;
-            height: 48px;
-            background: rgba(0, 0, 0, 0.8);
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.7);
             border-radius: 6px;
             display: flex;
             align-items: center;
@@ -732,21 +731,22 @@ export default function ViewTab() {
             width: 0;
             height: 0;
             border-left: 16px solid #fff;
-            border-top: 11px solid transparent;
-            border-bottom: 11px solid transparent;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
             margin-left: 3px;
           }
           
           .pause-icon {
-            width: 14px;
-            height: 18px;
             position: relative;
+            width: 16px;
+            height: 20px;
           }
           
           .pause-icon::before,
           .pause-icon::after {
             content: '';
             position: absolute;
+            top: 0;
             width: 4px;
             height: 18px;
             background: #fff;
