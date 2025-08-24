@@ -20,7 +20,38 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, MessageCircle, Send, Phone, Mail, CircleHelp as HelpCircle, CircleAlert as AlertCircle, CreditCard, User, Video, Coins, MoveHorizontal as MoreHorizontal, ChevronDown, ChevronUp, Clock, CircleCheck as CheckCircle, Circle as XCircle, TriangleAlert as AlertTriangle, Star, Copy, Paperclip, X, FileText, Image, RefreshCw, MessageSquare, Check, History, ChevronRight, ArrowRight } from 'lucide-react-native';
+import { 
+  ArrowLeft, 
+  MessageCircle, 
+  Send, 
+  Phone, 
+  Mail, 
+  HelpCircle, 
+  AlertCircle, 
+  CreditCard, 
+  User, 
+  Video, 
+  Coins, 
+  MoreHorizontal, 
+  ChevronDown, 
+  ChevronUp, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  AlertTriangle, 
+  Star, 
+  Copy, 
+  Paperclip, 
+  X, 
+  FileText, 
+  Image, 
+  RefreshCw, 
+  MessageSquare, 
+  Check, 
+  History, 
+  ChevronRight, 
+  ArrowRight 
+} from 'lucide-react-native';
 import { getSupabase } from '@/lib/supabase';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import CustomAlert from '@/components/CustomAlert';
@@ -38,7 +69,8 @@ import ReanimatedAnimated, {
 } from 'react-native-reanimated';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isTinyScreen = screenWidth < 350;
+const isTinyScreen = screenWidth < 340;
+const isVerySmallScreen = screenWidth < 350;
 const isSmallScreen = screenWidth < 380;
 const isTablet = screenWidth >= 768;
 
@@ -432,33 +464,33 @@ function ContactSupportScreen() {
 
   const getStatusIcon = (status) => {
     switch(status) {
-      case 'active': return <AlertCircle size={16} color="#3498DB" />;
-      case 'pending': return <Clock size={16} color="#F39C12" />;
-      case 'answered': return <MessageSquare size={16} color="#800080" />;
-      case 'completed': return <CheckCircle size={16} color="#27AE60" />;
-      case 'closed': return <XCircle size={16} color="#95A5A6" />;
-      default: return <HelpCircle size={16} color="#95A5A6" />;
+      case 'active': return <AlertCircle size={isTinyScreen ? 12 : 14} color="#3498DB" />;
+      case 'pending': return <Clock size={isTinyScreen ? 12 : 14} color="#F39C12" />;
+      case 'answered': return <MessageSquare size={isTinyScreen ? 12 : 14} color="#800080" />;
+      case 'completed': return <CheckCircle size={isTinyScreen ? 12 : 14} color="#27AE60" />;
+      case 'closed': return <XCircle size={isTinyScreen ? 12 : 14} color="#95A5A6" />;
+      default: return <HelpCircle size={isTinyScreen ? 12 : 14} color="#95A5A6" />;
     }
   };
 
   const getStatusColor = (status) => {
-    const colors = {
-      'active': { bg: isDark ? '#2A4365' : '#EBF8FF', text: '#2563EB' },
-      'pending': { bg: isDark ? '#4C2C17' : '#FEF3C7', text: '#D97706' },
-      'answered': { bg: isDark ? '#1A4736' : '#D1FAE5', text: '#059669' },
-      'completed': { bg: isDark ? '#3C2F5F' : '#F3E8FF', text: '#7C3AED' },
-      'closed': { bg: isDark ? '#2D3748' : '#F3F4F6', text: '#6B7280' }
+    const statusColors = {
+      'active': { bg: isDark ? 'rgba(52, 152, 219, 0.2)' : 'rgba(52, 152, 219, 0.1)', text: '#3498DB' },
+      'pending': { bg: isDark ? 'rgba(243, 156, 18, 0.2)' : 'rgba(243, 156, 18, 0.1)', text: '#F39C12' },
+      'answered': { bg: isDark ? 'rgba(128, 0, 128, 0.2)' : 'rgba(128, 0, 128, 0.1)', text: '#800080' },
+      'completed': { bg: isDark ? 'rgba(39, 174, 96, 0.2)' : 'rgba(39, 174, 96, 0.1)', text: '#27AE60' },
+      'closed': { bg: isDark ? 'rgba(149, 165, 166, 0.2)' : 'rgba(149, 165, 166, 0.1)', text: '#95A5A6' }
     };
-    return colors[status] || colors.active;
+    return statusColors[status] || statusColors.active;
   };
 
   const getPriorityColor = (priority) => {
-    const colors = {
+    const priorityColors = {
       'low': '#10B981',
       'medium': '#F59E0B',
       'high': '#EF4444'
     };
-    return colors[priority] || colors.low;
+    return priorityColors[priority] || priorityColors.low;
   };
 
   const formatRelativeTime = (dateString) => {
@@ -569,12 +601,12 @@ function ContactSupportScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={isTinyScreen ? 20 : 24} color="white" />
+            <ArrowLeft size={isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24} color="white" />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { fontSize: isTinyScreen ? 18 : 22 }]}>
+          <Text style={[styles.headerTitle, { fontSize: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 22 }]}>
             Contact Support
           </Text>
-          <MessageCircle size={isTinyScreen ? 20 : 24} color="white" />
+          <MessageCircle size={isTinyScreen ? 18 : isVerySmallScreen ? 20 : 24} color="white" />
         </View>
       </LinearGradient>
 
@@ -615,7 +647,7 @@ function ContactSupportScreen() {
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
-              <HelpCircle size={isTinyScreen ? 18 : 20} color={colors.primary} />
+              <HelpCircle size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.primary} />
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Select Category <Text style={{ color: colors.error }}>*</Text>
               </Text>
@@ -655,14 +687,14 @@ function ContactSupportScreen() {
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                     >
-                      <IconComponent size={isTinyScreen ? 18 : 22} color={category.color} />
+                      <IconComponent size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 22} color={category.color} />
                     </LinearGradient>
                     <View style={styles.categoryContent}>
                       <Text style={[
                         styles.categoryTitle,
                         { 
                           color: isSelected ? category.color : colors.text,
-                          fontSize: isTinyScreen ? 12 : 14
+                          fontSize: isTinyScreen ? 11 : isVerySmallScreen ? 12 : 14
                         }
                       ]}>
                         {category.title}
@@ -671,7 +703,7 @@ function ContactSupportScreen() {
                         styles.categoryDesc, 
                         { 
                           color: colors.textSecondary,
-                          fontSize: isTinyScreen ? 9 : 11
+                          fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 9 : 11
                         }
                       ]}>
                         {category.description}
@@ -700,7 +732,7 @@ function ContactSupportScreen() {
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
-              <AlertTriangle size={isTinyScreen ? 18 : 20} color={colors.warning} />
+              <AlertTriangle size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.warning} />
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Priority Level <Text style={{ color: colors.error }}>*</Text>
               </Text>
@@ -741,7 +773,7 @@ function ContactSupportScreen() {
                       styles.priorityText,
                       { 
                         color: isSelected ? priority.color : colors.text,
-                        fontSize: isTinyScreen ? 12 : 14
+                        fontSize: isTinyScreen ? 11 : isVerySmallScreen ? 12 : 14
                       }
                     ]}>
                       {priority.title}
@@ -750,7 +782,7 @@ function ContactSupportScreen() {
                       styles.priorityDesc,
                       { 
                         color: colors.textSecondary,
-                        fontSize: isTinyScreen ? 9 : 11
+                        fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 9 : 11
                       }
                     ]}>
                       {priority.desc}
@@ -778,7 +810,7 @@ function ContactSupportScreen() {
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
-              <FileText size={isTinyScreen ? 18 : 20} color={colors.accent} />
+              <FileText size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.accent} />
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Subject <Text style={{ color: colors.error }}>*</Text>
               </Text>
@@ -786,7 +818,7 @@ function ContactSupportScreen() {
             
             <View style={[styles.inputContainer, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
               <TextInput
-                style={[styles.input, { color: colors.text, fontSize: isTinyScreen ? 13 : 15 }]}
+                style={[styles.input, { color: colors.text, fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 15 }]}
                 placeholder="Brief description of your issue"
                 placeholderTextColor={colors.textSecondary}
                 value={subject}
@@ -817,7 +849,7 @@ function ContactSupportScreen() {
             style={styles.sectionGradient}
           >
             <View style={styles.sectionHeader}>
-              <MessageSquare size={isTinyScreen ? 18 : 20} color={colors.success} />
+              <MessageSquare size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.success} />
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Detailed Message <Text style={{ color: colors.error }}>*</Text>
               </Text>
@@ -825,13 +857,13 @@ function ContactSupportScreen() {
             
             <View style={[styles.inputContainer, styles.messageContainer, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
               <TextInput
-                style={[styles.input, styles.messageInput, { color: colors.text, fontSize: isTinyScreen ? 13 : 15 }]}
+                style={[styles.input, styles.messageInput, { color: colors.text, fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 15 }]}
                 placeholder="Describe your issue in detail..."
                 placeholderTextColor={colors.textSecondary}
                 value={message}
                 onChangeText={setMessage}
                 multiline
-                numberOfLines={isTinyScreen ? 4 : 6}
+                numberOfLines={isTinyScreen ? 3 : isVerySmallScreen ? 4 : 6}
                 textAlignVertical="top"
                 maxLength={1000}
                 selectionColor={colors.primary}
@@ -850,7 +882,7 @@ function ContactSupportScreen() {
                   {uploadingFile ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Paperclip size={isTinyScreen ? 16 : 18} color={colors.primary} />
+                    <Paperclip size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.primary} />
                   )}
                   {attachments.length > 0 && (
                     <View style={[styles.attachmentBadge, { backgroundColor: colors.primary }]}>
@@ -876,7 +908,7 @@ function ContactSupportScreen() {
                         style={[styles.compactRemoveButton, { backgroundColor: colors.error + '20' }]}
                         onPress={() => removeAttachment(index)}
                       >
-                        <X size={10} color={colors.error} />
+                        <X size={isTinyScreen ? 8 : 10} color={colors.error} />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -908,9 +940,9 @@ function ContactSupportScreen() {
             {loading ? (
               <ActivityIndicator color="white" size="small" />
             ) : (
-              <Send size={isTinyScreen ? 16 : 20} color="white" />
+              <Send size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 20} color="white" />
             )}
-            <Text style={[styles.submitButtonText, { fontSize: isTinyScreen ? 14 : 16 }]}>
+            <Text style={[styles.submitButtonText, { fontSize: isTinyScreen ? 13 : isVerySmallScreen ? 14 : 16 }]}>
               {loading ? 'Submitting...' : 'Submit Ticket'}
             </Text>
           </LinearGradient>
@@ -933,8 +965,8 @@ function ContactSupportScreen() {
           >
             <View style={styles.recentTicketsHeader}>
               <View style={styles.recentTicketsTitle}>
-                <History size={isTinyScreen ? 18 : 20} color={colors.primary} />
-                <Text style={[styles.recentTicketsTitleText, { color: colors.text, fontSize: isTinyScreen ? 16 : 18 }]}>
+                <History size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.primary} />
+                <Text style={[styles.recentTicketsTitleText, { color: colors.text, fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18 }]}>
                   Recent Tickets
                 </Text>
               </View>
@@ -944,7 +976,7 @@ function ContactSupportScreen() {
                 disabled={refreshing}
               >
                 <Animated.View style={{ transform: [{ rotate: spinValue }] }}>
-                  <RefreshCw size={isTinyScreen ? 14 : 16} color={colors.primary} />
+                  <RefreshCw size={isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16} color={colors.primary} />
                 </Animated.View>
               </AnimatedTouchableOpacity>
             </View>
@@ -969,9 +1001,9 @@ function ContactSupportScreen() {
                             onPress={() => copyTicketId(ticket.id)}
                           >
                             {copiedTicketId === ticket.id ? (
-                              <Check size={10} color={colors.success} />
+                              <Check size={isTinyScreen ? 8 : 10} color={colors.success} />
                             ) : (
-                              <Copy size={10} color={colors.primary} />
+                              <Copy size={isTinyScreen ? 8 : 10} color={colors.primary} />
                             )}
                           </AnimatedTouchableOpacity>
                         </View>
@@ -985,7 +1017,7 @@ function ContactSupportScreen() {
                           {getStatusIcon(ticket.status)}
                           <Text style={[styles.statusText, { 
                             color: getStatusColor(ticket.status).text,
-                            fontSize: isTinyScreen ? 9 : 10
+                            fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 9 : 10
                           }]}>
                             {ticket.status}
                           </Text>
@@ -996,12 +1028,12 @@ function ContactSupportScreen() {
                       </View>
                     </View>
                     
-                    <Text style={[styles.ticketTitle, { color: colors.text, fontSize: isTinyScreen ? 13 : 15 }]} numberOfLines={2}>
+                    <Text style={[styles.ticketTitle, { color: colors.text, fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 15 }]} numberOfLines={2}>
                       {ticket.title}
                     </Text>
                     
                     {ticket.description && (
-                      <Text style={[styles.ticketDescription, { color: colors.textSecondary, fontSize: isTinyScreen ? 11 : 13 }]} numberOfLines={2}>
+                      <Text style={[styles.ticketDescription, { color: colors.textSecondary, fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 13 }]} numberOfLines={2}>
                         {ticket.description}
                       </Text>
                     )}
@@ -1009,13 +1041,13 @@ function ContactSupportScreen() {
                     <View style={[styles.ticketFooter, { borderTopColor: colors.border }]}>
                       <View style={styles.ticketMeta}>
                         <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '15' }]}>
-                          <Text style={[styles.categoryText, { color: colors.primary, fontSize: isTinyScreen ? 9 : 10 }]}>
+                          <Text style={[styles.categoryText, { color: colors.primary, fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 9 : 10 }]}>
                             {ticket.category}
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Clock size={10} color={colors.textSecondary} />
-                          <Text style={[styles.ticketDate, { color: colors.textSecondary, fontSize: isTinyScreen ? 10 : 11 }]}>
+                          <Clock size={isTinyScreen ? 8 : 10} color={colors.textSecondary} />
+                          <Text style={[styles.ticketDate, { color: colors.textSecondary, fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 10 : 11 }]}>
                             {formatRelativeTime(ticket.created_at)}
                           </Text>
                         </View>
@@ -1025,8 +1057,8 @@ function ContactSupportScreen() {
                         style={[styles.viewButton, { backgroundColor: colors.primary + '15' }]}
                         onPress={() => navigateToTicketDetail(ticket)}
                       >
-                        <Text style={[styles.viewButtonText, { color: colors.primary, fontSize: isTinyScreen ? 10 : 11 }]}>View</Text>
-                        <ChevronRight size={12} color={colors.primary} />
+                        <Text style={[styles.viewButtonText, { color: colors.primary, fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 10 : 11 }]}>View</Text>
+                        <ChevronRight size={isTinyScreen ? 10 : 12} color={colors.primary} />
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
@@ -1037,18 +1069,18 @@ function ContactSupportScreen() {
                     style={[styles.viewAllButton, { borderColor: colors.border, backgroundColor: colors.card }]}
                     onPress={() => {/* Navigate to all tickets */}}
                   >
-                    <MessageSquare size={isTinyScreen ? 16 : 18} color={colors.primary} />
-                    <Text style={[styles.viewAllText, { color: colors.primary, fontSize: isTinyScreen ? 13 : 14 }]}>
+                    <MessageSquare size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.primary} />
+                    <Text style={[styles.viewAllText, { color: colors.primary, fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 14 }]}>
                       View All {recentTickets.length} Tickets
                     </Text>
-                    <ArrowRight size={isTinyScreen ? 14 : 16} color={colors.primary} />
+                    <ArrowRight size={isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16} color={colors.primary} />
                   </TouchableOpacity>
                 )}
               </View>
             ) : (
               <View style={[styles.emptyTicketsContainer, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                <MessageCircle size={isTinyScreen ? 28 : 32} color={colors.textSecondary} style={{ opacity: 0.5 }} />
-                <Text style={[styles.emptyTicketsText, { color: colors.textSecondary, fontSize: isTinyScreen ? 12 : 14 }]}>
+                <MessageCircle size={isTinyScreen ? 24 : isVerySmallScreen ? 28 : 32} color={colors.textSecondary} style={{ opacity: 0.5 }} />
+                <Text style={[styles.emptyTicketsText, { color: colors.textSecondary, fontSize: isTinyScreen ? 11 : isVerySmallScreen ? 12 : 14 }]}>
                   No support tickets yet.{"\n"}Submit your first ticket above to get started!
                 </Text>
               </View>
@@ -1063,31 +1095,31 @@ function ContactSupportScreen() {
             style={styles.contactGradient}
           >
             <View style={styles.contactHeader}>
-              <Star size={isTinyScreen ? 18 : 20} color={colors.accent} />
-              <Text style={[styles.contactTitle, { color: colors.text, fontSize: isTinyScreen ? 16 : 18 }]}>
+              <Star size={isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20} color={colors.accent} />
+              <Text style={[styles.contactTitle, { color: colors.text, fontSize: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18 }]}>
                 Quick Support
               </Text>
             </View>
             
             <View style={styles.contactItems}>
               <View style={[styles.contactItem, { backgroundColor: colors.primary + '10' }]}>
-                <Mail size={isTinyScreen ? 16 : 18} color={colors.primary} />
-                <Text style={[styles.contactText, { color: colors.text, fontSize: isTinyScreen ? 12 : 14 }]}>
+                <Mail size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.primary} />
+                <Text style={[styles.contactText, { color: colors.text, fontSize: isTinyScreen ? 11 : isVerySmallScreen ? 12 : 14 }]}>
                   support@vidgro.com
                 </Text>
               </View>
               
               <View style={[styles.contactItem, { backgroundColor: colors.primary + '10' }]}>
-                <Phone size={isTinyScreen ? 16 : 18} color={colors.primary} />
-                <Text style={[styles.contactText, { color: colors.text, fontSize: isTinyScreen ? 12 : 14 }]}>
+                <Phone size={isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18} color={colors.primary} />
+                <Text style={[styles.contactText, { color: colors.text, fontSize: isTinyScreen ? 11 : isVerySmallScreen ? 12 : 14 }]}>
                   +1 (555) 123-4567
                 </Text>
               </View>
             </View>
             
             <View style={[styles.responseTimeContainer, { borderTopColor: colors.border }]}>
-              <Clock size={isTinyScreen ? 12 : 14} color={colors.textSecondary} />
-              <Text style={[styles.responseTime, { color: colors.textSecondary, fontSize: isTinyScreen ? 11 : 12 }]}>
+              <Clock size={isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14} color={colors.textSecondary} />
+              <Text style={[styles.responseTime, { color: colors.textSecondary, fontSize: isTinyScreen ? 10 : isVerySmallScreen ? 11 : 12 }]}>
                 Average response: 2-4 hours
               </Text>
             </View>
@@ -1106,8 +1138,8 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 50,
-    paddingBottom: isTinyScreen ? 10 : 14,
-    paddingHorizontal: isTinyScreen ? 16 : 20,
+    paddingBottom: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 14,
+    paddingHorizontal: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1127,15 +1159,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: isTinyScreen ? 36 : 44,
+    height: isTinyScreen ? 32 : isVerySmallScreen ? 36 : 44,
   },
   backButton: {
-    padding: isTinyScreen ? 4 : 6,
-    width: isTinyScreen ? 32 : 40,
-    height: isTinyScreen ? 32 : 40,
+    padding: isTinyScreen ? 3 : isVerySmallScreen ? 4 : 6,
+    width: isTinyScreen ? 28 : isVerySmallScreen ? 32 : 40,
+    height: isTinyScreen ? 28 : isVerySmallScreen ? 32 : 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: isTinyScreen ? 16 : 20,
+    borderRadius: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 20,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   headerTitle: {
@@ -1147,9 +1179,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: isTinyScreen ? 12 : 16,
-    paddingVertical: isTinyScreen ? 16 : 20,
-    paddingBottom: isTinyScreen ? 32 : 40,
+    paddingHorizontal: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    paddingVertical: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    paddingBottom: isTinyScreen ? 24 : isVerySmallScreen ? 32 : 40,
   },
   scrollContentTablet: {
     paddingHorizontal: 40,
@@ -1158,18 +1190,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   subtitle: {
-    fontSize: isTinyScreen ? 13 : 15,
+    fontSize: isTinyScreen ? 12 : isVerySmallScreen ? 13 : 15,
     textAlign: 'center',
-    marginBottom: isTinyScreen ? 20 : 24,
-    lineHeight: isTinyScreen ? 18 : 22,
+    marginBottom: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
+    lineHeight: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 22,
     fontWeight: '500',
-    paddingHorizontal: isTinyScreen ? 8 : 12,
+    paddingHorizontal: isTinyScreen ? 4 : isVerySmallScreen ? 8 : 12,
   },
 
   // Section Cards
   section: {
-    marginBottom: isTinyScreen ? 16 : 20,
-    borderRadius: isTinyScreen ? 16 : 20,
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    borderRadius: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'transparent',
@@ -1189,16 +1221,16 @@ const styles = StyleSheet.create({
     }),
   },
   sectionGradient: {
-    padding: isTinyScreen ? 16 : 20,
+    padding: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: isTinyScreen ? 12 : 16,
-    gap: isTinyScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   sectionTitle: {
-    fontSize: isTinyScreen ? 14 : 16,
+    fontSize: isTinyScreen ? 13 : isVerySmallScreen ? 14 : 16,
     fontWeight: 'bold',
     letterSpacing: 0.3,
   },
@@ -1207,15 +1239,15 @@ const styles = StyleSheet.create({
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: isTinyScreen ? 8 : 10,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
   },
   categoriesGridTablet: {
     gap: 12,
   },
   categoryCard: {
-    width: isTinyScreen ? (screenWidth - 56) / 2 : (screenWidth - 60) / 2,
-    padding: isTinyScreen ? 12 : 16,
-    borderRadius: isTinyScreen ? 12 : 16,
+    width: isTinyScreen ? (screenWidth - 40) / 2 : isVerySmallScreen ? (screenWidth - 48) / 2 : (screenWidth - 60) / 2,
+    padding: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
     alignItems: 'center',
     overflow: 'hidden',
     ...Platform.select({
@@ -1234,12 +1266,12 @@ const styles = StyleSheet.create({
     }),
   },
   categoryIconContainer: {
-    width: isTinyScreen ? 36 : 44,
-    height: isTinyScreen ? 36 : 44,
-    borderRadius: isTinyScreen ? 18 : 22,
+    width: isTinyScreen ? 28 : isVerySmallScreen ? 36 : 44,
+    height: isTinyScreen ? 28 : isVerySmallScreen ? 36 : 44,
+    borderRadius: isTinyScreen ? 14 : isVerySmallScreen ? 18 : 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: isTinyScreen ? 8 : 12,
+    marginBottom: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1260,20 +1292,20 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     fontWeight: 'bold',
-    marginBottom: isTinyScreen ? 2 : 4,
+    marginBottom: isTinyScreen ? 1 : isVerySmallScreen ? 2 : 4,
     letterSpacing: 0.3,
     textAlign: 'center',
   },
   categoryDesc: {
     textAlign: 'center',
-    lineHeight: isTinyScreen ? 12 : 14,
+    lineHeight: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
     fontWeight: '500',
   },
 
   // Priority Selection
   priorityContainer: {
     flexDirection: 'row',
-    gap: isTinyScreen ? 6 : 8,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
@@ -1282,9 +1314,9 @@ const styles = StyleSheet.create({
   },
   priorityButton: {
     flex: 1,
-    minWidth: isTinyScreen ? 80 : 90,
-    padding: isTinyScreen ? 12 : 16,
-    borderRadius: isTinyScreen ? 12 : 16,
+    minWidth: isTinyScreen ? 70 : isVerySmallScreen ? 80 : 90,
+    padding: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
     alignItems: 'center',
     borderWidth: 2,
     overflow: 'hidden',
@@ -1308,20 +1340,20 @@ const styles = StyleSheet.create({
   },
   priorityText: {
     fontWeight: 'bold',
-    marginBottom: isTinyScreen ? 2 : 4,
+    marginBottom: isTinyScreen ? 1 : isVerySmallScreen ? 2 : 4,
     letterSpacing: 0.3,
   },
   priorityDesc: {
     textAlign: 'center',
     fontWeight: '500',
-    lineHeight: isTinyScreen ? 12 : 14,
+    lineHeight: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
   },
 
   // Input Components
   inputContainer: {
-    borderRadius: isTinyScreen ? 12 : 14,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
     borderWidth: 1,
-    marginBottom: isTinyScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
@@ -1339,78 +1371,78 @@ const styles = StyleSheet.create({
     }),
   },
   input: {
-    paddingHorizontal: isTinyScreen ? 12 : 16,
-    paddingVertical: isTinyScreen ? 10 : 12,
+    paddingHorizontal: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    paddingVertical: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
     fontWeight: '500',
   },
   messageContainer: {
-    minHeight: isTinyScreen ? 120 : 140,
-    paddingBottom: isTinyScreen ? 6 : 8,
+    minHeight: isTinyScreen ? 100 : isVerySmallScreen ? 120 : 140,
+    paddingBottom: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   messageInput: {
-    paddingTop: isTinyScreen ? 10 : 12,
-    minHeight: isTinyScreen ? 100 : 120,
+    paddingTop: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    minHeight: isTinyScreen ? 80 : isVerySmallScreen ? 100 : 120,
     textAlignVertical: 'top',
   },
   messageBoxFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: isTinyScreen ? 6 : 8,
+    paddingTop: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
     paddingHorizontal: 4,
   },
   attachmentIconButton: {
     position: 'relative',
-    padding: isTinyScreen ? 6 : 8,
-    borderRadius: isTinyScreen ? 16 : 20,
+    padding: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    borderRadius: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
   },
   attachmentBadge: {
     position: 'absolute',
     top: -2,
     right: -2,
     borderRadius: 8,
-    minWidth: 14,
-    height: 14,
+    minWidth: isTinyScreen ? 12 : 14,
+    height: isTinyScreen ? 12 : 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   attachmentBadgeText: {
-    fontSize: 8,
+    fontSize: isTinyScreen ? 7 : 8,
     fontWeight: '600',
     color: '#FFFFFF',
   },
   compactAttachmentsList: {
-    marginTop: isTinyScreen ? 6 : 8,
-    paddingTop: isTinyScreen ? 6 : 8,
+    marginTop: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    paddingTop: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
     borderTopWidth: 1,
   },
   compactAttachmentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: isTinyScreen ? 3 : 4,
-    paddingHorizontal: isTinyScreen ? 6 : 8,
-    marginBottom: isTinyScreen ? 3 : 4,
-    borderRadius: isTinyScreen ? 6 : 8,
+    paddingVertical: isTinyScreen ? 2 : isVerySmallScreen ? 3 : 4,
+    paddingHorizontal: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 2 : isVerySmallScreen ? 3 : 4,
+    borderRadius: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   compactAttachmentName: {
     flex: 1,
-    fontSize: isTinyScreen ? 10 : 12,
+    fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 10 : 12,
     fontWeight: '500',
   },
   compactRemoveButton: {
-    padding: isTinyScreen ? 3 : 4,
-    borderRadius: isTinyScreen ? 8 : 10,
+    padding: isTinyScreen ? 2 : isVerySmallScreen ? 3 : 4,
+    borderRadius: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
   },
   charCount: {
-    fontSize: isTinyScreen ? 10 : 12,
+    fontSize: isTinyScreen ? 9 : isVerySmallScreen ? 10 : 12,
     fontWeight: '500',
   },
 
   // Submit Button
   submitButton: {
-    borderRadius: isTinyScreen ? 14 : 16,
-    marginBottom: isTinyScreen ? 20 : 24,
+    borderRadius: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16,
+    marginBottom: isTinyScreen ? 16 : isVerySmallScreen ? 20 : 24,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
@@ -1434,8 +1466,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: isTinyScreen ? 14 : 16,
-    gap: isTinyScreen ? 6 : 8,
+    paddingVertical: isTinyScreen ? 12 : isVerySmallScreen ? 14 : 16,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   submitButtonText: {
     color: '#FFFFFF',
@@ -1449,29 +1481,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingVertical: isTinyScreen ? 6 : 8,
-    marginBottom: isTinyScreen ? 12 : 16,
+    paddingVertical: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
   },
   recentTicketsTitle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isTinyScreen ? 6 : 8,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   recentTicketsTitleText: {
     fontWeight: 'bold',
     letterSpacing: 0.3,
   },
   refreshButton: {
-    padding: isTinyScreen ? 6 : 8,
-    borderRadius: isTinyScreen ? 16 : 20,
+    padding: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    borderRadius: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
   },
   ticketsContainer: {
-    gap: isTinyScreen ? 10 : 12,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 10 : 12,
   },
   ticketCard: {
-    borderRadius: isTinyScreen ? 12 : 16,
-    padding: isTinyScreen ? 14 : 18,
-    marginBottom: isTinyScreen ? 10 : 12,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
+    padding: isTinyScreen ? 10 : isVerySmallScreen ? 14 : 18,
+    marginBottom: isTinyScreen ? 6 : isVerySmallScreen ? 10 : 12,
     borderWidth: 1,
     overflow: 'hidden',
     ...Platform.select({
@@ -1493,7 +1525,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: isTinyScreen ? 8 : 12,
+    marginBottom: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
   },
   ticketIdSection: {
     flex: 1,
@@ -1501,31 +1533,31 @@ const styles = StyleSheet.create({
   ticketIdContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isTinyScreen ? 6 : 8,
-    marginBottom: isTinyScreen ? 4 : 6,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 2 : isVerySmallScreen ? 4 : 6,
   },
   ticketIdLabel: {
-    fontSize: isTinyScreen ? 9 : 11,
+    fontSize: isTinyScreen ? 8 : isVerySmallScreen ? 9 : 11,
     fontWeight: '600',
     letterSpacing: 0.5,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   copyButton: {
-    padding: isTinyScreen ? 4 : 6,
-    borderRadius: isTinyScreen ? 4 : 6,
+    padding: isTinyScreen ? 3 : isVerySmallScreen ? 4 : 6,
+    borderRadius: isTinyScreen ? 3 : isVerySmallScreen ? 4 : 6,
     borderWidth: 1,
   },
   statusPriorityContainer: {
     alignItems: 'flex-end',
-    gap: isTinyScreen ? 6 : 8,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   statusBadge: {
-    paddingHorizontal: isTinyScreen ? 8 : 10,
-    paddingVertical: isTinyScreen ? 4 : 6,
-    borderRadius: isTinyScreen ? 12 : 16,
+    paddingHorizontal: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
+    paddingVertical: isTinyScreen ? 3 : isVerySmallScreen ? 4 : 6,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isTinyScreen ? 3 : 4,
+    gap: isTinyScreen ? 2 : isVerySmallScreen ? 3 : 4,
     borderWidth: 1,
   },
   statusText: {
@@ -1533,39 +1565,39 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   priorityIndicator: {
-    width: isTinyScreen ? 10 : 12,
-    height: isTinyScreen ? 10 : 12,
-    borderRadius: isTinyScreen ? 5 : 6,
+    width: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    height: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    borderRadius: isTinyScreen ? 4 : isVerySmallScreen ? 5 : 6,
     borderWidth: 2,
     borderColor: 'white',
   },
   ticketTitle: {
     fontWeight: '600',
-    lineHeight: isTinyScreen ? 18 : 20,
-    marginBottom: isTinyScreen ? 6 : 8,
+    lineHeight: isTinyScreen ? 16 : isVerySmallScreen ? 18 : 20,
+    marginBottom: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
     letterSpacing: 0.2,
   },
   ticketDescription: {
-    lineHeight: isTinyScreen ? 16 : 18,
-    marginBottom: isTinyScreen ? 12 : 16,
+    lineHeight: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18,
+    marginBottom: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
     opacity: 0.8,
   },
   ticketFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: isTinyScreen ? 8 : 12,
+    paddingTop: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
     borderTopWidth: 1,
   },
   ticketMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isTinyScreen ? 6 : 8,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
   },
   categoryBadge: {
-    paddingHorizontal: isTinyScreen ? 6 : 8,
-    paddingVertical: isTinyScreen ? 3 : 4,
-    borderRadius: isTinyScreen ? 8 : 10,
+    paddingHorizontal: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    paddingVertical: isTinyScreen ? 2 : isVerySmallScreen ? 3 : 4,
+    borderRadius: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
   },
   categoryText: {
     fontWeight: '600',
@@ -1577,10 +1609,10 @@ const styles = StyleSheet.create({
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isTinyScreen ? 3 : 4,
-    paddingHorizontal: isTinyScreen ? 8 : 10,
-    paddingVertical: isTinyScreen ? 4 : 6,
-    borderRadius: isTinyScreen ? 12 : 14,
+    gap: isTinyScreen ? 2 : isVerySmallScreen ? 3 : 4,
+    paddingHorizontal: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
+    paddingVertical: isTinyScreen ? 3 : isVerySmallScreen ? 4 : 6,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
   },
   viewButtonText: {
     fontWeight: '600',
@@ -1589,10 +1621,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: isTinyScreen ? 12 : 14,
-    borderRadius: isTinyScreen ? 10 : 12,
-    gap: isTinyScreen ? 6 : 8,
-    marginTop: isTinyScreen ? 6 : 8,
+    padding: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 14,
+    borderRadius: isTinyScreen ? 8 : isVerySmallScreen ? 10 : 12,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginTop: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
     borderWidth: 1,
     borderStyle: 'dashed',
   },
@@ -1601,23 +1633,23 @@ const styles = StyleSheet.create({
   },
   emptyTicketsContainer: {
     alignItems: 'center',
-    padding: isTinyScreen ? 24 : 32,
-    borderRadius: isTinyScreen ? 12 : 16,
+    padding: isTinyScreen ? 16 : isVerySmallScreen ? 24 : 32,
+    borderRadius: isTinyScreen ? 10 : isVerySmallScreen ? 12 : 16,
     borderWidth: 1,
     borderStyle: 'dashed',
   },
   emptyTicketsText: {
     textAlign: 'center',
-    marginTop: isTinyScreen ? 8 : 12,
-    lineHeight: isTinyScreen ? 16 : 18,
+    marginTop: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 12,
+    lineHeight: isTinyScreen ? 14 : isVerySmallScreen ? 16 : 18,
     fontWeight: '500',
   },
 
   // Contact Card
   contactCard: {
-    margin: isTinyScreen ? 0 : 0,
-    marginBottom: isTinyScreen ? 16 : 20,
-    borderRadius: isTinyScreen ? 16 : 20,
+    margin: 0,
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
+    borderRadius: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'transparent',
@@ -1637,32 +1669,32 @@ const styles = StyleSheet.create({
     }),
   },
   contactGradient: {
-    padding: isTinyScreen ? 16 : 20,
+    padding: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
   },
   contactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: isTinyScreen ? 6 : 8,
-    marginBottom: isTinyScreen ? 16 : 20,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 12 : isVerySmallScreen ? 16 : 20,
   },
   contactTitle: {
     fontWeight: 'bold',
     letterSpacing: 0.3,
   },
   contactItems: {
-    gap: isTinyScreen ? 12 : 16,
+    gap: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
     alignItems: 'center',
   },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: isTinyScreen ? 8 : 10,
-    paddingVertical: isTinyScreen ? 8 : 10,
-    paddingHorizontal: isTinyScreen ? 12 : 16,
+    gap: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
+    paddingVertical: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
+    paddingHorizontal: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
     width: '100%',
-    borderRadius: isTinyScreen ? 8 : 10,
+    borderRadius: isTinyScreen ? 6 : isVerySmallScreen ? 8 : 10,
   },
   contactText: {
     fontWeight: '500',
@@ -1672,9 +1704,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: isTinyScreen ? 6 : 8,
-    marginTop: isTinyScreen ? 12 : 16,
-    paddingTop: isTinyScreen ? 12 : 16,
+    gap: isTinyScreen ? 4 : isVerySmallScreen ? 6 : 8,
+    marginTop: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
+    paddingTop: isTinyScreen ? 8 : isVerySmallScreen ? 12 : 16,
     borderTopWidth: 1,
   },
   responseTime: {
