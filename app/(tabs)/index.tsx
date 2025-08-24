@@ -195,8 +195,15 @@ export default function ViewTab() {
         // Try both methods to send message
         webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
         webViewRef.current.injectJavaScript(`
+          console.log('🎮 Tab focus: Attempting to play video...');
           if (window.handleReactNativeMessage) {
             window.handleReactNativeMessage('{"type":"playVideo"}');
+            console.log('✅ Called handleReactNativeMessage with playVideo');
+          } else if (window.handleMessage) {
+            window.handleMessage({data: {type: 'playVideo'}});
+            console.log('✅ Called handleMessage directly');
+          } else {
+            console.log('❌ No message handler found');
           }
           true;
         `);
@@ -206,6 +213,7 @@ export default function ViewTab() {
         isVideoPlayingRef.current = true;
         setTimerPaused(false);
         timerPausedRef.current = false;
+        console.log('⏱️ Starting timer on tab focus');
         startTimer();
       } else {
         console.log('❌ CANNOT auto-play:', {
@@ -485,14 +493,39 @@ export default function ViewTab() {
         case 'webViewReady':
           console.log('🌐 WEBVIEW IS READY - can now send messages safely');
           
-          // Test WebView JavaScript responsiveness
+          // Test WebView JavaScript responsiveness and send test message back
           if (webViewRef.current) {
             webViewRef.current.injectJavaScript(`
-              console.log('🧪 Testing WebView JavaScript...');
-              if (window.testWebViewMessage) {
-                console.log('🧪 Test result:', window.testWebViewMessage());
-              } else {
-                console.log('❌ Test function not found');
+              try {
+                // Send a test message back to React Native to confirm JS execution
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'jsTest',
+                    message: 'WebView JavaScript is executing',
+                    hasHandlers: {
+                      handleReactNativeMessage: typeof window.handleReactNativeMessage !== 'undefined',
+                      handleMessage: typeof window.handleMessage !== 'undefined',
+                      player: typeof window.player !== 'undefined',
+                      YT: typeof window.YT !== 'undefined'
+                    }
+                  }));
+                }
+                
+                // Check if YouTube player exists
+                if (window.player && window.player.playVideo) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'playerStatus',
+                    playerExists: true,
+                    playerState: window.player.getPlayerState ? window.player.getPlayerState() : 'unknown'
+                  }));
+                }
+              } catch (e) {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'jsError',
+                    error: e.toString()
+                  }));
+                }
               }
               true;
             `);
@@ -612,6 +645,18 @@ export default function ViewTab() {
           // if (autoSkipEnabledRef.current) {
           //   setTimeout(() => handleSkipToNext(), 5000);
           // }
+          break;
+          
+        case 'jsTest':
+          console.log('🧪 WebView JS Test:', data);
+          break;
+          
+        case 'playerStatus':
+          console.log('🎬 YouTube Player Status:', data);
+          break;
+          
+        case 'jsError':
+          console.log('❌ WebView JS Error:', data.error);
           break;
       }
     } catch (error) {
