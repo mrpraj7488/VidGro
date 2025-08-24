@@ -1002,9 +1002,7 @@ function ContactSupportScreen() {
         </Animated.View>
       </ScrollView>
       
-      <CustomAlert {...alert部分
-
-alertProps} />
+      <CustomAlert {...alertProps} />
     </KeyboardAvoidingView>
   );
 }
