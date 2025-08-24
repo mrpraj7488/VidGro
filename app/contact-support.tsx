@@ -1,4 +1,3 @@
-```jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
@@ -1015,4 +1014,3 @@ const styles = StyleSheet.create({
 });
 
 export default ContactSupportScreen;
-```
