@@ -20,7 +20,8 @@
       "adaptiveIcon": {
         "foregroundImage": "assets/images/icon.png",
         "backgroundColor": "#0F172A"
-      }
+      },
+      "package": "com.zozo1.vidgrowatch"
     },
     "web": {
       "bundler": "webpack",
@@ -29,7 +30,11 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "plugins": ["expo-router", "expo-font", "expo-web-browser"],
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser"
+    ],
     "experiments": {
       "typedRoutes": true
     }
