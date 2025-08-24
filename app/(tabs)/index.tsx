@@ -122,31 +122,48 @@ export default function ViewTab() {
   // App state handling
   useEffect(() => {
     const handleAppStateChange = (nextAppState: string) => {
+      console.log('📱 APP STATE CHANGE:', nextAppState);
       const isActive = nextAppState === 'active';
       
       if (!isActive) {
+        console.log('🔄 APP GOING TO BACKGROUND - pausing everything');
         // App going to background - pause everything
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
         if (webViewRef.current) {
+          console.log('⏸️ SENDING pauseVideo (app background)');
           webViewRef.current.postMessage(JSON.stringify({ type: 'pauseVideo' }));
         }
       } else if (isTabFocusedRef.current && currentVideo) {
+        console.log('🔄 APP RETURNING TO FOREGROUND - attempting auto resume');
+        console.log('📊 Foreground state:', {
+          tabFocused: isTabFocusedRef.current,
+          videoLoaded: videoLoadedRef.current,
+          rewardProcessed: rewardProcessedRef.current
+        });
+        
         // App returning to foreground and tab is focused - force auto resume
         setTimeout(() => {
           if (webViewRef.current) {
+            console.log('▶️ SENDING playVideo (app foreground)');
             // Force play regardless of current state
             webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
             
             // Reset timer paused state to ensure timer can run
             if (videoLoadedRef.current && !rewardProcessedRef.current) {
+              console.log('🔄 UPDATING timer state (foreground)');
               setTimerPaused(false);
               timerPausedRef.current = false;
             }
           }
         }, 500); // Increased delay for better reliability
+      } else {
+        console.log('❌ NOT resuming on foreground:', {
+          tabFocused: isTabFocusedRef.current,
+          hasCurrentVideo: !!currentVideo
+        });
       }
     };
 
@@ -157,10 +174,20 @@ export default function ViewTab() {
   // Tab focus handling
   useFocusEffect(
     useCallback(() => {
+      console.log('🎯 TAB FOCUS: Video tab gained focus');
+      console.log('📊 Current state:', {
+        currentVideo: currentVideo?.video_id || 'none',
+        isVideoPlaying: isVideoPlayingRef.current,
+        timerPaused: timerPausedRef.current,
+        rewardProcessed: rewardProcessedRef.current,
+        suppressAutoPlay: suppressAutoPlayRef.current
+      });
+      
       isTabFocusedRef.current = true;
       
       // Check if we should suppress auto-play (coming back from edit/promote/delete)
       if (suppressAutoPlayRef.current) {
+        console.log('🚫 SUPPRESSING auto-play due to suppressAutoPlay flag');
         suppressAutoPlayRef.current = false;
         setSuppressAutoPlay(false);
         return; // Skip auto-play this time
@@ -168,30 +195,56 @@ export default function ViewTab() {
       
       // Aggressive auto-play when tab becomes focused
       const focusTimeout = setTimeout(() => {
+        console.log('⏰ FOCUS TIMEOUT: Attempting to auto-play video');
+        
         if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
+          console.log('▶️ SENDING playVideo message to WebView');
+          console.log('📱 WebView ref exists:', !!webViewRef.current);
+          
           // Always try to play when tab is focused, regardless of current state
           webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
           
           // Always ensure timer can run and video state is updated
+          console.log('🔄 UPDATING state: timer unpaused, video playing');
           setTimerPaused(false);
           timerPausedRef.current = false;
           setIsVideoPlaying(true);
           isVideoPlayingRef.current = true;
+          
+          console.log('✅ State updated:', {
+            timerPaused: false,
+            isVideoPlaying: true
+          });
+        } else {
+          console.log('❌ CANNOT auto-play:', {
+            hasCurrentVideo: !!currentVideo,
+            hasWebViewRef: !!webViewRef.current,
+            suppressAutoPlay: suppressAutoPlayRef.current
+          });
         }
       }, 300);
 
       return () => {
+        console.log('🎯 TAB BLUR: Video tab lost focus');
         isTabFocusedRef.current = false;
         clearTimeout(focusTimeout);
         
         // Pause when tab loses focus
         if (webViewRef.current) {
+          console.log('⏸️ SENDING pauseVideo message to WebView');
           webViewRef.current.postMessage(JSON.stringify({ type: 'pauseVideo' }));
         }
+        
+        console.log('🔄 UPDATING state: timer paused, video stopped');
         setTimerPaused(true);
         timerPausedRef.current = true;
         setIsVideoPlaying(false);
         isVideoPlayingRef.current = false;
+        
+        console.log('✅ Blur state updated:', {
+          timerPaused: true,
+          isVideoPlaying: false
+        });
       };
     }, [currentVideo, suppressAutoPlay])
   );
@@ -436,9 +489,11 @@ export default function ViewTab() {
   const handleWebViewMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+      console.log('📨 WEBVIEW MESSAGE RECEIVED:', data.type, data);
       
       switch (data.type) {
         case 'videoLoaded':
+          console.log('🎬 VIDEO LOADED - updating state');
           setVideoLoadedSuccessfully(true);
           videoLoadedRef.current = true;
           setVideoError(false);
@@ -449,18 +504,30 @@ export default function ViewTab() {
           }
           
           // Auto-play immediately when video loads if tab is focused
+          console.log('🎬 Checking auto-play on video load:', {
+            tabFocused: isTabFocusedRef.current,
+            rewardProcessed: rewardProcessedRef.current
+          });
+          
           if (isTabFocusedRef.current && !rewardProcessedRef.current) {
+            console.log('▶️ AUTO-PLAYING video after load');
             setTimeout(() => {
               if (webViewRef.current) {
                 webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
               }
             }, 100);
+          } else {
+            console.log('❌ NOT auto-playing on load:', {
+              tabFocused: isTabFocusedRef.current,
+              rewardProcessed: rewardProcessedRef.current
+            });
           }
           
           setTimeout(() => setIsTransitioning(false), 200);
           break;
 
         case 'videoPlaying':
+          console.log('▶️ VIDEO IS NOW PLAYING - updating React state');
           setIsVideoPlaying(true);
           isVideoPlayingRef.current = true;
           setTimerPaused(false);
@@ -480,6 +547,7 @@ export default function ViewTab() {
           break;
           
         case 'videoPaused':
+          console.log('⏸️ VIDEO IS NOW PAUSED - updating React state');
           setIsVideoPlaying(false);
           isVideoPlayingRef.current = false;
           setTimerPaused(true);
