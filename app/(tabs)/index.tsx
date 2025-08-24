@@ -609,41 +609,17 @@ export default function ViewTab() {
     }
   }, [startTimer, handleSkipToNext, autoSkipEnabledRef]);
 
-  // Extract YouTube video ID from URL
-  const extractVideoId = useCallback((youtubeUrl: string): string => {
-    if (!youtubeUrl) return '';
-    
-    console.log('🔍 Extracting video ID from URL:', youtubeUrl);
-    
-    // Handle different YouTube URL formats
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
-      /^([a-zA-Z0-9_-]{11})$/ // Already just the ID
-    ];
-    
-    for (const pattern of patterns) {
-      const match = youtubeUrl.match(pattern);
-      if (match && match[1]) {
-        console.log('✅ Extracted video ID:', match[1]);
-        return match[1];
-      }
-    }
-    
-    console.log('❌ Failed to extract video ID from:', youtubeUrl);
-    return '';
-  }, []);
-  
   // Memoize HTML content to prevent unnecessary regeneration
   const htmlContent = useMemo(() => {
-    const videoId = extractVideoId(currentVideo?.youtube_url || '');
+    const videoId = currentVideo?.youtube_url || '';
     console.log('🎬 Creating HTML content for video ID:', videoId);
     return createHtmlContent(videoId);
   }, [currentVideo?.youtube_url]);
   
   // Create HTML content
   const createHtmlContent = useCallback((youtubeVideoId: string) => {
-    if (!youtubeVideoId || youtubeVideoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(youtubeVideoId)) {
+    // Simple validation - just check if we have a video ID
+    if (!youtubeVideoId) {
       return `
         <!DOCTYPE html>
         <html>
