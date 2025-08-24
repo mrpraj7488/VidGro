@@ -774,14 +774,7 @@ export default function ViewTab() {
       </head>
       <body>
         <div id="video-container" class="paused">
-          <iframe
-            id="youtube-player"
-            src="https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&showinfo=0&theme=dark&enablejsapi=1&mute=0&loop=0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-            frameborder="0"
-            scrolling="no">
-          </iframe>
+          <div id="youtube-player"></div>
           
           <div id="security-overlay"></div>
           <div id="play-pause-button"><div class="play-icon"></div></div>
@@ -1245,14 +1238,7 @@ export default function ViewTab() {
       </head>
       <body>
         <div id="video-container" class="paused">
-          <iframe
-            id="youtube-player"
-            src="https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&showinfo=0&theme=dark&enablejsapi=1&mute=0&loop=0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-            frameborder="0"
-            scrolling="no">
-          </iframe>
+          <div id="youtube-player"></div>
           
           <div id="security-overlay"></div>
           <div id="play-pause-button"><div class="play-icon"></div></div>
@@ -1420,8 +1406,23 @@ export default function ViewTab() {
               if (videoUnavailable) return;
               
               try {
-                console.log('🎬 Creating YouTube player...');
+                console.log('🎬 Creating YouTube player with video ID: ${youtubeVideoId}');
                 player = new YT.Player('youtube-player', {
+                  height: '100%',
+                  width: '100%',
+                  videoId: '${youtubeVideoId}',
+                  playerVars: {
+                    'autoplay': 0,  // Don't autoplay immediately
+                    'controls': 0,
+                    'disablekb': 1,
+                    'fs': 0,
+                    'iv_load_policy': 3,
+                    'modestbranding': 1,
+                    'playsinline': 1,
+                    'rel': 0,
+                    'showinfo': 0,
+                    'mute': 1  // Start muted for autoplay to work
+                  },
                   events: {
                     'onReady': onPlayerReady,
                     'onStateChange': onPlayerStateChange,
@@ -1453,6 +1454,14 @@ export default function ViewTab() {
                 }
                 
                 console.log('📹 Video loaded successfully:', videoData.title);
+                
+                // Unmute after player is ready (if needed for UX)
+                try {
+                  event.target.unMute();
+                  console.log('🔊 Unmuted player');
+                } catch (e) {
+                  console.log('⚠️ Could not unmute, continuing muted');
+                }
                 
                 if (window.pendingPlayRequest) {
                   console.log('🎯 Executing pending play request');
