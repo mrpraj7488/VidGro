@@ -801,9 +801,10 @@ export default function ViewTab() {
             
             checkIframeAvailability();
             
-            window.addEventListener('message', function(event) {
+            function handleMessage(event) {
               try {
                 const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                console.log('📨 WebView received message:', data);
                 
                 if (data.type === 'timerComplete') {
                   timerCompleted = true;
@@ -836,7 +837,11 @@ export default function ViewTab() {
               } catch (e) {
                 // Silent error handling
               }
-            });
+            }
+            
+            // Add both event listeners for cross-platform compatibility
+            document.addEventListener('message', handleMessage);
+            window.addEventListener('message', handleMessage);
             
             if (!window.YT) {
               const tag = document.createElement('script');
