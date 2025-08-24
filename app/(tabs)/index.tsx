@@ -962,8 +962,8 @@ export default function ViewTab() {
             
             // Fallback if API doesn't load in 3 seconds
             setTimeout(() => {
-              if (!playerInitialized && !videoUnavailable) {
-                console.log('⏱️ YouTube API timeout, using fallback');
+              if (!player || typeof player.playVideo !== 'function') {
+                console.log('⏱️ YouTube API timeout or player not functional, using fallback');
                 createFallbackPlayer();
               }
             }, 3000);
