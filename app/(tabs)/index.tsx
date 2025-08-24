@@ -1405,17 +1405,7 @@ export default function ViewTab() {
               console.log('🔄 Creating fallback iframe player');
               const videoId = '` + youtubeVideoId + `';
               const container = document.getElementById('youtube-player');
-              container.innerHTML = \`
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src="https://www.youtube.com/embed/\${videoId}?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&showinfo=0&enablejsapi=1"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowfullscreen
-                  frameborder="0"
-                  style="border: none; pointer-events: none;">
-                </iframe>
-              \`;
+              container.innerHTML = '<iframe width="100%" height="100%" src="https://www.youtube.com/embed/' + videoId + '?autoplay=0&controls=1&rel=0&modestbranding=1&playsinline=1&fs=0&iv_load_policy=3&cc_load_policy=0&showinfo=0&enablejsapi=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen frameborder="0"></iframe>';
               
               // Simulate player ready for fallback
               setTimeout(() => {
