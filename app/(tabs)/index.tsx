@@ -136,7 +136,13 @@ export default function ViewTab() {
           console.log('⏸️ SENDING pauseVideo (app background)');
           const jsCode = `
             (function() {
-              window.postMessage(JSON.stringify({ type: 'pauseVideo' }), '*');
+              console.log('🔵 Injected JS executing pauseVideo');
+              if (typeof window.handleMessage === 'function') {
+                console.log('✅ handleMessage found, calling it');
+                window.handleMessage({ data: JSON.stringify({ type: 'pauseVideo' }) });
+              } else {
+                console.log('❌ handleMessage not found');
+              }
             })();
           `;
           webViewRef.current.injectJavaScript(jsCode);
@@ -154,7 +160,13 @@ export default function ViewTab() {
           console.log('▶️ SENDING playVideo (app foreground)');
           const jsCode = `
             (function() {
-              window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+              console.log('🔵 Injected JS executing playVideo');
+              if (typeof window.handleMessage === 'function') {
+                console.log('✅ handleMessage found, calling it');
+                window.handleMessage({ data: JSON.stringify({ type: 'playVideo' }) });
+              } else {
+                console.log('❌ handleMessage not found');
+              }
             })();
           `;
           webViewRef.current.injectJavaScript(jsCode);
@@ -204,7 +216,13 @@ export default function ViewTab() {
         console.log('▶️ SENDING playVideo message to WebView');
         const jsCode = `
           (function() {
-            window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+            console.log('🔵 Injected JS executing playVideo from tab focus');
+            if (typeof window.handleMessage === 'function') {
+              console.log('✅ handleMessage found, calling it');
+              window.handleMessage({ data: JSON.stringify({ type: 'playVideo' }) });
+            } else {
+              console.log('❌ handleMessage not found');
+            }
           })();
         `;
         webViewRef.current.injectJavaScript(jsCode);
@@ -225,7 +243,13 @@ export default function ViewTab() {
           console.log('⏸️ SENDING pauseVideo message to WebView');
           const jsCode = `
             (function() {
-              window.postMessage(JSON.stringify({ type: 'pauseVideo' }), '*');
+              console.log('🔵 Injected JS executing pauseVideo from tab blur');
+              if (typeof window.handleMessage === 'function') {
+                console.log('✅ handleMessage found, calling it');
+                window.handleMessage({ data: JSON.stringify({ type: 'pauseVideo' }) });
+              } else {
+                console.log('❌ handleMessage not found');
+              }
             })();
           `;
           webViewRef.current.injectJavaScript(jsCode);
@@ -333,7 +357,9 @@ export default function ViewTab() {
     if (webViewRef.current) {
       const jsCode = `
         (function() {
-          window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+          if (typeof handleMessage === 'function') {
+            handleMessage({ data: JSON.stringify({ type: 'playVideo' }) });
+          }
         })();
       `;
       webViewRef.current.injectJavaScript(jsCode);
@@ -382,7 +408,9 @@ export default function ViewTab() {
     if (webViewRef.current) {
       const jsCode = `
         (function() {
-          window.postMessage(JSON.stringify({ type: 'timerComplete' }), '*');
+          if (typeof handleMessage === 'function') {
+            handleMessage({ data: JSON.stringify({ type: 'timerComplete' }) });
+          }
         })();
       `;
       webViewRef.current.injectJavaScript(jsCode);
@@ -512,7 +540,9 @@ export default function ViewTab() {
             if (webViewRef.current) {
               const jsCode = `
                 (function() {
-                  window.postMessage(JSON.stringify({ type: 'playVideo' }), '*');
+                  if (typeof handleMessage === 'function') {
+                    handleMessage({ data: JSON.stringify({ type: 'playVideo' }) });
+                  }
                 })();
               `;
               webViewRef.current.injectJavaScript(jsCode);
@@ -773,7 +803,7 @@ export default function ViewTab() {
             
             checkIframeAvailability();
             
-            function handleMessage(event) {
+            window.handleMessage = function(event) {
               try {
                 console.log('📨 WebView received message:', event.data);
                 const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
