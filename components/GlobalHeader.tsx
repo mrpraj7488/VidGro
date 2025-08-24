@@ -115,7 +115,7 @@ export default function GlobalHeader({
       }
     ]}>
       <LinearGradient
-        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#9B59B6']}
+        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#800080']}
         style={styles.sideMenuHeader}
       >
         <View style={styles.sideMenuHeaderContent}>
@@ -227,7 +227,7 @@ export default function GlobalHeader({
   return (
     <>
       <LinearGradient
-        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#9B59B6']}
+        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#800080']}
         style={styles.header}
       >
         <View style={styles.headerContent}>
