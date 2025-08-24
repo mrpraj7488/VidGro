@@ -58,10 +58,22 @@ import CustomAlert from '@/components/CustomAlert';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import FileUploadService from '@/services/FileUploadService';
+import * as Haptics from 'expo-haptics';
+import ReanimatedAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 380;
 const isTinyScreen = screenWidth < 350;
+const isSmallScreen = screenWidth < 380;
+const isTablet = screenWidth >= 768;
+
+const AnimatedTouchableOpacity = ReanimatedAnimated.createAnimatedComponent(TouchableOpacity);
 
 function ContactSupportScreen() {
   const { profile, user } = useAuth();
@@ -95,6 +107,13 @@ function ContactSupportScreen() {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg']
   });
+
+  // Reanimated values for interactive elements
+  const submitButtonScale = useSharedValue(1);
+  const categoryButtonScales = useRef(Array.from({ length: 6 }, () => useSharedValue(1))).current;
+  const priorityButtonScales = useRef(Array.from({ length: 3 }, () => useSharedValue(1))).current;
+  const copyButtonScale = useSharedValue(1);
+  const refreshButtonScale = useSharedValue(1);
 
   const supportCategories = [
     { 
@@ -147,21 +166,21 @@ function ContactSupportScreen() {
       title: 'Low', 
       desc: 'General questions',
       color: '#10B981',
-      bgColor: isDark ? '#1A4736' : '#ECFDF5'
+      bgColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)'
     },
     { 
       id: 'medium', 
       title: 'Medium', 
       desc: 'Account issues',
       color: '#F59E0B',
-      bgColor: isDark ? '#4A3A1A' : '#FFFBEB'
+      bgColor: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.1)'
     },
     { 
       id: 'high', 
       title: 'High', 
       desc: 'Technical problems',
       color: '#EF4444',
-      bgColor: isDark ? '#4A1A1A' : '#FEF2F2'
+      bgColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)'
     }
   ];
 
@@ -354,6 +373,15 @@ function ContactSupportScreen() {
       return; // Auth handled elsewhere
     }
 
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    submitButtonScale.value = withSequence(
+      withSpring(0.95, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
     setLoading(true);
     
     try {
@@ -476,6 +504,15 @@ function ContactSupportScreen() {
   };
 
   const copyTicketId = (ticketId) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    copyButtonScale.value = withSequence(
+      withSpring(0.9, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
     Clipboard.setString(ticketId.toString());
     setCopiedTicketId(ticketId);
     setTimeout(() => {
@@ -488,6 +525,15 @@ function ContactSupportScreen() {
   };
 
   const handleManualRefresh = async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    refreshButtonScale.value = withSequence(
+      withSpring(0.9, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
     Animated.timing(refreshRotation, {
       toValue: 1,
       duration: 500,
@@ -500,594 +546,83 @@ function ContactSupportScreen() {
     // Seamless refresh without popup
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    gradientHeader: {
-      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 50,
-      paddingBottom: 14,
-      paddingHorizontal: 20,
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.15,
-          shadowRadius: 8,
-        },
-        android: {
-          elevation: 8,
-        },
-      }),
-    },
-    headerContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      height: 44,
-    },
-    backButton: {
-      padding: 6,
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 20,
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    },
-    headerTitle: {
-      fontSize: 22,
-      fontWeight: 'bold',
-      color: 'white',
-      letterSpacing: 0.5,
-    },
-    content: {
-      flex: 1,
-      padding: isSmallScreen ? 16 : 20,
-    },
-    subtitle: {
-      fontSize: isSmallScreen ? 14 : 16,
-      textAlign: 'center',
-      marginBottom: 24,
-      lineHeight: 22,
-      color: isDark ? '#A0AEC0' : '#4A5568',
-      fontWeight: '400',
-    },
-    section: {
-      marginBottom: 24,
-    },
-    sectionTitle: {
-      fontSize: isSmallScreen ? 16 : 18,
-      fontWeight: '600',
-      marginBottom: 12,
-      color: isDark ? '#E2E8F0' : '#2D3748',
-    },
-    categoriesGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: isSmallScreen ? 10 : 12,
-    },
-    categoryCard: {
-      width: isSmallScreen ? '47%' : '48%',
-      padding: isSmallScreen ? 14 : 18,
-      borderRadius: isSmallScreen ? 12 : 16,
-      alignItems: 'center',
-      overflow: 'hidden',
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
-        },
-        android: {
-          elevation: 6,
-        },
-      }),
-    },
-    categoryIcon: {
-      width: isSmallScreen ? 44 : 48,
-      height: isSmallScreen ? 44 : 48,
-      borderRadius: isSmallScreen ? 22 : 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 12,
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.15,
-          shadowRadius: 4,
-        },
-        android: {
-          elevation: 3,
-        },
-      }),
-    },
-    categoryTitle: {
-      fontSize: isSmallScreen ? 14 : 15,
-      fontWeight: '700',
-      marginBottom: 6,
-      letterSpacing: 0.3,
-      textAlign: 'center',
-    },
-    categoryDesc: {
-      fontSize: isSmallScreen ? 11 : 12,
-      textAlign: 'center',
-      lineHeight: isSmallScreen ? 14 : 16,
-      fontWeight: '500',
-    },
-    priorityContainer: {
-      flexDirection: 'row',
-      gap: isSmallScreen ? 8 : 12,
-      flexWrap: 'wrap',
-      justifyContent: 'center',
-    },
-    priorityButton: {
-      flex: 1,
-      minWidth: isTinyScreen ? 90 : 100,
-      padding: isSmallScreen ? 14 : 16,
-      borderRadius: isSmallScreen ? 12 : 16,
-      alignItems: 'center',
-      borderWidth: 2,
-      overflow: 'hidden',
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: isDark ? 0.3 : 0.1,
-          shadowRadius: 8,
-        },
-        android: {
-          elevation: 6,
-        },
-      }),
-    },
-    priorityButtonSelected: {
-      transform: [{ scale: 1.02 }],
-      borderWidth: 2,
-    },
-    priorityText: {
-      fontSize: isSmallScreen ? 14 : 15,
-      fontWeight: '700',
-      marginBottom: 6,
-      letterSpacing: 0.3,
-    },
-    priorityDesc: {
-      fontSize: isSmallScreen ? 11 : 12,
-      color: isDark ? '#A0AEC0' : '#718096',
-      textAlign: 'center',
-      fontWeight: '500',
-      lineHeight: isSmallScreen ? 14 : 16,
-    },
-    inputContainer: {
-      borderRadius: 14,
-      borderWidth: 1,
-      backgroundColor: isDark ? '#2D3748' : '#F7FAFC',
-      borderColor: isDark ? '#4A5568' : '#E2E8F0',
-      marginBottom: 8,
-      overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.2 : 0.05,
-      shadowRadius: 3,
-      elevation: 2,
-    },
-    input: {
-      paddingHorizontal: 16,
-      paddingVertical: isSmallScreen ? 12 : 14,
-      fontSize: isSmallScreen ? 14 : 16,
-      color: isDark ? '#E2E8F0' : '#2D3748',
-    },
-    messageContainer: {
-      minHeight: 160,
-      paddingBottom: 8,
-    },
-    messageInput: {
-      paddingTop: 14,
-      minHeight: 140,
-      textAlignVertical: 'top',
-    },
-    messageBoxFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: 8,
-      paddingHorizontal: 4,
-    },
-    attachmentIconButton: {
-      position: 'relative',
-      padding: 8,
-      borderRadius: 20,
-      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.1)',
-    },
-    attachmentBadge: {
-      position: 'absolute',
-      top: -2,
-      right: -2,
-      backgroundColor: isDark ? '#4A90E2' : '#800080',
-      borderRadius: 10,
-      minWidth: 16,
-      height: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    attachmentBadgeText: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: '#FFFFFF',
-    },
-    compactAttachmentsList: {
-      marginTop: 8,
-      paddingTop: 8,
-      borderTopWidth: 1,
-      borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-    },
-    compactAttachmentItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-      marginBottom: 4,
-      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.1)' : 'rgba(128, 0, 128, 0.05)',
-      borderRadius: 8,
-    },
-    compactAttachmentName: {
-      flex: 1,
-      fontSize: 12,
-      color: isDark ? '#E2E8F0' : '#2D3748',
-      fontWeight: '500',
-    },
-    compactRemoveButton: {
-      padding: 4,
-      borderRadius: 12,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-    },
-    charCount: {
-      fontSize: 12,
-      color: isDark ? '#A0AEC0' : '#718096',
-      fontWeight: '500',
-    },
-    submitButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: isSmallScreen ? 16 : 18,
-      borderRadius: isSmallScreen ? 14 : 16,
-      gap: 10,
-      marginBottom: 24,
-      overflow: 'hidden',
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.3,
-          shadowRadius: 12,
-        },
-        android: {
-          elevation: 8,
-        },
-      }),
-    },
-    submitButtonText: {
-      color: '#FFFFFF',
-      fontSize: isSmallScreen ? 15 : 16,
-      fontWeight: '700',
-      letterSpacing: 0.5,
-    },
-    recentTicketsHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 4,
-      paddingVertical: 8,
-      marginBottom: 16,
-    },
-    recentTicketsTitle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    recentTicketsTitleText: {
-      fontSize: isSmallScreen ? 17 : 19,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-    },
-    refreshButton: {
-      padding: 8,
-      borderRadius: 20,
-      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.1)',
-    },
-    ticketsContainer: {
-      gap: isSmallScreen ? 12 : 16,
-    },
-    ticketCard: {
-      backgroundColor: isDark ? '#2D3748' : '#FFFFFF',
-      borderRadius: isSmallScreen ? 14 : 18,
-      padding: isSmallScreen ? 18 : 22,
-      marginBottom: isSmallScreen ? 14 : 18,
-      borderWidth: 1,
-      borderColor: isDark ? '#4A5568' : '#E2E8F0',
-      overflow: 'hidden',
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: isDark ? 0.4 : 0.12,
-          shadowRadius: 12,
-        },
-        android: {
-          elevation: 8,
-        },
-      }),
-    },
-    ticketCardHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 12,
-    },
-    ticketIdSection: {
-      flex: 1,
-    },
-    ticketIdContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginBottom: 6,
-    },
-    ticketIdLabel: {
-      fontSize: isSmallScreen ? 11 : 12,
-      fontWeight: '500',
-      opacity: 0.7,
-      letterSpacing: 0.5,
-      color: isDark ? '#A0AEC0' : '#718096',
-    },
-    copyButton: {
-      padding: 6,
-      borderRadius: 8,
-      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.1)' : 'rgba(128, 0, 128, 0.05)',
-    },
-    statusPriorityContainer: {
-      alignItems: 'flex-end',
-      gap: 8,
-    },
-    statusBadge: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-    },
-    statusText: {
-      fontSize: isSmallScreen ? 10 : 11,
-      fontWeight: '600',
-      textTransform: 'capitalize',
-    },
-    priorityIndicator: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      borderWidth: 2,
-      borderColor: isDark ? '#2D3748' : '#FFFFFF',
-    },
-    ticketTitle: {
-      fontSize: isSmallScreen ? 15 : 16,
-      fontWeight: '600',
-      lineHeight: isSmallScreen ? 20 : 22,
-      marginBottom: 8,
-      color: isDark ? '#E2E8F0' : '#2D3748',
-    },
-    ticketDescription: {
-      fontSize: isSmallScreen ? 13 : 14,
-      lineHeight: isSmallScreen ? 18 : 20,
-      marginBottom: 16,
-      opacity: 0.8,
-      color: isDark ? '#A0AEC0' : '#718096',
-    },
-    ticketFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-    },
-    ticketMeta: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    categoryBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.1)' : 'rgba(128, 0, 128, 0.05)',
-    },
-    categoryText: {
-      fontSize: isSmallScreen ? 10 : 11,
-      fontWeight: '500',
-      color: isDark ? '#4A90E2' : '#800080',
-      textTransform: 'capitalize',
-    },
-    ticketDate: {
-      fontSize: isSmallScreen ? 11 : 12,
-      fontWeight: '500',
-      color: isDark ? '#A0AEC0' : '#718096',
-    },
-    viewButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.1)' : 'rgba(128, 0, 128, 0.05)',
-    },
-    viewButtonText: {
-      fontSize: isSmallScreen ? 11 : 12,
-      fontWeight: '600',
-      color: isDark ? '#4A90E2' : '#800080',
-    },
-    viewAllButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: isSmallScreen ? 14 : 16,
-      borderRadius: 12,
-      gap: 8,
-      marginTop: 8,
-      borderWidth: 1,
-      borderStyle: 'dashed',
-      borderColor: isDark ? '#4A5568' : '#E2E8F0',
-      backgroundColor: isDark ? '#2D3748' : '#F7FAFC',
-    },
-    viewAllText: {
-      fontSize: isSmallScreen ? 14 : 15,
-      fontWeight: '600',
-      color: isDark ? '#4A90E2' : '#800080',
-    },
-    emptyTicketsContainer: {
-      alignItems: 'center',
-      padding: 32,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderStyle: 'dashed',
-      borderColor: isDark ? '#4A5568' : '#E2E8F0',
-      backgroundColor: isDark ? '#2D3748' : '#F7FAFC',
-    },
-    emptyTicketsText: {
-      fontSize: isSmallScreen ? 14 : 15,
-      textAlign: 'center',
-      marginTop: 12,
-      color: isDark ? '#A0AEC0' : '#718096',
-    },
-    contactCard: {
-      padding: isSmallScreen ? 18 : 22,
-      borderRadius: isSmallScreen ? 14 : 18,
-      marginBottom: 24,
-      backgroundColor: isDark ? '#2D3748' : '#F7FAFC',
-      overflow: 'hidden',
-      ...Platform.select({
-        ios: {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: isDark ? 0.4 : 0.12,
-          shadowRadius: 12,
-        },
-        android: {
-          elevation: 8,
-        },
-      }),
-    },
-    contactHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginBottom: 20,
-    },
-    contactTitle: {
-      fontSize: isSmallScreen ? 16 : 18,
-      fontWeight: '700',
-      color: isDark ? '#E2E8F0' : '#2D3748',
-    },
-    contactItems: {
-      gap: 16,
-      alignItems: 'center',
-    },
-    contactItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 12,
-      paddingVertical: 8,
-      width: '100%',
-      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.1)' : 'rgba(128, 0, 128, 0.05)',
-      borderRadius: 10,
-    },
-    contactText: {
-      fontSize: isSmallScreen ? 14 : 15,
-      color: isDark ? '#A0AEC0' : '#4A5568',
-      fontWeight: '500',
-    },
-    responseTimeContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: 16,
-      paddingTop: 16,
-      borderTopWidth: 1,
-      borderTopColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-    },
-    responseTime: {
-      fontSize: isSmallScreen ? 12 : 13,
-      color: isDark ? '#A0AEC0' : '#718096',
-      fontWeight: '500',
-    },
-    viewTicketButton: {
-      padding: 12,
-      borderRadius: 12,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
-      borderColor: isDark ? '#4A5568' : '#E2E8F0',
-      borderWidth: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: 12,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    viewTicketText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: isDark ? '#4A90E2' : '#800080',
-    },
-  });
+  const handleCategoryPress = (categoryId: string, index: number) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    categoryButtonScales[index].value = withSequence(
+      withSpring(0.95, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
+    setSelectedCategory(categoryId);
+  };
+
+  const handlePriorityPress = (priorityId: string, index: number) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    priorityButtonScales[index].value = withSequence(
+      withSpring(0.95, { damping: 15, stiffness: 400 }),
+      withSpring(1, { damping: 15, stiffness: 400 })
+    );
+
+    setSelectedPriority(priorityId);
+  };
+
+  // Animated styles
+  const submitButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: submitButtonScale.value }],
+  }));
+
+  const copyButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: copyButtonScale.value }],
+  }));
+
+  const refreshButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: refreshButtonScale.value }],
+  }));
 
   return (
     <KeyboardAvoidingView 
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Enhanced Header */}
       <LinearGradient
-        colors={isDark ? ['#1E293B', '#334155'] : ['#800080', '#800080']}
-        style={styles.gradientHeader}
+        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#800080']}
+        style={styles.header}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color="white" />
+            <ArrowLeft size={isTinyScreen ? 20 : 24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Contact Support</Text>
-          <View style={{ width: 24 }} />
+          <Text style={[styles.headerTitle, { fontSize: isTinyScreen ? 18 : 22 }]}>
+            Contact Support
+          </Text>
+          <MessageCircle size={isTinyScreen ? 20 : 24} color="white" />
         </View>
       </LinearGradient>
 
       <ScrollView 
-        style={[styles.content, { backgroundColor: isDark ? colors.background : '#F7FAFC' }]}
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh} 
-            tintColor={isDark ? '#4A90E2' : '#800080'}
+            tintColor={colors.primary}
             title="Refreshing..."
-            titleColor={isDark ? '#A0AEC0' : '#718096'}
+            titleColor={colors.textSecondary}
           />
         }
+        contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
       >
         <Animated.View style={{ opacity: fadeAnim }}>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -1095,461 +630,499 @@ function ContactSupportScreen() {
           </Text>
         </Animated.View>
 
-        {/* Category Selection */}
+        {/* Category Selection Card */}
         <Animated.View 
           style={[
             styles.section,
+            { backgroundColor: colors.surface },
             {
               opacity: fadeAnim,
               transform: [{ scale: scaleAnim }]
             }
           ]}
         >
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Select Category <Text style={{ color: '#EF4444' }}>*</Text>
-          </Text>
-          <View style={styles.categoriesGrid}>
-            {supportCategories.map((category, index) => {
-              const IconComponent = category.icon;
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.categoryCard,
-                    { 
-                      backgroundColor: selectedCategory === category.id 
-                        ? category.color + '20' 
-                        : isDark ? '#2D3748' : '#FFFFFF',
-                      borderColor: selectedCategory === category.id 
-                        ? category.color 
-                        : isDark ? '#4A5568' : '#E2E8F0',
-                      borderWidth: selectedCategory === category.id ? 2 : 1,
-                    }
-                  ]}
-                  onPress={() => setSelectedCategory(category.id)}
-                  activeOpacity={0.7}
-                >
-                  <LinearGradient
-                    colors={[category.color + '20', category.color + '10']}
-                    style={styles.categoryIcon}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <IconComponent size={isSmallScreen ? 22 : 24} color={category.color} />
-                  </LinearGradient>
-                  <Text style={[
-                    styles.categoryTitle,
-                    { 
-                      color: selectedCategory === category.id 
-                        ? category.color 
-                        : isDark ? '#E2E8F0' : '#2D3748',
-                      fontWeight: selectedCategory === category.id ? '700' : '600'
-                    }
-                  ]}>
-                    {category.title}
-                  </Text>
-                  <Text style={[styles.categoryDesc, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-                    {category.description}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </Animated.View>
-
-        {/* Priority Selection */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Priority Level <Text style={{ color: '#EF4444' }}>*</Text>
-          </Text>
-          <View style={styles.priorityContainer}>
-            {priorityLevels.map((priority) => (
-              <TouchableOpacity
-                key={priority.id}
-                style={[
-                  styles.priorityButton,
-                  selectedPriority === priority.id && styles.priorityButtonSelected,
-                  {
-                    backgroundColor: isDark ? '#2D3748' : '#FFFFFF',
-                    borderColor: selectedPriority === priority.id 
-                      ? priority.color 
-                      : isDark ? '#4A5568' : '#E2E8F0',
-                  }
-                ]}
-                onPress={() => setSelectedPriority(priority.id)}
-                activeOpacity={0.7}
-              >
-                {selectedPriority === priority.id && (
-                  <LinearGradient
-                    colors={[priority.bgColor, priority.bgColor + '80']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  />
-                )}
-                <Text style={[
-                  styles.priorityText,
-                  { 
-                    color: selectedPriority === priority.id 
-                      ? priority.color 
-                      : isDark ? '#E2E8F0' : '#2D3748',
-                    fontWeight: selectedPriority === priority.id ? '700' : '600'
-                  }
-                ]}>
-                  {priority.title}
-                </Text>
-                <Text style={styles.priorityDesc}>
-                  {priority.desc}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Animated.View>
-
-        {/* Subject Input */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-              marginTop: 8,
-            }
-          ]}
-        >
-          <Text style={[
-            styles.sectionTitle, 
-            { 
-              color: colors.text,
-              marginBottom: 10,
-              fontSize: 15,
-              fontWeight: '600',
-            }
-          ]}>
-            Subject <Text style={{ color: '#EF4444' }}>*</Text>
-          </Text>
-          <View style={[
-            styles.inputContainer,
-            {
-              backgroundColor: isDark ? '#2D3748' : '#FFFFFF',
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: isDark ? '#4A5568' : '#E2E8F0',
-              shadowColor: isDark ? '#000' : '#4A90E2',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: isDark ? 0.15 : 0.1,
-              shadowRadius: 4,
-              elevation: 3,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-            }
-          ]}>
-            <TextInput
-              style={[
-                styles.input, 
-                { 
-                  color: colors.text,
-                  fontSize: 15,
-                  padding: 0,
-                  minHeight: 24,
-                  flex: 1,
-                }
-              ]}
-              placeholder="Brief description of your issue"
-              placeholderTextColor={isDark ? '#718096' : '#A0AEC0'}
-              value={subject}
-              onChangeText={setSubject}
-              maxLength={100}
-              selectionColor={isDark ? '#4A90E2' : '#800080'}
-            />
-            <Text style={[
-              styles.charCount,
-              {
-                color: isDark ? '#A0AEC0' : '#718096',
-                fontSize: 12,
-                marginTop: 4,
-                alignSelf: 'flex-end',
-              }
-            ]}>
-              {subject.length}/100
-            </Text>
-          </View>
-        </Animated.View>
-
-        {/* Message Input */}
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Detailed Message <Text style={{ color: '#EF4444' }}>*</Text>
-          </Text>
-          <View style={[styles.inputContainer, styles.messageContainer]}>
-            <TextInput
-              style={[styles.input, styles.messageInput, { color: colors.text }]}
-              placeholder="Describe your issue in detail..."
-              placeholderTextColor={isDark ? '#A0AEC0' : '#A0AEC0'}
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-              maxLength={1000}
-            />
-            
-            {/* Attachment Button Inside Message Box */}
-            <View style={styles.messageBoxFooter}>
-              <TouchableOpacity 
-                style={[styles.attachmentIconButton, {
-                  opacity: attachments.length >= 5 ? 0.5 : 1,
-                }]}
-                onPress={handlePickDocument}
-                disabled={uploadingFile || attachments.length >= 5}
-              >
-                {uploadingFile ? (
-                  <ActivityIndicator size="small" color={isDark ? '#4A90E2' : '#800080'} />
-                ) : (
-                  <Paperclip size={18} color={isDark ? '#4A90E2' : '#800080'} />
-                )}
-                {attachments.length > 0 && (
-                  <View style={styles.attachmentBadge}>
-                    <Text style={styles.attachmentBadgeText}>{attachments.length}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              <Text style={styles.charCount}>
-                {message.length}/1000
+          <LinearGradient
+            colors={isDark ? ['rgba(74, 144, 226, 0.08)', 'rgba(74, 144, 226, 0.03)'] : ['rgba(128, 0, 128, 0.08)', 'rgba(128, 0, 128, 0.03)']}
+            style={styles.sectionGradient}
+          >
+            <View style={styles.sectionHeader}>
+              <HelpCircle size={isTinyScreen ? 18 : 20} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Select Category <Text style={{ color: colors.error }}>*</Text>
               </Text>
             </View>
             
-            {/* Compact Attachment List */}
-            {attachments.length > 0 && (
-              <View style={styles.compactAttachmentsList}>
-                {attachments.map((attachment, index) => (
-                  <View key={attachment.name} style={styles.compactAttachmentItem}>
-                    <Text style={styles.compactAttachmentName} numberOfLines={1}>
-                      {attachment.name}
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.compactRemoveButton}
-                      onPress={() => removeAttachment(index)}
+            <View style={[styles.categoriesGrid, isTablet && styles.categoriesGridTablet]}>
+              {supportCategories.map((category, index) => {
+                const IconComponent = category.icon;
+                const isSelected = selectedCategory === category.id;
+                
+                const categoryAnimatedStyle = useAnimatedStyle(() => ({
+                  transform: [{ scale: categoryButtonScales[index].value }],
+                }));
+
+                return (
+                  <AnimatedTouchableOpacity
+                    key={category.id}
+                    style={[
+                      styles.categoryCard,
+                      { 
+                        backgroundColor: isSelected 
+                          ? category.color + '20' 
+                          : colors.surface,
+                        borderColor: isSelected 
+                          ? category.color 
+                          : colors.border,
+                        borderWidth: isSelected ? 2 : 1,
+                      },
+                      categoryAnimatedStyle
+                    ]}
+                    onPress={() => handleCategoryPress(category.id, index)}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={[category.color + '15', category.color + '08']}
+                      style={styles.categoryIconContainer}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
                     >
-                      <X size={12} color={isDark ? '#E53E3E' : '#C53030'} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
+                      <IconComponent size={isTinyScreen ? 18 : 22} color={category.color} />
+                    </LinearGradient>
+                    <View style={styles.categoryContent}>
+                      <Text style={[
+                        styles.categoryTitle,
+                        { 
+                          color: isSelected ? category.color : colors.text,
+                          fontSize: isTinyScreen ? 12 : 14
+                        }
+                      ]}>
+                        {category.title}
+                      </Text>
+                      <Text style={[
+                        styles.categoryDesc, 
+                        { 
+                          color: colors.textSecondary,
+                          fontSize: isTinyScreen ? 9 : 11
+                        }
+                      ]}>
+                        {category.description}
+                      </Text>
+                    </View>
+                  </AnimatedTouchableOpacity>
+                );
+              })}
+            </View>
+          </LinearGradient>
         </Animated.View>
 
+        {/* Priority Selection Card */}
+        <Animated.View 
+          style={[
+            styles.section,
+            { backgroundColor: colors.surface },
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={isDark ? ['rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.03)'] : ['rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.03)']}
+            style={styles.sectionGradient}
+          >
+            <View style={styles.sectionHeader}>
+              <AlertTriangle size={isTinyScreen ? 18 : 20} color={colors.warning} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Priority Level <Text style={{ color: colors.error }}>*</Text>
+              </Text>
+            </View>
+            
+            <View style={[styles.priorityContainer, isTablet && styles.priorityContainerTablet]}>
+              {priorityLevels.map((priority, index) => {
+                const isSelected = selectedPriority === priority.id;
+                
+                const priorityAnimatedStyle = useAnimatedStyle(() => ({
+                  transform: [{ scale: priorityButtonScales[index].value }],
+                }));
+
+                return (
+                  <AnimatedTouchableOpacity
+                    key={priority.id}
+                    style={[
+                      styles.priorityButton,
+                      isSelected && styles.priorityButtonSelected,
+                      {
+                        backgroundColor: isSelected ? priority.bgColor : colors.surface,
+                        borderColor: isSelected ? priority.color : colors.border,
+                      },
+                      priorityAnimatedStyle
+                    ]}
+                    onPress={() => handlePriorityPress(priority.id, index)}
+                    activeOpacity={0.8}
+                  >
+                    {isSelected && (
+                      <LinearGradient
+                        colors={[priority.bgColor, priority.bgColor + '80']}
+                        style={StyleSheet.absoluteFill}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                      />
+                    )}
+                    <Text style={[
+                      styles.priorityText,
+                      { 
+                        color: isSelected ? priority.color : colors.text,
+                        fontSize: isTinyScreen ? 12 : 14
+                      }
+                    ]}>
+                      {priority.title}
+                    </Text>
+                    <Text style={[
+                      styles.priorityDesc,
+                      { 
+                        color: colors.textSecondary,
+                        fontSize: isTinyScreen ? 9 : 11
+                      }
+                    ]}>
+                      {priority.desc}
+                    </Text>
+                  </AnimatedTouchableOpacity>
+                );
+              })}
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Subject Input Card */}
+        <Animated.View 
+          style={[
+            styles.section,
+            { backgroundColor: colors.surface },
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={isDark ? ['rgba(0, 212, 255, 0.08)', 'rgba(0, 212, 255, 0.03)'] : ['rgba(128, 0, 128, 0.08)', 'rgba(128, 0, 128, 0.03)']}
+            style={styles.sectionGradient}
+          >
+            <View style={styles.sectionHeader}>
+              <FileText size={isTinyScreen ? 18 : 20} color={colors.accent} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Subject <Text style={{ color: colors.error }}>*</Text>
+              </Text>
+            </View>
+            
+            <View style={[styles.inputContainer, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.input, { color: colors.text, fontSize: isTinyScreen ? 13 : 15 }]}
+                placeholder="Brief description of your issue"
+                placeholderTextColor={colors.textSecondary}
+                value={subject}
+                onChangeText={setSubject}
+                maxLength={100}
+                selectionColor={colors.primary}
+              />
+              <Text style={[styles.charCount, { color: colors.textSecondary }]}>
+                {subject.length}/100
+              </Text>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Message Input Card */}
+        <Animated.View 
+          style={[
+            styles.section,
+            { backgroundColor: colors.surface },
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <LinearGradient
+            colors={isDark ? ['rgba(16, 185, 129, 0.08)', 'rgba(16, 185, 129, 0.03)'] : ['rgba(16, 185, 129, 0.08)', 'rgba(16, 185, 129, 0.03)']}
+            style={styles.sectionGradient}
+          >
+            <View style={styles.sectionHeader}>
+              <MessageSquare size={isTinyScreen ? 18 : 20} color={colors.success} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Detailed Message <Text style={{ color: colors.error }}>*</Text>
+              </Text>
+            </View>
+            
+            <View style={[styles.inputContainer, styles.messageContainer, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.input, styles.messageInput, { color: colors.text, fontSize: isTinyScreen ? 13 : 15 }]}
+                placeholder="Describe your issue in detail..."
+                placeholderTextColor={colors.textSecondary}
+                value={message}
+                onChangeText={setMessage}
+                multiline
+                numberOfLines={isTinyScreen ? 4 : 6}
+                textAlignVertical="top"
+                maxLength={1000}
+                selectionColor={colors.primary}
+              />
+              
+              {/* Attachment Button Inside Message Box */}
+              <View style={styles.messageBoxFooter}>
+                <TouchableOpacity 
+                  style={[styles.attachmentIconButton, {
+                    backgroundColor: colors.primary + '20',
+                    opacity: attachments.length >= 5 ? 0.5 : 1,
+                  }]}
+                  onPress={handlePickDocument}
+                  disabled={uploadingFile || attachments.length >= 5}
+                >
+                  {uploadingFile ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Paperclip size={isTinyScreen ? 16 : 18} color={colors.primary} />
+                  )}
+                  {attachments.length > 0 && (
+                    <View style={[styles.attachmentBadge, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.attachmentBadgeText}>{attachments.length}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                
+                <Text style={[styles.charCount, { color: colors.textSecondary }]}>
+                  {message.length}/1000
+                </Text>
+              </View>
+              
+              {/* Compact Attachment List */}
+              {attachments.length > 0 && (
+                <View style={[styles.compactAttachmentsList, { borderTopColor: colors.border }]}>
+                  {attachments.map((attachment, index) => (
+                    <View key={attachment.name} style={[styles.compactAttachmentItem, { backgroundColor: colors.primary + '10' }]}>
+                      <Text style={[styles.compactAttachmentName, { color: colors.text }]} numberOfLines={1}>
+                        {attachment.name}
+                      </Text>
+                      <TouchableOpacity 
+                        style={[styles.compactRemoveButton, { backgroundColor: colors.error + '20' }]}
+                        onPress={() => removeAttachment(index)}
+                      >
+                        <X size={10} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Submit Button */}
-        <TouchableOpacity
+        <AnimatedTouchableOpacity
+          style={[
+            styles.submitButton,
+            (!selectedCategory || !subject || !message || loading) && styles.submitButtonDisabled,
+            submitButtonAnimatedStyle
+          ]}
           onPress={handleSubmitTicket}
-          disabled={loading || !selectedCategory || !subject || !message}
+          disabled={!selectedCategory || !subject || !message || loading}
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={loading || !selectedCategory || !subject || !message 
-              ? ['#A0AEC0', '#718096'] 
-              : isDark ? ['#4A90E2', '#6366F1'] : ['#800080', '#800080']}
-            style={styles.submitButton}
+            colors={(!selectedCategory || !subject || !message || loading) 
+              ? [colors.border, colors.border] 
+              : isDark ? [colors.primary, colors.secondary] : ['#800080', '#800080']}
+            style={styles.submitButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="white" size="small" />
             ) : (
-              <Send size={20} color="#FFFFFF" />
+              <Send size={isTinyScreen ? 16 : 20} color="white" />
             )}
-            <Text style={styles.submitButtonText}>
+            <Text style={[styles.submitButtonText, { fontSize: isTinyScreen ? 14 : 16 }]}>
               {loading ? 'Submitting...' : 'Submit Ticket'}
             </Text>
           </LinearGradient>
-        </TouchableOpacity>
+        </AnimatedTouchableOpacity>
 
-        {/* Recent Tickets */}
+        {/* Recent Tickets Card */}
         <Animated.View 
           style={[
             styles.section,
+            { backgroundColor: colors.surface },
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }]
             }
           ]}
         >
-          <View style={styles.recentTicketsHeader}>
-            <View style={styles.recentTicketsTitle}>
-              <History size={22} color={isDark ? '#4A90E2' : '#800080'} />
-              <Text style={[styles.recentTicketsTitleText, { color: colors.text }]}>
-                Recent Tickets
-              </Text>
+          <LinearGradient
+            colors={isDark ? ['rgba(157, 78, 221, 0.08)', 'rgba(157, 78, 221, 0.03)'] : ['rgba(157, 78, 221, 0.08)', 'rgba(157, 78, 221, 0.03)']}
+            style={styles.sectionGradient}
+          >
+            <View style={styles.recentTicketsHeader}>
+              <View style={styles.recentTicketsTitle}>
+                <History size={isTinyScreen ? 18 : 20} color={colors.primary} />
+                <Text style={[styles.recentTicketsTitleText, { color: colors.text, fontSize: isTinyScreen ? 16 : 18 }]}>
+                  Recent Tickets
+                </Text>
+              </View>
+              <AnimatedTouchableOpacity 
+                style={[styles.refreshButton, { backgroundColor: colors.primary + '20' }, refreshButtonAnimatedStyle]}
+                onPress={handleManualRefresh} 
+                disabled={refreshing}
+              >
+                <Animated.View style={{ transform: [{ rotate: spinValue }] }}>
+                  <RefreshCw size={isTinyScreen ? 14 : 16} color={colors.primary} />
+                </Animated.View>
+              </AnimatedTouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={styles.refreshButton}
-              onPress={handleManualRefresh} 
-              disabled={refreshing}
-            >
-              <Animated.View style={{ transform: [{ rotate: spinValue }] }}>
-                <RefreshCw size={16} color={isDark ? '#4A90E2' : '#800080'} />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
-          
-          {recentTickets.length > 0 ? (
-            <View style={styles.ticketsContainer}>
-              {recentTickets.slice(0, 3).map((ticket) => (
-                <TouchableOpacity
-                  key={ticket.id}
-                  style={styles.ticketCard}
-                  onPress={() => navigateToTicketDetail(ticket)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.ticketCardHeader}>
-                    <View style={styles.ticketIdSection}>
-                      <View style={styles.ticketIdContainer}>
-                        <Text style={styles.ticketIdLabel}>
-                          TICKET #{ticket.id.slice(-6).toUpperCase()}
-                        </Text>
-                        <TouchableOpacity 
-                          style={styles.copyButton}
-                          onPress={() => copyTicketId(ticket.id)}
-                        >
-                          {copiedTicketId === ticket.id ? (
-                            <Check size={12} color={isDark ? '#4A90E2' : '#800080'} />
-                          ) : (
-                            <Copy size={12} color={isDark ? '#4A90E2' : '#800080'} />
-                          )}
-                        </TouchableOpacity>
+            
+            {recentTickets.length > 0 ? (
+              <View style={styles.ticketsContainer}>
+                {recentTickets.slice(0, 3).map((ticket) => (
+                  <TouchableOpacity
+                    key={ticket.id}
+                    style={[styles.ticketCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => navigateToTicketDetail(ticket)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.ticketCardHeader}>
+                      <View style={styles.ticketIdSection}>
+                        <View style={styles.ticketIdContainer}>
+                          <Text style={[styles.ticketIdLabel, { color: colors.textSecondary }]}>
+                            TICKET #{ticket.id.slice(-6).toUpperCase()}
+                          </Text>
+                          <AnimatedTouchableOpacity 
+                            style={[styles.copyButton, { backgroundColor: colors.surface, borderColor: colors.border }, copyButtonAnimatedStyle]}
+                            onPress={() => copyTicketId(ticket.id)}
+                          >
+                            {copiedTicketId === ticket.id ? (
+                              <Check size={10} color={colors.success} />
+                            ) : (
+                              <Copy size={10} color={colors.primary} />
+                            )}
+                          </AnimatedTouchableOpacity>
+                        </View>
                       </View>
-                    </View>
-                    
-                    <View style={styles.statusPriorityContainer}>
-                      <View style={[styles.statusBadge, { 
-                        backgroundColor: getStatusColor(ticket.status).bg,
-                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                      }]}>
-                        {getStatusIcon(ticket.status)}
-                        <Text style={[styles.statusText, { 
-                          color: getStatusColor(ticket.status).text 
+                      
+                      <View style={styles.statusPriorityContainer}>
+                        <View style={[styles.statusBadge, { 
+                          backgroundColor: getStatusColor(ticket.status).bg,
+                          borderColor: colors.border,
                         }]}>
-                          {ticket.status}
-                        </Text>
-                      </View>
-                      <View style={[styles.priorityIndicator, { 
-                        backgroundColor: getPriorityColor(ticket.priority),
-                        shadowColor: getPriorityColor(ticket.priority),
-                      }]} />
-                    </View>
-                  </View>
-                  
-                  <Text style={styles.ticketTitle} numberOfLines={2}>
-                    {ticket.title}
-                  </Text>
-                  
-                  {ticket.description && (
-                    <Text style={styles.ticketDescription} numberOfLines={2}>
-                      {ticket.description}
-                    </Text>
-                  )}
-                  
-                  <View style={styles.ticketFooter}>
-                    <View style={styles.ticketMeta}>
-                      <View style={
-
-styles.categoryBadge}>
-                        <Text style={styles.categoryText}>
-                          {ticket.category}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Clock size={12} color={isDark ? '#A0AEC0' : '#718096'} />
-                        <Text style={styles.ticketDate}>
-                          {formatRelativeTime(ticket.created_at)}
-                        </Text>
+                          {getStatusIcon(ticket.status)}
+                          <Text style={[styles.statusText, { 
+                            color: getStatusColor(ticket.status).text,
+                            fontSize: isTinyScreen ? 9 : 10
+                          }]}>
+                            {ticket.status}
+                          </Text>
+                        </View>
+                        <View style={[styles.priorityIndicator, { 
+                          backgroundColor: getPriorityColor(ticket.priority),
+                        }]} />
                       </View>
                     </View>
                     
-                    <TouchableOpacity 
-                      style={styles.viewButton}
-                      onPress={() => navigateToTicketDetail(ticket)}
-                    >
-                      <Text style={styles.viewButtonText}>View</Text>
-                      <ChevronRight size={14} color={isDark ? '#4A90E2' : '#800080'} />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
-              
-              {recentTickets.length > 3 && (
-                <TouchableOpacity 
-                  style={styles.viewAllButton}
-                  onPress={() => {/* Navigate to all tickets */}}
-                >
-                  <MessageSquare size={18} color={isDark ? '#4A90E2' : '#800080'} />
-                  <Text style={styles.viewAllText}>
-                    View All {recentTickets.length} Tickets
-                  </Text>
-                  <ArrowRight size={16} color={isDark ? '#4A90E2' : '#800080'} />
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            <View style={styles.emptyTicketsContainer}>
-              <MessageCircle size={32} color={isDark ? '#A0AEC0' : '#718096'} style={{ opacity: 0.5 }} />
-              <Text style={styles.emptyTicketsText}>
-                No support tickets yet.{"\n"}Submit your first ticket above to get started!
-              </Text>
-            </View>
-          )}
+                    <Text style={[styles.ticketTitle, { color: colors.text, fontSize: isTinyScreen ? 13 : 15 }]} numberOfLines={2}>
+                      {ticket.title}
+                    </Text>
+                    
+                    {ticket.description && (
+                      <Text style={[styles.ticketDescription, { color: colors.textSecondary, fontSize: isTinyScreen ? 11 : 13 }]} numberOfLines={2}>
+                        {ticket.description}
+                      </Text>
+                    )}
+                    
+                    <View style={[styles.ticketFooter, { borderTopColor: colors.border }]}>
+                      <View style={styles.ticketMeta}>
+                        <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '15' }]}>
+                          <Text style={[styles.categoryText, { color: colors.primary, fontSize: isTinyScreen ? 9 : 10 }]}>
+                            {ticket.category}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Clock size={10} color={colors.textSecondary} />
+                          <Text style={[styles.ticketDate, { color: colors.textSecondary, fontSize: isTinyScreen ? 10 : 11 }]}>
+                            {formatRelativeTime(ticket.created_at)}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      <TouchableOpacity 
+                        style={[styles.viewButton, { backgroundColor: colors.primary + '15' }]}
+                        onPress={() => navigateToTicketDetail(ticket)}
+                      >
+                        <Text style={[styles.viewButtonText, { color: colors.primary, fontSize: isTinyScreen ? 10 : 11 }]}>View</Text>
+                        <ChevronRight size={12} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                
+                {recentTickets.length > 3 && (
+                  <TouchableOpacity 
+                    style={[styles.viewAllButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+                    onPress={() => {/* Navigate to all tickets */}}
+                  >
+                    <MessageSquare size={isTinyScreen ? 16 : 18} color={colors.primary} />
+                    <Text style={[styles.viewAllText, { color: colors.primary, fontSize: isTinyScreen ? 13 : 14 }]}>
+                      View All {recentTickets.length} Tickets
+                    </Text>
+                    <ArrowRight size={isTinyScreen ? 14 : 16} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={[styles.emptyTicketsContainer, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <MessageCircle size={isTinyScreen ? 28 : 32} color={colors.textSecondary} style={{ opacity: 0.5 }} />
+                <Text style={[styles.emptyTicketsText, { color: colors.textSecondary, fontSize: isTinyScreen ? 12 : 14 }]}>
+                  No support tickets yet.{"\n"}Submit your first ticket above to get started!
+                </Text>
+              </View>
+            )}
+          </LinearGradient>
         </Animated.View>
         
-        {/* Contact Info */}
-        <View style={styles.contactCard}>
-          <View style={styles.contactHeader}>
-            <Star size={20} color="#FFD700" />
-            <Text style={styles.contactTitle}>
-              Quick Support
-            </Text>
-          </View>
-          
-          <View style={styles.contactItems}>
-            <View style={styles.contactItem}>
-              <Mail size={18} color={isDark ? '#4A90E2' : '#800080'} />
-              <Text style={styles.contactText}>
-                support@vidgro.com
+        {/* Contact Info Card */}
+        <View style={[styles.contactCard, { backgroundColor: colors.surface }]}>
+          <LinearGradient
+            colors={isDark ? ['rgba(255, 215, 0, 0.08)', 'rgba(255, 215, 0, 0.03)'] : ['rgba(255, 215, 0, 0.08)', 'rgba(255, 215, 0, 0.03)']}
+            style={styles.contactGradient}
+          >
+            <View style={styles.contactHeader}>
+              <Star size={isTinyScreen ? 18 : 20} color={colors.accent} />
+              <Text style={[styles.contactTitle, { color: colors.text, fontSize: isTinyScreen ? 16 : 18 }]}>
+                Quick Support
               </Text>
             </View>
             
-            <View style={styles.contactItem}>
-              <Phone size={18} color={isDark ? '#4A90E2' : '#800080'} />
-              <Text style={styles.contactText}>
-                +1 (555) 123-4567
+            <View style={styles.contactItems}>
+              <View style={[styles.contactItem, { backgroundColor: colors.primary + '10' }]}>
+                <Mail size={isTinyScreen ? 16 : 18} color={colors.primary} />
+                <Text style={[styles.contactText, { color: colors.text, fontSize: isTinyScreen ? 12 : 14 }]}>
+                  support@vidgro.com
+                </Text>
+              </View>
+              
+              <View style={[styles.contactItem, { backgroundColor: colors.primary + '10' }]}>
+                <Phone size={isTinyScreen ? 16 : 18} color={colors.primary} />
+                <Text style={[styles.contactText, { color: colors.text, fontSize: isTinyScreen ? 12 : 14 }]}>
+                  +1 (555) 123-4567
+                </Text>
+              </View>
+            </View>
+            
+            <View style={[styles.responseTimeContainer, { borderTopColor: colors.border }]}>
+              <Clock size={isTinyScreen ? 12 : 14} color={colors.textSecondary} />
+              <Text style={[styles.responseTime, { color: colors.textSecondary, fontSize: isTinyScreen ? 11 : 12 }]}>
+                Average response: 2-4 hours
               </Text>
             </View>
-          </View>
-          
-          <View style={styles.responseTimeContainer}>
-            <Clock size={14} color={isDark ? '#A0AEC0' : '#718096'} />
-            <Text style={styles.responseTime}>
-              Average response: 2-4 hours
-            </Text>
-          </View>
+          </LinearGradient>
         </View>
       </ScrollView>
       
@@ -1557,5 +1130,587 @@ styles.categoryBadge}>
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 50,
+    paddingBottom: isTinyScreen ? 10 : 14,
+    paddingHorizontal: isTinyScreen ? 16 : 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      },
+    }),
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: isTinyScreen ? 36 : 44,
+  },
+  backButton: {
+    padding: isTinyScreen ? 4 : 6,
+    width: isTinyScreen ? 32 : 40,
+    height: isTinyScreen ? 32 : 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: isTinyScreen ? 16 : 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  headerTitle: {
+    fontWeight: 'bold',
+    color: 'white',
+    letterSpacing: 0.5,
+  },
+  content: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: isTinyScreen ? 12 : 16,
+    paddingVertical: isTinyScreen ? 16 : 20,
+    paddingBottom: isTinyScreen ? 32 : 40,
+  },
+  scrollContentTablet: {
+    paddingHorizontal: 40,
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  subtitle: {
+    fontSize: isTinyScreen ? 13 : 15,
+    textAlign: 'center',
+    marginBottom: isTinyScreen ? 20 : 24,
+    lineHeight: isTinyScreen ? 18 : 22,
+    fontWeight: '500',
+    paddingHorizontal: isTinyScreen ? 8 : 12,
+  },
+
+  // Section Cards
+  section: {
+    marginBottom: isTinyScreen ? 16 : 20,
+    borderRadius: isTinyScreen ? 16 : 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  sectionGradient: {
+    padding: isTinyScreen ? 16 : 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: isTinyScreen ? 12 : 16,
+    gap: isTinyScreen ? 6 : 8,
+  },
+  sectionTitle: {
+    fontSize: isTinyScreen ? 14 : 16,
+    fontWeight: 'bold',
+    letterSpacing: 0.3,
+  },
+
+  // Category Grid
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: isTinyScreen ? 8 : 10,
+  },
+  categoriesGridTablet: {
+    gap: 12,
+  },
+  categoryCard: {
+    width: isTinyScreen ? (screenWidth - 56) / 2 : (screenWidth - 60) / 2,
+    padding: isTinyScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 12 : 16,
+    alignItems: 'center',
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
+      },
+    }),
+  },
+  categoryIconContainer: {
+    width: isTinyScreen ? 36 : 44,
+    height: isTinyScreen ? 36 : 44,
+    borderRadius: isTinyScreen ? 18 : 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: isTinyScreen ? 8 : 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  categoryContent: {
+    alignItems: 'center',
+  },
+  categoryTitle: {
+    fontWeight: 'bold',
+    marginBottom: isTinyScreen ? 2 : 4,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
+  categoryDesc: {
+    textAlign: 'center',
+    lineHeight: isTinyScreen ? 12 : 14,
+    fontWeight: '500',
+  },
+
+  // Priority Selection
+  priorityContainer: {
+    flexDirection: 'row',
+    gap: isTinyScreen ? 6 : 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  priorityContainerTablet: {
+    gap: 12,
+  },
+  priorityButton: {
+    flex: 1,
+    minWidth: isTinyScreen ? 80 : 90,
+    padding: isTinyScreen ? 12 : 16,
+    borderRadius: isTinyScreen ? 12 : 16,
+    alignItems: 'center',
+    borderWidth: 2,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
+      },
+    }),
+  },
+  priorityButtonSelected: {
+    transform: [{ scale: 1.02 }],
+  },
+  priorityText: {
+    fontWeight: 'bold',
+    marginBottom: isTinyScreen ? 2 : 4,
+    letterSpacing: 0.3,
+  },
+  priorityDesc: {
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: isTinyScreen ? 12 : 14,
+  },
+
+  // Input Components
+  inputContainer: {
+    borderRadius: isTinyScreen ? 12 : 14,
+    borderWidth: 1,
+    marginBottom: isTinyScreen ? 6 : 8,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 1,
+      },
+      web: {
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+      },
+    }),
+  },
+  input: {
+    paddingHorizontal: isTinyScreen ? 12 : 16,
+    paddingVertical: isTinyScreen ? 10 : 12,
+    fontWeight: '500',
+  },
+  messageContainer: {
+    minHeight: isTinyScreen ? 120 : 140,
+    paddingBottom: isTinyScreen ? 6 : 8,
+  },
+  messageInput: {
+    paddingTop: isTinyScreen ? 10 : 12,
+    minHeight: isTinyScreen ? 100 : 120,
+    textAlignVertical: 'top',
+  },
+  messageBoxFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: isTinyScreen ? 6 : 8,
+    paddingHorizontal: 4,
+  },
+  attachmentIconButton: {
+    position: 'relative',
+    padding: isTinyScreen ? 6 : 8,
+    borderRadius: isTinyScreen ? 16 : 20,
+  },
+  attachmentBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    borderRadius: 8,
+    minWidth: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentBadgeText: {
+    fontSize: 8,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  compactAttachmentsList: {
+    marginTop: isTinyScreen ? 6 : 8,
+    paddingTop: isTinyScreen ? 6 : 8,
+    borderTopWidth: 1,
+  },
+  compactAttachmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: isTinyScreen ? 3 : 4,
+    paddingHorizontal: isTinyScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 3 : 4,
+    borderRadius: isTinyScreen ? 6 : 8,
+  },
+  compactAttachmentName: {
+    flex: 1,
+    fontSize: isTinyScreen ? 10 : 12,
+    fontWeight: '500',
+  },
+  compactRemoveButton: {
+    padding: isTinyScreen ? 3 : 4,
+    borderRadius: isTinyScreen ? 8 : 10,
+  },
+  charCount: {
+    fontSize: isTinyScreen ? 10 : 12,
+    fontWeight: '500',
+  },
+
+  // Submit Button
+  submitButton: {
+    borderRadius: isTinyScreen ? 14 : 16,
+    marginBottom: isTinyScreen ? 20 : 24,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)',
+      },
+    }),
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: isTinyScreen ? 14 : 16,
+    gap: isTinyScreen ? 6 : 8,
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+
+  // Recent Tickets
+  recentTicketsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingVertical: isTinyScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 12 : 16,
+  },
+  recentTicketsTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isTinyScreen ? 6 : 8,
+  },
+  recentTicketsTitleText: {
+    fontWeight: 'bold',
+    letterSpacing: 0.3,
+  },
+  refreshButton: {
+    padding: isTinyScreen ? 6 : 8,
+    borderRadius: isTinyScreen ? 16 : 20,
+  },
+  ticketsContainer: {
+    gap: isTinyScreen ? 10 : 12,
+  },
+  ticketCard: {
+    borderRadius: isTinyScreen ? 12 : 16,
+    padding: isTinyScreen ? 14 : 18,
+    marginBottom: isTinyScreen ? 10 : 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.08)',
+      },
+    }),
+  },
+  ticketCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: isTinyScreen ? 8 : 12,
+  },
+  ticketIdSection: {
+    flex: 1,
+  },
+  ticketIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isTinyScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 4 : 6,
+  },
+  ticketIdLabel: {
+    fontSize: isTinyScreen ? 9 : 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  copyButton: {
+    padding: isTinyScreen ? 4 : 6,
+    borderRadius: isTinyScreen ? 4 : 6,
+    borderWidth: 1,
+  },
+  statusPriorityContainer: {
+    alignItems: 'flex-end',
+    gap: isTinyScreen ? 6 : 8,
+  },
+  statusBadge: {
+    paddingHorizontal: isTinyScreen ? 8 : 10,
+    paddingVertical: isTinyScreen ? 4 : 6,
+    borderRadius: isTinyScreen ? 12 : 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isTinyScreen ? 3 : 4,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  priorityIndicator: {
+    width: isTinyScreen ? 10 : 12,
+    height: isTinyScreen ? 10 : 12,
+    borderRadius: isTinyScreen ? 5 : 6,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  ticketTitle: {
+    fontWeight: '600',
+    lineHeight: isTinyScreen ? 18 : 20,
+    marginBottom: isTinyScreen ? 6 : 8,
+    letterSpacing: 0.2,
+  },
+  ticketDescription: {
+    lineHeight: isTinyScreen ? 16 : 18,
+    marginBottom: isTinyScreen ? 12 : 16,
+    opacity: 0.8,
+  },
+  ticketFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: isTinyScreen ? 8 : 12,
+    borderTopWidth: 1,
+  },
+  ticketMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isTinyScreen ? 6 : 8,
+  },
+  categoryBadge: {
+    paddingHorizontal: isTinyScreen ? 6 : 8,
+    paddingVertical: isTinyScreen ? 3 : 4,
+    borderRadius: isTinyScreen ? 8 : 10,
+  },
+  categoryText: {
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  ticketDate: {
+    fontWeight: '500',
+  },
+  viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isTinyScreen ? 3 : 4,
+    paddingHorizontal: isTinyScreen ? 8 : 10,
+    paddingVertical: isTinyScreen ? 4 : 6,
+    borderRadius: isTinyScreen ? 12 : 14,
+  },
+  viewButtonText: {
+    fontWeight: '600',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: isTinyScreen ? 12 : 14,
+    borderRadius: isTinyScreen ? 10 : 12,
+    gap: isTinyScreen ? 6 : 8,
+    marginTop: isTinyScreen ? 6 : 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  viewAllText: {
+    fontWeight: '600',
+  },
+  emptyTicketsContainer: {
+    alignItems: 'center',
+    padding: isTinyScreen ? 24 : 32,
+    borderRadius: isTinyScreen ? 12 : 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  emptyTicketsText: {
+    textAlign: 'center',
+    marginTop: isTinyScreen ? 8 : 12,
+    lineHeight: isTinyScreen ? 16 : 18,
+    fontWeight: '500',
+  },
+
+  // Contact Card
+  contactCard: {
+    margin: isTinyScreen ? 0 : 0,
+    marginBottom: isTinyScreen ? 16 : 20,
+    borderRadius: isTinyScreen ? 16 : 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+      },
+    }),
+  },
+  contactGradient: {
+    padding: isTinyScreen ? 16 : 20,
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: isTinyScreen ? 6 : 8,
+    marginBottom: isTinyScreen ? 16 : 20,
+  },
+  contactTitle: {
+    fontWeight: 'bold',
+    letterSpacing: 0.3,
+  },
+  contactItems: {
+    gap: isTinyScreen ? 12 : 16,
+    alignItems: 'center',
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: isTinyScreen ? 8 : 10,
+    paddingVertical: isTinyScreen ? 8 : 10,
+    paddingHorizontal: isTinyScreen ? 12 : 16,
+    width: '100%',
+    borderRadius: isTinyScreen ? 8 : 10,
+  },
+  contactText: {
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  responseTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: isTinyScreen ? 6 : 8,
+    marginTop: isTinyScreen ? 12 : 16,
+    paddingTop: isTinyScreen ? 12 : 16,
+    borderTopWidth: 1,
+  },
+  responseTime: {
+    fontWeight: '500',
+  },
+});
 
 export default ContactSupportScreen;
