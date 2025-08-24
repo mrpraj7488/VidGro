@@ -1406,13 +1406,14 @@ export default function ViewTab() {
               if (videoUnavailable) return;
               
               try {
-                console.log('🎬 Creating YouTube player with video ID: ${youtubeVideoId}');
+                const videoId = '` + youtubeVideoId + `';
+                console.log('🎬 Creating YouTube player with video ID:', videoId);
                 player = new YT.Player('youtube-player', {
                   height: '100%',
                   width: '100%',
-                  videoId: '${youtubeVideoId}',
+                  videoId: videoId,
                   playerVars: {
-                    'autoplay': 0,  // Don't autoplay immediately
+                    'autoplay': 0,
                     'controls': 0,
                     'disablekb': 1,
                     'fs': 0,
@@ -1421,7 +1422,8 @@ export default function ViewTab() {
                     'playsinline': 1,
                     'rel': 0,
                     'showinfo': 0,
-                    'mute': 1  // Start muted for autoplay to work
+                    'mute': 1,
+                    'origin': window.location.origin
                   },
                   events: {
                     'onReady': onPlayerReady,
@@ -1455,15 +1457,8 @@ export default function ViewTab() {
                 
                 console.log('📹 Video loaded successfully:', videoData.title);
                 
-                // Unmute after player is ready (if needed for UX)
-                try {
-                  event.target.unMute();
-                  console.log('🔊 Unmuted player');
-                } catch (e) {
-                  console.log('⚠️ Could not unmute, continuing muted');
-                }
-                
-                if (window.pendingPlayRequest) {
+                // Start with autoplay (muted for mobile compatibility)
+                if (window.pendingPlayRequest && !timerCompleted) {
                   console.log('🎯 Executing pending play request');
                   event.target.playVideo();
                   window.pendingPlayRequest = false;
