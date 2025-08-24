@@ -821,12 +821,12 @@ export default function ViewTab() {
                   if (playerReady && player && !timerCompleted) {
                     console.log('✅ All conditions met, calling player.playVideo()');
                     player.playVideo();
+                    // Immediately notify that we're playing
+                    notifyReactNative('videoPlaying');
                   } else {
-                    console.log('❌ Cannot play video:', {
-                      playerReady: playerReady,
-                      hasPlayer: !!player,
-                      timerCompleted: timerCompleted
-                    });
+                    console.log('❌ Cannot play video - player not ready yet');
+                    // Store the play request to execute when player is ready
+                    window.pendingPlayRequest = true;
                   }
                 }
                 
@@ -885,7 +885,14 @@ export default function ViewTab() {
                   return;
                 }
                 
-                event.target.playVideo();
+                // Check if there's a pending play request
+                if (window.pendingPlayRequest) {
+                  console.log('🎯 Executing pending play request');
+                  event.target.playVideo();
+                  window.pendingPlayRequest = false;
+                  notifyReactNative('videoPlaying');
+                }
+                
                 notifyReactNative('videoLoaded');
                 
               } catch (e) {
