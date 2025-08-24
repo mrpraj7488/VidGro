@@ -1,31 +1,63 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+  Dimensions,
+  ActivityIndicator,
+  RefreshControl,
+  FlatList,
+  Alert,
+  Animated
+} from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { 
+  Send, 
+  Paperclip, 
+  X, 
+  ArrowLeft, 
+  Shield, 
+  User as UserIcon,
+  FileText,
+  Image as ImageIcon,
+  Download,
+  Check,
+  RefreshCw,
+  AlertCircle,
+  Clock,
+  MessageSquare,
+  CheckCircle,
+  XCircle
+} from 'lucide-react-native';
+import { getSupabase } from '@/lib/supabase';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import CustomAlert from '@/components/CustomAlert';
+import * as DocumentPicker from 'expo-document-picker';
+import FileUploadService from '@/services/FileUploadService';
 
-export default function TicketDetailScreen() {
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 380;
+
+function TicketDetailScreen() {
+  const { profile, user } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
-  
-  return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: 18, color: '#000000' }}>Ticket Detail Screen</Text>
-      <Text style={{ fontSize: 14, color: '#666666', marginTop: 10 }}>
-        Ticket ID: {params.id || 'No ID'}
-      </Text>
-      <TouchableOpacity 
-        style={{ 
-          backgroundColor: '#800080', 
-          padding: 12, 
-          borderRadius: 8, 
-          marginTop: 20 
-        }}
-        onPress={() => router.back()}
-      >
-        <Text style={{ color: 'white' }}>Go Back</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+  const supabase = getSupabase();
+  const { showError, showSuccess, showInfo, alertProps, showAlert } = useCustomAlert();
+  const scrollViewRef = useRef(null);
+
+  // State
+  const [ticket, setTicket] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -35,12 +67,6 @@ export default function TicketDetailScreen() {
   const [realtimeSubscription, setRealtimeSubscription] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
-
-  // Animation values for interactive elements
-  const sendButtonScale = useSharedValue(1);
-  const attachButtonScale = useSharedValue(1);
-  const refreshButtonScale = useSharedValue(1);
-  const downloadButtonScale = useSharedValue(1);
 
   // Load ticket data
   useEffect(() => {
@@ -153,15 +179,6 @@ export default function TicketDetailScreen() {
   };
 
   const onRefresh = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    
-    refreshButtonScale.value = withSequence(
-      withSpring(0.9, { damping: 15, stiffness: 400 }),
-      withSpring(1, { damping: 15, stiffness: 400 })
-    );
-
     setRefreshing(true);
     await loadTicketData();
     setRefreshing(false);
@@ -170,15 +187,6 @@ export default function TicketDetailScreen() {
   const handleSendMessage = async () => {
     if (!newMessage.trim() && attachments.length === 0) return;
     if (!user?.id || !params.id) return;
-
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-
-    sendButtonScale.value = withSequence(
-      withSpring(0.9, { damping: 15, stiffness: 400 }),
-      withSpring(1, { damping: 15, stiffness: 400 })
-    );
 
     setSending(true);
     try {
@@ -247,15 +255,6 @@ export default function TicketDetailScreen() {
       return;
     }
 
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-
-    attachButtonScale.value = withSequence(
-      withSpring(0.9, { damping: 15, stiffness: 400 }),
-      withSpring(1, { damping: 15, stiffness: 400 })
-    );
-
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'application/pdf', 'text/*'],
@@ -294,14 +293,13 @@ export default function TicketDetailScreen() {
   };
 
   const getStatusIcon = (status) => {
-    const iconSize = isTinyScreen ? 16 : isSmallScreen ? 18 : 20;
     switch(status) {
-      case 'active': return <AlertCircle size={iconSize} color="#3498DB" />;
-      case 'pending': return <Clock size={iconSize} color="#F39C12" />;
-      case 'answered': return <MessageSquare size={iconSize} color="#800080" />;
-      case 'completed': return <CheckCircle size={iconSize} color="#27AE60" />;
-      case 'closed': return <XCircle size={iconSize} color="#95A5A6" />;
-      default: return <AlertCircle size={iconSize} color="#95A5A6" />;
+      case 'active': return <AlertCircle size={20} color="#3498DB" />;
+      case 'pending': return <Clock size={20} color="#F39C12" />;
+      case 'answered': return <MessageSquare size={20} color="#800080" />;
+      case 'completed': return <CheckCircle size={20} color="#27AE60" />;
+      case 'closed': return <XCircle size={20} color="#95A5A6" />;
+      default: return <AlertCircle size={20} color="#95A5A6" />;
     }
   };
 
@@ -316,27 +314,9 @@ export default function TicketDetailScreen() {
     }
   };
 
-  const handleDownloadAttachment = async (attachment) => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-
-    downloadButtonScale.value = withSequence(
-      withSpring(0.9, { damping: 15, stiffness: 400 }),
-      withSpring(1, { damping: 15, stiffness: 400 })
-    );
-
-    if (attachment.url) {
-      const downloadUrl = await FileUploadService.getDownloadUrl(attachment.path);
-      if (downloadUrl) {
-        showInfo('Opening File', `Opening ${attachment.name}...`);
-      }
-    }
-  };
-
   const renderMessage = ({ item, index }) => {
     const isAdmin = item.is_admin;
-    const isCurrentUser = !isAdmin;
+    const isCurrentUser = !isAdmin;  // User message when NOT admin
     const messageTime = new Date(item.created_at);
     const timeString = messageTime.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
@@ -344,10 +324,6 @@ export default function TicketDetailScreen() {
       hour12: true 
     });
     const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'You';
-
-    const downloadAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: downloadButtonScale.value }],
-    }));
 
     return (
       <Animated.View 
@@ -365,63 +341,62 @@ export default function TicketDetailScreen() {
           <View style={[
             styles.avatar, 
             { 
-              backgroundColor: isDark ? colors.primary : '#075E54',
-              width: isTinyScreen ? 28 : isSmallScreen ? 32 : 36,
-              height: isTinyScreen ? 28 : isSmallScreen ? 32 : 36,
-              borderRadius: isTinyScreen ? 14 : isSmallScreen ? 16 : 18,
-              marginRight: isTinyScreen ? 6 : 8
+              backgroundColor: '#075E54',
+              marginRight: 8
             }
           ]}>
-            <Shield size={isTinyScreen ? 12 : isSmallScreen ? 14 : 16} color="white" />
+            <Shield size={18} color="white" />
           </View>
         )}
         
-        <View style={[styles.messageContent, { maxWidth: isTablet ? '60%' : '75%' }]}>
+        <View style={styles.messageContent}>
           {/* Sender name label */}
-          <Text style={[
-            styles.senderLabel,
-            {
-              fontSize: isTinyScreen ? 10 : isSmallScreen ? 11 : 12,
-              color: isAdmin ? (isDark ? colors.primary : '#075E54') : (isDark ? colors.accent : '#128C7E'),
-              marginBottom: isTinyScreen ? 2 : 4,
-              marginLeft: isAdmin ? (isTinyScreen ? 8 : 12) : 0,
-              marginRight: isCurrentUser ? (isTinyScreen ? 8 : 12) : 0,
-              textAlign: isCurrentUser ? 'right' : 'left'
-            }
-          ]}>
-            {isAdmin ? 'Support Team' : userName}
+          <Text style={{
+            fontSize: 12,
+            color: isAdmin ? '#075E54' : '#128C7E',
+            fontWeight: '600',
+            marginBottom: 4,
+            marginLeft: isAdmin ? 12 : 0,
+            marginRight: isCurrentUser ? 12 : 0,
+            textAlign: isCurrentUser ? 'right' : 'left'
+          }}>
+            {isAdmin ? 'Admin' : userName}
           </Text>
           
-          {/* Message bubble with gradient */}
-          <LinearGradient
-            colors={
-              isCurrentUser 
-                ? isDark 
-                  ? ['rgba(74, 144, 226, 0.15)', 'rgba(74, 144, 226, 0.08)']
-                  : ['rgba(128, 0, 128, 0.12)', 'rgba(128, 0, 128, 0.06)']
-                : isDark
-                  ? ['rgba(45, 55, 72, 0.8)', 'rgba(45, 55, 72, 0.6)']
-                  : ['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.85)']
+          {/* Message bubble with tail */}
+          <View style={[
+            styles.messageBubble,
+            isCurrentUser ? styles.userBubble : styles.adminBubble,
+            { 
+              backgroundColor: isCurrentUser 
+                ? '#DCF8C6'
+                : '#FFFFFF',
+              maxWidth: screenWidth * 0.75,
+              borderWidth: isAdmin ? 1 : 0,
+              borderColor: isAdmin ? '#E5E5E5' : 'transparent'
             }
-            style={[
-              styles.messageBubble,
-              isCurrentUser ? styles.userBubble : styles.adminBubble,
-              { 
-                maxWidth: isTablet ? screenWidth * 0.6 : screenWidth * 0.75,
-                borderWidth: 1,
-                borderColor: isDark ? colors.border : 'rgba(0, 0, 0, 0.08)',
-                paddingHorizontal: isTinyScreen ? 10 : isSmallScreen ? 12 : 14,
-                paddingVertical: isTinyScreen ? 8 : isSmallScreen ? 10 : 12
+          ]}>
+            {/* Tail for message bubble */}
+            <View style={[
+              styles.messageTail,
+              isCurrentUser ? styles.userTail : styles.adminTail,
+              {
+                backgroundColor: isCurrentUser 
+                  ? '#DCF8C6'
+                  : '#FFFFFF',
+                borderLeftWidth: isAdmin ? 1 : 0,
+                borderTopWidth: isAdmin ? 1 : 0,
+                borderColor: isAdmin ? '#E5E5E5' : 'transparent'
               }
-            ]}
-          >
+            ]} />
+            
             {/* Message text */}
             <Text style={[
               styles.messageText, 
               { 
-                color: colors.text,
-                fontSize: isTinyScreen ? 13 : isSmallScreen ? 14 : 15,
-                lineHeight: isTinyScreen ? 18 : isSmallScreen ? 20 : 22
+                color: '#303030',
+                fontSize: 15,
+                lineHeight: 20
               }
             ]}>
               {item.message}
@@ -429,73 +404,74 @@ export default function TicketDetailScreen() {
 
             {/* Attachments */}
             {item.attachments && item.attachments.length > 0 && (
-              <View style={[styles.messageAttachments, { marginTop: isTinyScreen ? 6 : 8 }]}>
+              <View style={styles.messageAttachments}>
                 {item.attachments.map((attachment: any, idx: number) => (
-                  <AnimatedTouchableOpacity 
+                  <TouchableOpacity 
                     key={idx} 
                     style={[
                       styles.attachmentChip,
                       { 
-                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                        backgroundColor: isCurrentUser 
+                          ? 'rgba(0,0,0,0.05)' 
+                          : 'rgba(0,0,0,0.03)',
                         borderWidth: 1,
-                        borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-                        paddingHorizontal: isTinyScreen ? 6 : 8,
-                        paddingVertical: isTinyScreen ? 4 : 6,
-                        borderRadius: isTinyScreen ? 8 : 10
-                      },
-                      downloadAnimatedStyle
+                        borderColor: 'rgba(0,0,0,0.1)'
+                      }
                     ]}
-                    onPress={() => handleDownloadAttachment(attachment)}
+                    onPress={async () => {
+                      if (attachment.url) {
+                        const downloadUrl = await FileUploadService.getDownloadUrl(attachment.path);
+                        if (downloadUrl) {
+                          showInfo('Opening File', `Opening ${attachment.name}...`);
+                        }
+                      }
+                    }}
                   >
                     {attachment.type?.includes('image') ? (
-                      <ImageIcon size={isTinyScreen ? 10 : 12} color={colors.primary} />
+                      <ImageIcon size={14} color="#128C7E" />
                     ) : (
-                      <FileText size={isTinyScreen ? 10 : 12} color={colors.primary} />
+                      <FileText size={14} color="#128C7E" />
                     )}
                     <Text 
                       style={[
                         styles.attachmentName, 
                         { 
-                          color: colors.text,
-                          fontSize: isTinyScreen ? 10 : 11,
-                          maxWidth: isTinyScreen ? 80 : 100
+                          color: '#4A5568'
                         }
                       ]} 
                       numberOfLines={1}
                     >
                       {attachment.name}
                     </Text>
-                    <Download size={isTinyScreen ? 8 : 10} color={colors.primary} />
-                  </AnimatedTouchableOpacity>
+                    <Download size={12} color="#128C7E" />
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
 
             {/* Time and status */}
-            <View style={[styles.messageFooter, { marginTop: isTinyScreen ? 4 : 6 }]}>
+            <View style={styles.messageFooter}>
               <Text style={[
                 styles.messageTime, 
                 { 
-                  color: colors.textSecondary,
-                  fontSize: isTinyScreen ? 9 : 10
+                  color: '#8696A0',
+                  fontSize: 11
                 }
               ]}>
                 {timeString}
               </Text>
               {isCurrentUser && (
-                <Text style={[
-                  styles.messageStatus,
-                  {
-                    fontSize: isTinyScreen ? 9 : 10,
-                    color: item.sent === false ? colors.error : colors.success,
-                    marginLeft: isTinyScreen ? 4 : 6
-                  }
-                ]}>
+                <Text style={{
+                  fontSize: 11,
+                  color: item.sent === false ? '#FF6B6B' : '#4CAF50',
+                  marginLeft: 6,
+                  fontStyle: 'italic'
+                }}>
                   {item.sent === false ? 'Not sent' : 'Sent'}
                 </Text>
               )}
             </View>
-          </LinearGradient>
+          </View>
         </View>
         
         {/* Avatar for user messages - RIGHT SIDE */}
@@ -503,21 +479,11 @@ export default function TicketDetailScreen() {
           <View style={[
             styles.avatar, 
             { 
-              backgroundColor: isDark ? colors.accent : '#128C7E',
-              width: isTinyScreen ? 28 : isSmallScreen ? 32 : 36,
-              height: isTinyScreen ? 28 : isSmallScreen ? 32 : 36,
-              borderRadius: isTinyScreen ? 14 : isSmallScreen ? 16 : 18,
-              marginLeft: isTinyScreen ? 6 : 8
+              backgroundColor: '#128C7E',
+              marginLeft: 8
             }
           ]}>
-            <Text style={[
-              styles.avatarText,
-              { 
-                fontSize: isTinyScreen ? 12 : isSmallScreen ? 13 : 14,
-                fontWeight: 'bold',
-                color: 'white'
-              }
-            ]}>
+            <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>
               {userName.charAt(0).toUpperCase()}
             </Text>
           </View>
@@ -526,43 +492,26 @@ export default function TicketDetailScreen() {
     );
   };
 
-  const refreshAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: refreshButtonScale.value }],
-  }));
-
-  const sendAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: sendButtonScale.value }],
-  }));
-
-  const attachAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: attachButtonScale.value }],
-  }));
-
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <LinearGradient
-          colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#9932CC']}
-          style={styles.header}
+          colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#800080']}
+          style={styles.gradientHeader}
         >
           <View style={styles.headerContent}>
             <TouchableOpacity 
               style={styles.backButton}
               onPress={() => router.back()}
             >
-              <ArrowLeft size={isTinyScreen ? 20 : 24} color="white" />
+              <ArrowLeft size={24} color="white" />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { fontSize: isTinyScreen ? 16 : isSmallScreen ? 18 : 20 }]}>
-              Loading...
-            </Text>
-            <View style={{ width: isTinyScreen ? 32 : 40 }} />
+            <Text style={styles.headerTitle}>Loading...</Text>
+            <View style={{ width: 40 }} />
           </View>
         </LinearGradient>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.text, fontSize: isTinyScreen ? 14 : 16 }]}>
-            Loading ticket details...
-          </Text>
         </View>
       </View>
     );
@@ -571,29 +520,9 @@ export default function TicketDetailScreen() {
   if (!ticket) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient
-          colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#9932CC']}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <ArrowLeft size={isTinyScreen ? 20 : 24} color="white" />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { fontSize: isTinyScreen ? 16 : isSmallScreen ? 18 : 20 }]}>
-              Ticket Not Found
-            </Text>
-            <View style={{ width: isTinyScreen ? 32 : 40 }} />
-          </View>
-        </LinearGradient>
-        <View style={styles.errorContainer}>
-          <XCircle size={isTinyScreen ? 40 : 48} color={colors.error} />
-          <Text style={[styles.errorText, { color: colors.text, fontSize: isTinyScreen ? 14 : 16 }]}>
-            Ticket not found
-          </Text>
-        </View>
+        <Text style={[styles.errorText, { color: colors.text }]}>
+          Ticket not found
+        </Text>
       </View>
     );
   }
@@ -605,154 +534,64 @@ export default function TicketDetailScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Enhanced Header with Gradient */}
       <LinearGradient
-        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#9932CC']}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={isDark ? [colors.headerBackground, colors.surface] : ['#800080', '#800080']}
+        style={styles.gradientHeader}
       >
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={isTinyScreen ? 20 : 24} color="white" />
+            <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
-            <Text style={[
-              styles.headerTitle, 
-              { fontSize: isTinyScreen ? 14 : isSmallScreen ? 16 : 18 }
-            ]} numberOfLines={1}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
               #{ticket.id.slice(0, 8)}
             </Text>
             <View style={[
               styles.statusBadge, 
-              { 
-                backgroundColor: getStatusColor(ticket.status) + (isDark ? '40' : '30'),
-                paddingHorizontal: isTinyScreen ? 6 : 8,
-                paddingVertical: isTinyScreen ? 2 : 4,
-                borderRadius: isTinyScreen ? 8 : 10
-              }
+              { backgroundColor: getStatusColor(ticket.status) + '30' }
             ]}>
               {getStatusIcon(ticket.status)}
-              <Text style={[
-                styles.statusText, 
-                { 
-                  color: getStatusColor(ticket.status),
-                  fontSize: isTinyScreen ? 8 : isSmallScreen ? 9 : 10
-                }
-              ]}>
+              <Text style={[styles.statusText, { color: getStatusColor(ticket.status) }]}>
                 {ticket.status.toUpperCase()}
               </Text>
             </View>
           </View>
-          <AnimatedTouchableOpacity 
-            style={[styles.refreshButton, refreshAnimatedStyle]}
+          <TouchableOpacity 
+            style={styles.refreshButton}
             onPress={onRefresh}
           >
-            <RefreshCw size={isTinyScreen ? 16 : 18} color="white" />
-          </AnimatedTouchableOpacity>
+            <RefreshCw size={20} color="white" />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      {/* Ticket Info Card */}
-      <View style={[
-        styles.ticketInfoCard, 
-        { 
-          backgroundColor: colors.surface,
-          marginHorizontal: isTinyScreen ? 8 : isSmallScreen ? 12 : 16,
-          marginTop: isTinyScreen ? 8 : 12,
-          borderRadius: isTinyScreen ? 12 : 16,
-          padding: isTinyScreen ? 12 : isSmallScreen ? 16 : 20
-        }
-      ]}>
-        <LinearGradient
-          colors={isDark ? ['rgba(74, 144, 226, 0.1)', 'rgba(74, 144, 226, 0.05)'] : ['rgba(128, 0, 128, 0.08)', 'rgba(128, 0, 128, 0.03)']}
-          style={styles.ticketInfoGradient}
-        >
-          <Text style={[
-            styles.ticketTitle, 
-            { 
-              color: colors.text,
-              fontSize: isTinyScreen ? 14 : isSmallScreen ? 16 : 18,
-              lineHeight: isTinyScreen ? 18 : isSmallScreen ? 22 : 24
-            }
-          ]}>
-            {ticket.title}
+      {/* Ticket Info */}
+      <View style={[styles.ticketInfo, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.ticketTitle, { color: colors.text }]}>
+          {ticket.title}
+        </Text>
+        <View style={styles.ticketMeta}>
+          <Text style={[styles.ticketMetaText, { color: colors.textSecondary }]}>
+            Category: {ticket.category}
           </Text>
-          <View style={[
-            styles.ticketMeta,
-            isTablet ? styles.ticketMetaTablet : styles.ticketMetaMobile
-          ]}>
-            <View style={styles.metaItem}>
-              <Text style={[
-                styles.metaLabel, 
-                { 
-                  color: colors.textSecondary,
-                  fontSize: isTinyScreen ? 10 : 11
-                }
-              ]}>
-                Category
-              </Text>
-              <Text style={[
-                styles.metaValue, 
-                { 
-                  color: colors.text,
-                  fontSize: isTinyScreen ? 11 : 12
-                }
-              ]}>
-                {ticket.category}
-              </Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Text style={[
-                styles.metaLabel, 
-                { 
-                  color: colors.textSecondary,
-                  fontSize: isTinyScreen ? 10 : 11
-                }
-              ]}>
-                Priority
-              </Text>
-              <Text style={[
-                styles.metaValue, 
-                { 
-                  color: colors.text,
-                  fontSize: isTinyScreen ? 11 : 12
-                }
-              ]}>
-                {ticket.priority}
-              </Text>
-            </View>
-          </View>
-        </LinearGradient>
+          <Text style={[styles.ticketMetaText, { color: colors.textSecondary }]}>
+            Priority: {ticket.priority}
+          </Text>
+        </View>
       </View>
 
-      {/* Messages Container with Chat Background */}
-      <View style={[
-        styles.chatContainer, 
-        { 
-          backgroundColor: isDark ? 'rgba(26, 32, 44, 0.6)' : 'rgba(229, 221, 213, 0.8)',
-          marginHorizontal: isTinyScreen ? 8 : isSmallScreen ? 12 : 16,
-          marginTop: isTinyScreen ? 8 : 12,
-          borderRadius: isTinyScreen ? 12 : 16,
-          flex: 1
-        }
-      ]}>
+      {/* Chat Background */}
+      <View style={[styles.chatBackground, { backgroundColor: isDark ? '#1A202C' : '#E5DDD5' }]}>
+        {/* Messages */}
         <FlatList
           ref={scrollViewRef}
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id || Math.random().toString()}
-          contentContainerStyle={[
-            styles.messagesContainer,
-            { 
-              paddingHorizontal: isTinyScreen ? 8 : isSmallScreen ? 12 : 16,
-              paddingVertical: isTinyScreen ? 12 : 16,
-              paddingBottom: isTinyScreen ? 40 : isTablet ? 60 : 50
-            }
-          ]}
+          contentContainerStyle={styles.messagesContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -763,179 +602,129 @@ export default function TicketDetailScreen() {
             />
           }
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          ItemSeparatorComponent={() => <View style={{ height: isTinyScreen ? 6 : 8 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         />
       </View>
 
-      {/* Input Area Card */}
+      {/* Input Area */}
       {!isTicketClosed && (
         <View style={[
-          styles.inputAreaCard, 
+          styles.inputArea, 
           { 
-            backgroundColor: colors.surface,
-            marginHorizontal: isTinyScreen ? 8 : isSmallScreen ? 12 : 16,
-            marginBottom: isTinyScreen ? 8 : 12,
-            borderRadius: isTinyScreen ? 12 : 16,
-            padding: isTinyScreen ? 8 : isSmallScreen ? 12 : 16
+            backgroundColor: isDark ? '#2D3748' : '#FFFFFF',
+            borderTopWidth: 1,
+            borderTopColor: isDark ? '#4A5568' : '#E2E8F0',
+            ...Platform.select({
+              ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 3,
+              },
+              android: {
+                elevation: 8,
+              },
+            }),
           }
         ]}>
-          <LinearGradient
-            colors={isDark ? ['rgba(74, 144, 226, 0.08)', 'rgba(74, 144, 226, 0.03)'] : ['rgba(128, 0, 128, 0.06)', 'rgba(128, 0, 128, 0.02)']}
-            style={styles.inputAreaGradient}
-          >
-            {/* Attachments Preview */}
-            {attachments.length > 0 && (
-              <ScrollView 
-                horizontal 
-                style={[styles.attachmentsPreview, { marginBottom: isTinyScreen ? 6 : 8 }]}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingRight: 16 }}
-              >
-                {attachments.map((attachment, index) => (
-                  <View key={index} style={[
-                    styles.attachmentPreview, 
-                    { 
-                      backgroundColor: isDark ? 'rgba(74, 144, 226, 0.15)' : 'rgba(128, 0, 128, 0.1)',
-                      borderColor: isDark ? 'rgba(74, 144, 226, 0.3)' : 'rgba(128, 0, 128, 0.2)',
-                      paddingHorizontal: isTinyScreen ? 8 : 10,
-                      paddingVertical: isTinyScreen ? 6 : 8,
-                      borderRadius: isTinyScreen ? 12 : 16,
-                      marginRight: isTinyScreen ? 6 : 8
-                    }
-                  ]}>
-                    <FileText size={isTinyScreen ? 12 : 14} color={colors.primary} />
-                    <Text style={[
-                      styles.attachmentPreviewName, 
-                      { 
-                        color: colors.text,
-                        fontSize: isTinyScreen ? 10 : 11,
-                        maxWidth: isTinyScreen ? 80 : 100
-                      }
-                    ]} numberOfLines={1}>
-                      {attachment.name}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => removeAttachment(index)}
-                      style={styles.removeAttachment}
-                    >
-                      <X size={isTinyScreen ? 12 : 14} color={colors.error} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-            
-            {/* Input Row */}
-            <View style={[styles.inputRow, { gap: isTinyScreen ? 6 : 8 }]}>
-              <AnimatedTouchableOpacity 
-                style={[
-                  styles.attachButton,
+          {attachments.length > 0 && (
+            <ScrollView 
+              horizontal 
+              style={styles.attachmentsPreview}
+              showsHorizontalScrollIndicator={false}
+            >
+              {attachments.map((attachment, index) => (
+                <View key={index} style={[
+                  styles.attachmentPreview, 
                   { 
-                    backgroundColor: isDark ? 'rgba(74, 144, 226, 0.2)' : 'rgba(128, 0, 128, 0.15)',
-                    opacity: attachments.length >= 3 ? 0.5 : 1,
-                    width: isTinyScreen ? 36 : 40,
-                    height: isTinyScreen ? 36 : 40,
-                    borderRadius: isTinyScreen ? 18 : 20
-                  },
-                  attachAnimatedStyle
-                ]}
-                onPress={handlePickDocument}
-                disabled={attachments.length >= 3}
-              >
-                <Paperclip 
-                  size={isTinyScreen ? 16 : 18} 
-                  color={attachments.length >= 3 
-                    ? colors.textSecondary
-                    : colors.primary
-                  } 
-                />
-              </AnimatedTouchableOpacity>
-              
-              <View style={[
-                styles.messageInputContainer,
+                    backgroundColor: isDark ? '#4A5568' : '#F7FAFC',
+                    borderColor: isDark ? '#718096' : '#CBD5E0'
+                  }
+                ]}>
+                  <FileText size={14} color={colors.primary} />
+                  <Text style={[styles.attachmentPreviewName, { color: colors.text }]} numberOfLines={1}>
+                    {attachment.name}
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={() => removeAttachment(index)}
+                    style={styles.removeAttachment}
+                  >
+                    <XCircle size={18} color={isDark ? '#F56565' : '#E53E3E'} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+          
+          <View style={styles.inputRow}>
+            <TouchableOpacity 
+              style={[
+                styles.attachButton,
                 { 
-                  backgroundColor: colors.inputBackground,
-                  borderColor: colors.border,
-                  borderRadius: isTinyScreen ? 18 : 20,
-                  minHeight: isTinyScreen ? 36 : 40,
-                  maxHeight: isTinyScreen ? 80 : 100
+                  backgroundColor: isDark ? '#4A5568' : '#EDF2F7',
+                  opacity: attachments.length >= 3 ? 0.5 : 1
                 }
-              ]}>
-                <TextInput
-                  style={[
-                    styles.messageInput, 
-                    { 
-                      color: colors.text,
-                      fontSize: isTinyScreen ? 13 : 14,
-                      paddingHorizontal: isTinyScreen ? 12 : 16,
-                      paddingVertical: Platform.OS === 'ios' ? (isTinyScreen ? 8 : 10) : (isTinyScreen ? 6 : 8)
-                    }
-                  ]}
-                  placeholder="Type your message..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={newMessage}
-                  onChangeText={setNewMessage}
-                  multiline
-                  maxLength={500}
-                />
-              </View>
-              
-              <AnimatedTouchableOpacity 
-                style={[
-                  styles.sendButton, 
-                  { 
-                    backgroundColor: (!newMessage.trim() && attachments.length === 0) || sending 
-                      ? colors.border
-                      : colors.primary,
-                    width: isTinyScreen ? 36 : 40,
-                    height: isTinyScreen ? 36 : 40,
-                    borderRadius: isTinyScreen ? 18 : 20
-                  },
-                  sendAnimatedStyle
-                ]}
-                onPress={handleSendMessage}
-                disabled={(!newMessage.trim() && attachments.length === 0) || sending}
-              >
-                {sending ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Send size={isTinyScreen ? 14 : 16} color="white" />
-                )}
-              </AnimatedTouchableOpacity>
+              ]}
+              onPress={handlePickDocument}
+              disabled={attachments.length >= 3}
+            >
+              <Paperclip 
+                size={22} 
+                color={attachments.length >= 3 
+                  ? (isDark ? '#718096' : '#A0AEC0') 
+                  : (isDark ? '#4A90E2' : '#800080')
+                } 
+              />
+            </TouchableOpacity>
+            
+            <View style={[
+              styles.messageInputContainer,
+              { 
+                backgroundColor: isDark ? '#1A202C' : '#F7FAFC',
+                borderColor: isDark ? '#4A5568' : '#E2E8F0'
+              }
+            ]}>
+              <TextInput
+                style={[styles.messageInput, { color: colors.text }]}
+                placeholder="Type a message"
+                placeholderTextColor={isDark ? '#718096' : '#A0AEC0'}
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+                maxLength={500}
+              />
             </View>
-          </LinearGradient>
+            
+            <TouchableOpacity 
+              style={[
+                styles.sendButton, 
+                { 
+                  backgroundColor: (!newMessage.trim() && attachments.length === 0) || sending 
+                    ? (isDark ? '#4A5568' : '#CBD5E0')
+                    : (isDark ? '#4A90E2' : '#800080'),
+                  transform: [{ rotate: '-45deg' }]
+                }
+              ]}
+              onPress={handleSendMessage}
+              disabled={(!newMessage.trim() && attachments.length === 0) || sending}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Send size={22} color="white" style={{ transform: [{ rotate: '45deg' }] }} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
-      {/* Closed Ticket Notice Card */}
+      {/* Closed Ticket Notice */}
       {isTicketClosed && (
-        <View style={[
-          styles.closedNoticeCard, 
-          { 
-            backgroundColor: colors.surface,
-            marginHorizontal: isTinyScreen ? 8 : isSmallScreen ? 12 : 16,
-            marginBottom: isTinyScreen ? 8 : 12,
-            borderRadius: isTinyScreen ? 12 : 16,
-            padding: isTinyScreen ? 12 : 16
-          }
-        ]}>
-          <LinearGradient
-            colors={[getStatusColor(ticket.status) + '15', getStatusColor(ticket.status) + '08']}
-            style={styles.closedNoticeGradient}
-          >
-            <View style={styles.closedNoticeContent}>
-              <CheckCircle size={isTinyScreen ? 18 : 20} color={getStatusColor(ticket.status)} />
-              <Text style={[
-                styles.closedNoticeText, 
-                { 
-                  color: colors.text,
-                  fontSize: isTinyScreen ? 13 : 14
-                }
-              ]}>
-                This ticket has been {ticket.status}
-              </Text>
-            </View>
-          </LinearGradient>
+        <View style={[styles.closedNotice, { backgroundColor: colors.surface }]}>
+          <CheckCircle size={20} color={getStatusColor(ticket.status)} />
+          <Text style={[styles.closedNoticeText, { color: colors.text }]}>
+            This ticket has been {ticket.status}
+          </Text>
         </View>
       )}
 
@@ -948,205 +737,97 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + (isTinyScreen ? 12 : 16) : (isTinyScreen ? 40 : 50),
-    paddingBottom: isTinyScreen ? 10 : isSmallScreen ? 12 : 16,
-    paddingHorizontal: isTinyScreen ? 12 : isSmallScreen ? 16 : 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      },
-    }),
+  gradientHeader: {
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 : 50,
+    paddingBottom: 14,
+    paddingHorizontal: 20,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: isTinyScreen ? 36 : isSmallScreen ? 40 : 44,
+    height: 44,
   },
   backButton: {
-    padding: isTinyScreen ? 4 : 6,
-    width: isTinyScreen ? 32 : 36,
-    height: isTinyScreen ? 32 : 36,
+    padding: 6,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: isTinyScreen ? 16 : 18,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
   },
   headerTitleContainer: {
     flex: 1,
-    flexDirection: isTablet ? 'row' : 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: isTablet ? 12 : (isTinyScreen ? 4 : 6),
+    gap: 10,
   },
   headerTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
-    letterSpacing: 0.3,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: isTinyScreen ? 3 : 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-      },
-    }),
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
   },
   statusText: {
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.3,
   },
   refreshButton: {
-    padding: isTinyScreen ? 6 : 8,
-    width: isTinyScreen ? 32 : 36,
-    height: isTinyScreen ? 32 : 36,
+    padding: 8,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: isTinyScreen ? 16 : 18,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: isTinyScreen ? 8 : 12,
-  },
-  loadingText: {
-    fontWeight: '500',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: isTinyScreen ? 12 : 16,
-    paddingHorizontal: 20,
   },
   errorText: {
+    fontSize: 16,
     textAlign: 'center',
-    fontWeight: '500',
+    marginTop: 50,
   },
-  ticketInfoCard: {
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  ticketInfoGradient: {
-    padding: 0,
+  ticketInfo: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   ticketTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    marginBottom: isTinyScreen ? 8 : 12,
-    letterSpacing: 0.3,
+    marginBottom: 8,
   },
   ticketMeta: {
-    gap: isTinyScreen ? 8 : 12,
-  },
-  ticketMetaMobile: {
-    flexDirection: 'column',
-  },
-  ticketMetaTablet: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    gap: 16,
   },
-  metaItem: {
-    alignItems: isTablet ? 'center' : 'flex-start',
+  ticketMetaText: {
+    fontSize: 13,
   },
-  metaLabel: {
-    fontWeight: '500',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  metaValue: {
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  chatContainer: {
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
-      },
-    }),
+  chatBackground: {
+    flex: 1,
   },
   messagesContainer: {
-    flexGrow: 1,
+    padding: 16,
+    paddingBottom: 20,
   },
   messageWrapper: {
     flexDirection: 'row',
+    marginBottom: 12,
     alignItems: 'flex-end',
-    marginBottom: isTinyScreen ? 8 : 12,
   },
   adminMessageWrapper: {
     justifyContent: 'flex-start',
@@ -1155,242 +836,173 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.15)',
-      },
-    }),
-  },
-  avatarText: {
-    fontWeight: 'bold',
-    color: 'white',
+    marginHorizontal: 8,
   },
   messageContent: {
+    maxWidth: '75%',
     position: 'relative',
-  },
-  senderLabel: {
-    fontWeight: '600',
   },
   messageBubble: {
-    borderRadius: isTinyScreen ? 14 : 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
     position: 'relative',
-    minWidth: isTinyScreen ? 60 : 80,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  userBubble: {
-    borderTopRightRadius: isTinyScreen ? 4 : 6,
-    marginRight: isTinyScreen ? 6 : 8,
-  },
-  adminBubble: {
-    borderTopLeftRadius: isTinyScreen ? 4 : 6,
-    marginLeft: isTinyScreen ? 6 : 8,
-  },
-  messageText: {
-    letterSpacing: 0.3,
-  },
-  messageAttachments: {
-    gap: isTinyScreen ? 4 : 6,
-  },
-  attachmentChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: isTinyScreen ? 4 : 6,
+    minWidth: 80,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
+        shadowOpacity: 0.1,
         shadowRadius: 2,
       },
       android: {
-        elevation: 1,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
+        elevation: 2,
       },
     }),
   },
+  userBubble: {
+    borderTopRightRadius: 4,
+    marginRight: 8,
+  },
+  adminBubble: {
+    borderTopLeftRadius: 4,
+    marginLeft: 8,
+  },
+  messageTail: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 15,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  userTail: {
+    right: -8,
+    top: 0,
+    borderBottomColor: 'inherit',
+    transform: [{ rotate: '45deg' }],
+  },
+  adminTail: {
+    left: -8,
+    top: 0,
+    borderBottomColor: 'inherit',
+    transform: [{ rotate: '-45deg' }],
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: 0.3,
+  },
+  messageAttachments: {
+    marginTop: 10,
+    gap: 6,
+  },
+  attachmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
   attachmentName: {
+    fontSize: 13,
     flex: 1,
     fontWeight: '500',
   },
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 6,
     justifyContent: 'flex-end',
   },
   messageTime: {
+    fontSize: 11,
     fontWeight: '400',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  messageStatus: {
-    fontStyle: 'italic',
-    fontWeight: '500',
-  },
-  inputAreaCard: {
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-      },
-    }),
-  },
-  inputAreaGradient: {
-    padding: 0,
+  inputArea: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 25 : 10,
   },
   attachmentsPreview: {
-    maxHeight: isTinyScreen ? 35 : 40,
+    maxHeight: 45,
+    marginBottom: 10,
   },
   attachmentPreview: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    marginRight: 8,
+    gap: 8,
     borderWidth: 1,
-    gap: isTinyScreen ? 4 : 6,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
-      },
-    }),
   },
   attachmentPreviewName: {
+    fontSize: 13,
+    maxWidth: 120,
     fontWeight: '500',
   },
   removeAttachment: {
-    padding: isTinyScreen ? 2 : 4,
+    padding: 2,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    gap: 10,
   },
   attachButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      },
-    }),
   },
   messageInputContainer: {
     flex: 1,
+    borderRadius: 24,
     borderWidth: 1,
+    minHeight: 44,
+    maxHeight: 120,
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-      },
-    }),
   },
   messageInput: {
+    fontSize: 15,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    minHeight: 44,
+    maxHeight: 100,
     textAlignVertical: 'center',
   },
   sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.2)',
-      },
-    }),
   },
-  closedNoticeCard: {
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
-      },
-    }),
-  },
-  closedNoticeGradient: {
-    padding: 0,
-  },
-  closedNoticeContent: {
+  closedNotice: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: isTinyScreen ? 6 : 8,
+    padding: 16,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   closedNoticeText: {
+    fontSize: 14,
     fontWeight: '600',
-    letterSpacing: 0.3,
   },
 });
+
+export default TicketDetailScreen;
