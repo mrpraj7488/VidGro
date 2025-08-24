@@ -485,13 +485,30 @@ export default function ViewTab() {
         case 'webViewReady':
           console.log('🌐 WEBVIEW IS READY - can now send messages safely');
           
+          // Test WebView JavaScript responsiveness
+          if (webViewRef.current) {
+            webViewRef.current.injectJavaScript(`
+              console.log('🧪 Testing WebView JavaScript...');
+              if (window.testWebViewMessage) {
+                console.log('🧪 Test result:', window.testWebViewMessage());
+              } else {
+                console.log('❌ Test function not found');
+              }
+              true;
+            `);
+          }
+          
           // If tab is focused and we have a video, auto-play now that WebView is ready
           if (isTabFocusedRef.current && currentVideo && !rewardProcessedRef.current && webViewRef.current) {
             console.log('▶️ AUTO-PLAYING video now that WebView is ready');
             webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
             webViewRef.current.injectJavaScript(`
+              console.log('🎬 Injecting playVideo command...');
               if (window.handleReactNativeMessage) {
+                console.log('✅ Found handleReactNativeMessage, calling it');
                 window.handleReactNativeMessage('{"type":"playVideo"}');
+              } else {
+                console.log('❌ handleReactNativeMessage not found');
               }
               true;
             `);
@@ -501,6 +518,7 @@ export default function ViewTab() {
             isVideoPlayingRef.current = true;
             setTimerPaused(false);
             timerPausedRef.current = false;
+            console.log('⏱️ Starting timer after WebView ready auto-play');
             startTimer();
           }
           break;
@@ -842,10 +860,17 @@ export default function ViewTab() {
               console.log('📬 Direct message from React Native:', data);
               try {
                 const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                console.log('📬 Parsed direct message:', parsed);
                 handleMessage({ data: parsed });
               } catch (e) {
                 console.log('❌ Error parsing direct message:', e);
               }
+            };
+            
+            // Also create a simple test function
+            window.testWebViewMessage = function() {
+              console.log('🧪 Test function called - WebView JavaScript is working');
+              return 'WebView JS is responsive';
             };
             
             // Also listen for standard message events
@@ -1225,12 +1250,29 @@ export default function ViewTab() {
           allowsInlineMediaPlayback={true}
           injectedJavaScript={`
             (function() {
+              console.log('🔧 Injected JavaScript executing...');
+              
+              // Override window.postMessage to intercept messages
               const originalPostMessage = window.postMessage;
               window.postMessage = function(data) {
-                console.log('📨 Injected JS received postMessage:', data);
-                window.dispatchEvent(new MessageEvent('message', { data: data }));
+                console.log('📨 Injected JS intercepted postMessage:', data);
+                try {
+                  const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                  console.log('📨 Parsed injected message:', parsed);
+                  
+                  // Manually trigger the message handler
+                  if (window.handleReactNativeMessage) {
+                    window.handleReactNativeMessage(data);
+                  } else {
+                    console.log('❌ handleReactNativeMessage not found, dispatching event');
+                    window.dispatchEvent(new MessageEvent('message', { data: data }));
+                  }
+                } catch (e) {
+                  console.log('❌ Error in injected postMessage:', e);
+                }
                 return originalPostMessage.apply(this, arguments);
               };
+              
               console.log('✅ Injected JavaScript message handler ready');
             })();
             true;
