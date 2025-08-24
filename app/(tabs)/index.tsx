@@ -204,7 +204,23 @@ export default function ViewTab() {
           // Always try to play when tab is focused, regardless of current state
           const playMessage = JSON.stringify({ type: 'playVideo' });
           console.log('📤 Sending message:', playMessage);
-          webViewRef.current.postMessage(playMessage);
+          
+          // Try multiple times with delays to ensure WebView receives the message
+          const sendPlayMessage = () => {
+            if (webViewRef.current) {
+              console.log('📤 Attempting to send playVideo message...');
+              webViewRef.current.postMessage(playMessage);
+            }
+          };
+          
+          // Send immediately
+          sendPlayMessage();
+          
+          // Send again after short delay
+          setTimeout(sendPlayMessage, 100);
+          
+          // Send again after longer delay
+          setTimeout(sendPlayMessage, 500);
           
           // Wait for WebView response before updating React state
           console.log('⏳ Waiting for WebView to respond with videoPlaying...');
@@ -219,10 +235,17 @@ export default function ViewTab() {
               setIsVideoPlaying(true);
               isVideoPlayingRef.current = true;
               
-              // Try sending play message again
+              // Try sending play message again with multiple attempts
               console.log('🔄 RETRY: Sending playVideo message again');
-              if (webViewRef.current) {
-                webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+              const retryMessage = JSON.stringify({ type: 'playVideo' });
+              
+              for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                  if (webViewRef.current) {
+                    console.log(`🔄 Retry attempt ${i + 1}:`, retryMessage);
+                    webViewRef.current.postMessage(retryMessage);
+                  }
+                }, i * 200); // 0ms, 200ms, 400ms delays
               }
             }
           }, 1000); // Wait 1 second for WebView response
@@ -503,6 +526,10 @@ export default function ViewTab() {
       console.log('📨 WEBVIEW MESSAGE RECEIVED:', data.type, data);
       
       switch (data.type) {
+        case 'webViewReady':
+          console.log('🌐 WEBVIEW IS READY - can now send messages safely');
+          break;
+          
         case 'videoLoaded':
           console.log('🎬 VIDEO LOADED - updating state');
           setVideoLoadedSuccessfully(true);
@@ -724,9 +751,26 @@ export default function ViewTab() {
             'use strict';
             
             let player = null;
-            let isPlaying = false;
-            let playerReady = false;
             let timerCompleted = false;
+            let playerReady = false;
+            let player = null;
+            
+            console.log('🌐 WebView JavaScript loaded and ready');
+            
+            function notifyWebViewReady() {
+              try {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'webViewReady',
+                  timestamp: Date.now()
+                }));
+                console.log('📡 Sent webViewReady message to React Native');
+              } catch (e) {
+                console.log('❌ Failed to send webViewReady message:', e);
+              }
+            }
+            
+            notifyWebViewReady();
+            
             let videoUnavailable = false;
             
             const securityOverlay = document.getElementById('security-overlay');
