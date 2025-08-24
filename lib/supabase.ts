@@ -52,14 +52,12 @@ const MAX_INITIALIZATION_ATTEMPTS = 3;
 // Helper: Initialize Supabase with config if possible
 const tryInitializeWithConfig = (config: RuntimeConfig | null): boolean => {
   if (!config?.supabase?.url) {
-    console.warn('⚠️ Cannot initialize Supabase: missing URL in config');
     return false;
   }
 
   // For public endpoint, use fallback key if anonKey is missing
   const anonKey = config.supabase.anonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
   if (!anonKey) {
-    console.warn('⚠️ Cannot initialize Supabase: missing anonKey in config and no fallback available');
     return false;
   }
 
@@ -70,14 +68,12 @@ const tryInitializeWithConfig = (config: RuntimeConfig | null): boolean => {
 
 export const initializeSupabase = (url: string, anonKey: string | null | undefined) => {
   if (supabaseClient) {
-    console.log('📱 Supabase already initialized');
     return supabaseClient;
   }
   if (!url || !anonKey) {
-    console.warn('⚠️ Cannot initialize Supabase: missing url or anonKey');
     return null;
   }
-  console.log('📱 Initializing Supabase with runtime config');
+  
   supabaseClient = createClient(url, anonKey, {
     auth: {
       storage: AsyncStorage,
@@ -91,10 +87,6 @@ export const initializeSupabase = (url: string, anonKey: string | null | undefin
 };
 
 export const getSupabase = () => {
-  if (!supabaseClient) {
-    console.warn('⚠️ Supabase accessed before initialization, returning null');
-    return null;
-  }
   return supabaseClient;
 };
 
@@ -103,7 +95,7 @@ export const supabase = new Proxy({} as any, {
   get(target, prop) {
     const client = getSupabase();
     if (!client) {
-      console.warn('⚠️ Supabase accessed before initialization');
+      // Return a safe no-op function for production
       return () => Promise.resolve({ data: null, error: new Error('Supabase not initialized') });
     }
     return client[prop];
@@ -126,13 +118,11 @@ export const watchVideoAndEarnCoins = async (
     });
 
     if (error) {
-      console.error('Error calling watch_video_and_earn_coins:', error);
       return { data: null, error };
     }
 
     return { data, error: null };
   } catch (err) {
-    console.error('Unexpected error in watchVideo:', err);
     return { data: null, error: err };
   }
 };
@@ -149,95 +139,46 @@ export async function getUserProfile(userId: string): Promise<any> {
       .single();
 
     if (error) {
-      console.error('Error fetching user profile:', error);
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error('Profile fetch failed:', error);
     return null;
   }
 }
 
 // Get video queue
 export async function getVideoQueue(userId: string): Promise<any[]> {
-  if (!userId) return [];
   try {
-    const client = getSupabase();
-    if (!client) return [];
-
-    const { data, error } = await client.rpc('get_video_queue_for_user', {
-      user_uuid: userId
-    });
-
-    if (!error) {
-      return (data || []).map((v: any) => ({
-        video_id: v.video_id ?? v.id,
-        youtube_url: v.youtube_url ?? '',
-        title: v.title,
-        duration_seconds: Number(v.duration_seconds || 0),
-        coin_reward: Number(v.coin_reward ?? 0),
-        views_count: Number(v.views_count ?? 0),
-        target_views: Number(v.target_views ?? 0),
-        status: v.status,
-        user_id: v.user_id,
-        completed: v.completed ?? false,
-        total_watch_time: Number(v.total_watch_time ?? 0),
-        completion_rate: Number(v.completion_rate ?? 0),
-      }));
-    }
-
-    console.warn('RPC get_video_queue_for_user failed, falling back to direct query:', error?.message);
-
-    // Improved fallback: fetch watchable videos with better filtering
-    const nowIso = new Date().toISOString();
-    const { data: fallback, error: fallbackError } = await client
+    const { data, error } = await getSupabase()
       .from('videos')
-      .select(`
-        id, youtube_url, title, duration_seconds, coin_reward,
-        views_count, target_views, status, user_id, completed,
-        total_watch_time, completion_rate, created_at, hold_until, repromoted_at
-      `)
-      .neq('user_id', userId)                                    // Not user's own videos
-      .is('deleted_at', null)                                    // Not deleted videos
-      .eq('completed', false)                                    // Not completed videos
-      .neq('status', 'completed')                                // Not completed status videos
-      .neq('status', 'paused')                                   // Not paused videos
-      .lt('views_count', 'target_views')                         // Haven't reached target views
-      .or(`status.eq.active,status.eq.on_hold.and.hold_until.lte.${nowIso},status.eq.repromoted`)
-      .order('repromoted_at', { ascending: false, nullsFirst: false })
+      .select('*')
+      .neq('user_id', userId)  // Don't show user's own videos
+      .is('deleted_at', null)  // Only show non-deleted videos
+      .in('status', ['active', 'repromoted'])  // Both active and repromoted videos are playable
+      .or('hold_until.is.null,hold_until.lte.now()')  // Either no hold or hold has expired
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (fallbackError) {
-      console.error('Fallback video query failed:', fallbackError);
-      return [];
+    if (error) {
+      throw error;
     }
 
-    // Map to expected shape
-    const fallbackMapped = (fallback || []).map((v: any) => ({
-      video_id: v.id,
-      youtube_url: v.youtube_url,
-      title: v.title,
-      duration_seconds: Number(v.duration_seconds || 0),
-      coin_reward: Number(v.coin_reward ?? 0),
-      views_count: Number(v.views_count ?? 0),
-      target_views: Number(v.target_views ?? 0),
-      status: v.status,
-      user_id: v.user_id,
-      completed: v.completed ?? false,
-      total_watch_time: Number(v.total_watch_time ?? 0),
-      completion_rate: Number(v.completion_rate ?? 0),
-    }));
-
-    console.log('🎬 Fallback video query returned:', fallbackMapped.length);
-    return fallbackMapped;
+    return data?.map(video => ({
+      ...video,
+      youtube_url: video.youtube_url,
+      coin_reward: video.coin_reward || 1,
+      duration: video.duration || 30,
+      // Ensure these fields exist to prevent undefined errors
+      views_count: video.views_count || 0,
+      target_views: video.target_views || 0,
+      completed: video.completed || false
+    })) || [];
   } catch (error) {
-    console.error('getVideoQueue error:', error);
-    throw error;
+    return [];
   }
-}
+};
 
 // Create video promotion
 export const createVideoPromotion = async (
@@ -408,60 +349,55 @@ export const deleteVideo = async (
 // Get user comprehensive analytics
 export const getUserComprehensiveAnalytics = async (userId: string) => {
   try {
-    const { data, error } = await getSupabase().rpc('get_user_comprehensive_analytics', {
-      user_uuid: userId
-    });
+    // First try to get analytics from the RPC function
+    const { data: analyticsData, error: analyticsError } = await getSupabase()
+      .rpc('get_user_analytics', { p_user_id: userId });
 
-    if (!error) {
-      return { data, error: null };
+    if (!analyticsError && analyticsData) {
+      return analyticsData;
     }
 
-    console.warn('RPC get_user_comprehensive_analytics failed, using fallback:', error?.message);
-    
-    // Fallback: calculate analytics from videos table
+    // Fallback: Calculate analytics from videos table
     const { data: videos, error: videosError } = await getSupabase()
       .from('videos')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .is('deleted_at', null);
 
-    if (videosError) {
-      console.error('Fallback analytics query failed:', videosError);
-      return { data: null, error: videosError };
-    }
+    if (videosError) throw videosError;
 
     const analytics = {
       total_videos_promoted: videos?.length || 0,
-      active_videos: videos?.filter((v: any) => v.status === 'active').length || 0,
+      active_videos: videos?.filter((v: any) => v.status === 'active').length || 0,  
       completed_videos: videos?.filter((v: any) => v.status === 'completed').length || 0,
       on_hold_videos: videos?.filter((v: any) => v.status === 'on_hold').length || 0,
+      repromoted_videos: videos?.filter((v: any) => v.status === 'repromoted').length || 0,  
       total_views_received: videos?.reduce((sum: number, v: any) => sum + (v.views_count || 0), 0) || 0,
-      total_watch_time_received: videos?.reduce((sum: number, v: any) => sum + (v.total_watch_time || 0), 0) || 0,
-      total_coins_distributed: videos?.reduce((sum: number, v: any) => sum + (v.coins_earned_total || 0), 0) || 0,
-      average_completion_rate: videos?.length > 0 ? videos.reduce((sum: number, v: any) => sum + (v.completion_rate || 0), 0) / videos.length : 0,
-      current_coins: 0, // Would need to fetch from profiles table
-      total_coins_earned: videos?.reduce((sum: number, v: any) => sum + (v.coins_earned_total || 0), 0) || 0
+      total_watch_time: videos?.reduce((sum: number, v: any) => sum + (v.total_watch_time || 0), 0) || 0,
+      total_coins_spent: videos?.reduce((sum: number, v: any) => sum + (v.coin_cost || 0), 0) || 0,
+      total_coins_earned: videos?.reduce((sum: number, v: any) => sum + (v.coins_earned_total || 0), 0) || 0,
+      average_completion_rate: videos?.length > 0 
+        ? videos.reduce((sum: number, v: any) => sum + (v.completion_rate || 0), 0) / videos.length 
+        : 0
     };
 
-    return { data: analytics, error: null };
-  } catch (err) {
-    console.error('getUserComprehensiveAnalytics error:', err);
-    return { data: null, error: err };
+    return analytics;
+  } catch (error) {
+    return null;
   }
 };
 
 // Get user videos with analytics
 export const getUserVideosWithAnalytics = async (userId: string) => {
   try {
-    const { data, error } = await getSupabase().rpc('get_user_videos_with_analytics', {
-      user_uuid: userId
-    });
+    // First try to get analytics from the RPC function
+    const { data: analyticsData, error: analyticsError } = await getSupabase()
+      .rpc('get_user_videos_with_analytics', { p_user_id: userId });
 
-    if (!error) {
-      return { data, error: null };
+    if (!analyticsError && analyticsData) {
+      return analyticsData;
     }
 
-    console.warn('RPC get_user_videos_with_analytics failed, using fallback:', error?.message);
-    
     // Fallback: fetch videos directly from videos table
     const { data: videos, error: videosError } = await getSupabase()
       .from('videos')
@@ -482,52 +418,59 @@ export const getUserVideosWithAnalytics = async (userId: string) => {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    if (videosError) {
-      console.error('Fallback videos query failed:', videosError);
-      return { data: null, error: videosError };
-    }
+    if (videosError) throw videosError;
 
-    return { data: videos || [], error: null };
+    return videos || [];
   } catch (err) {
-    console.error('getUserVideosWithAnalytics error:', err);
-    return { data: null, error: err };
+    return null;
   }
 };
 
 export const getUserRecentActivity = async (userId: string) => {
   try {
-    // First try the RPC function
-    const { data: rpcData, error: rpcError } = await getSupabase().rpc('get_user_recent_activity', {
-      user_uuid: userId
-    });
-    
-    if (!rpcError && rpcData) {
-      return { data: rpcData, error: null };
-    }
-    
-    // If RPC fails, query transactions table directly
-    const { data, error } = await getSupabase()
+    // Fetch all relevant transactions
+    const { data: transactions, error } = await getSupabase()
       .from('transactions')
-      .select('transaction_type, amount, description, created_at')
+      .select('*')
       .eq('user_id', userId)
+      .in('transaction_type', [
+        'video_promotion',
+        'coin_purchase',
+        'referral_reward',
+        'daily_bonus',
+        'adjustment',
+        'video_repromoted'  // Added video_repromoted to the list of transaction types
+      ])
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(30);
 
-    if (error) {
-      return { data: null, error };
-    }
+    if (error) throw error;
 
-    // Transform data to match expected format
-    const transformedData = data?.map(transaction => ({
-      activity_type: transaction.transaction_type,
-      amount: transaction.amount,
+    // Map transaction types to activity types
+    const activityMap: Record<string, string> = {
+      'video_promotion': 'promotion',
+      'video_repromoted': 'repromote',
+      'coin_purchase': 'purchase',
+      'referral_reward': 'referral',
+      'daily_bonus': 'bonus',
+      'adjustment': 'adjustment'
+    };
+
+    // Transform transactions into activity format
+    const activities = (transactions || []).map(transaction => ({
+      id: transaction.id,
+      user_id: transaction.user_id,
+      activity_type: activityMap[transaction.transaction_type] || 'other',
+      amount: Math.abs(transaction.amount),
       description: transaction.description,
-      created_at: transaction.created_at
-    })) || [];
+      created_at: transaction.created_at,
+      metadata: transaction.metadata || {},
+      transaction_type: transaction.transaction_type,
+      transaction_id: transaction.transaction_id
+    }));
 
-    return { data: transformedData, error: null };
+    return { data: activities, error: null };
   } catch (err) {
-    console.error('getUserRecentActivity error:', err);
     return { data: null, error: err };
   }
 };
@@ -554,13 +497,11 @@ export const recordCoinPurchase = async (
     });
 
     if (error) {
-      console.error('Error recording coin purchase:', error);
       return { data: null, error };
     }
 
     return { data, error: null };
   } catch (err) {
-    console.error('recordCoinPurchase error:', err);
     return { data: null, error: err };
   }
 };
@@ -584,13 +525,11 @@ export const getUserTransactionHistory = async (userId: string, limit: number = 
       .limit(limit);
 
     if (error) {
-      console.error('Error fetching transaction history:', error);
       return { data: null, error };
     }
 
     return { data, error: null };
   } catch (err) {
-    console.error('getUserTransactionHistory error:', err);
     return { data: null, error: err };
   }
 };
@@ -600,7 +539,6 @@ export const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
   try {
     // Check if config has required structure
     if (!config || typeof config !== 'object') {
-      console.warn('📱 Config validation failed: Invalid config object');
       return null;
     }
 
@@ -609,7 +547,6 @@ export const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
     const missingFields = requiredFields.filter(field => !config[field]);
     
     if (missingFields.length > 0) {
-      console.warn('📱 Config validation failed: Missing required fields:', missingFields);
       return null;
     }
 
@@ -617,7 +554,7 @@ export const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
     const hasAllRequiredFields = requiredFields.every(field => {
       const hasField = field in config;
       if (!hasField) {
-        console.warn(`📱 Config validation failed: Missing required field: ${field}`);
+        return false;
       }
       return hasField;
     });
@@ -628,7 +565,6 @@ export const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
 
     // Check if Supabase URL exists
     if (!config.supabase?.url) {
-      console.warn('📱 Config validation failed: Missing Supabase URL');
       return null;
     }
 
@@ -650,15 +586,14 @@ export const validateRuntimeConfig = (config: any): RuntimeConfig | null => {
       initializationAttempts++;
       const initialized = tryInitializeWithConfig(validatedConfig);
       if (initialized) {
-        console.log('📱 Supabase initialized successfully with config');
+        return validatedConfig;
       } else {
-        console.warn(`📱 Supabase initialization attempt ${initializationAttempts} failed`);
+        return null;
       }
     }
 
     return validatedConfig;
   } catch (error) {
-    console.error('📱 Config validation error:', error);
     return null;
   }
 };
