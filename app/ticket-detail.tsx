@@ -1421,5 +1421,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 });
-
-export default TicketDetailScreen;
