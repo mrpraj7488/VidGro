@@ -598,7 +598,8 @@ export default function ViewTab() {
         case 'videoError':
           setVideoError(true);
           if (autoSkipEnabledRef.current) {
-            handleSkipToNext();
+            // Add delay to prevent rapid skipping
+            setTimeout(() => handleSkipToNext(), 2000);
           }
           break;
       }
@@ -796,7 +797,7 @@ export default function ViewTab() {
                 if (!playerReady && !videoUnavailable) {
                   markVideoUnavailable();
                 }
-              }, 3000);
+              }, 8000);
             }
             
             checkIframeAvailability();
@@ -859,7 +860,7 @@ export default function ViewTab() {
                 if (!window.YT || !window.YT.Player) {
                   markVideoUnavailable();
                 }
-              }, 2500);
+              }, 6000);
             } else {
               setTimeout(() => window.onYouTubeIframeAPIReady(), 100);
             }
