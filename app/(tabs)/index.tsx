@@ -331,38 +331,62 @@ export default function ViewTab() {
     // Reset state
     setWatchTimer(0);
     watchTimerRef.current = 0;
+    setIsVideoPlaying(false);
+    setTimerPaused(false);
+    setVideoLoadedSuccessfully(false);
+    setVideoError(false);
+    setWebViewReady(false);
+    rewardProcessedRef.current = false;
+  }, []);
 
   // Initialize new video
-  initializeNewVideo(currentVideo);
-}
-}, [currentVideo?.video_id, shouldSkipCurrentVideo, moveToNextVideo]);
-
-// Clean up previous video
-const cleanupVideo = useCallback(() => {
-// Clear timers
-if (timerRef.current) {
-  clearInterval(timerRef.current);
-  timerRef.current = null;
-}
+  const initializeNewVideo = useCallback((video: any) => {
+    if (!video) return;
+    
+    console.log('🎬 Initializing new video:', video.video_id);
+    currentVideoRef.current = video.video_id;
+    
+    // Reset states for new video
+    setIsVideoTransitioning(false);
+    setVideoLoadedSuccessfully(false);
+    setVideoError(false);
+    setWatchTimer(0);
+    watchTimerRef.current = 0;
+    rewardProcessedRef.current = false;
+    setWebViewReady(false);
+    
+    // Set up video load timeout
+    videoLoadTimeoutRef.current = window.setTimeout(() => {
+      if (!videoLoadedRef.current) {
+        console.log('⏰ Video load timeout - showing error');
+        setVideoError(true);
+        setShowRefreshButton(true);
+      }
+    }, 15000);
   }, []);
 
   // Start video playback
   const startVideoPlayback = useCallback(() => {
     if (!currentVideo || !videoLoadedRef.current) return;
 
-    if (webViewRef.current) {
+    if (webViewRef.current && webViewReady) {
       const jsCode = `
         (function() {
-          if (typeof handleMessage === 'function') {
-            handleMessage({ data: JSON.stringify({ type: 'playVideo' }) });
+          console.log('🔵 Injected JS executing playVideo');
+          if (typeof window.handleMessage === 'function') {
+            console.log('✅ handleMessage found, calling it');
+            window.handleMessage({ data: JSON.stringify({ type: 'playVideo' }) });
+          } else {
+            console.log('❌ handleMessage not found');
           }
         })();
+        true;
       `;
       webViewRef.current.injectJavaScript(jsCode);
     }
 
     startTimer();
-  }, [currentVideo]);
+  }, [currentVideo, webViewReady, startTimer]);
 
   // Timer management
   const startTimer = useCallback(() => {
@@ -385,7 +409,7 @@ if (timerRef.current) {
         }
       }
     }, 1000);
-  }, [currentVideo]);
+  }, [currentVideo, handleVideoCompletion]);
 
   // Handle video completion
   const handleVideoCompletion = useCallback(async () => {
@@ -401,13 +425,18 @@ if (timerRef.current) {
     }
 
     // Notify WebView
-    if (webViewRef.current) {
+    if (webViewRef.current && webViewReady) {
       const jsCode = `
         (function() {
-          if (typeof handleMessage === 'function') {
-            handleMessage({ data: JSON.stringify({ type: 'timerComplete' }) });
+          console.log('🔵 Injected JS executing timerComplete');
+          if (typeof window.handleMessage === 'function') {
+            console.log('✅ handleMessage found, calling it');
+            window.handleMessage({ data: JSON.stringify({ type: 'timerComplete' }) });
+          } else {
+            console.log('❌ handleMessage not found');
           }
         })();
+        true;
       `;
       webViewRef.current.injectJavaScript(jsCode);
     }
