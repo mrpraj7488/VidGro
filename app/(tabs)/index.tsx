@@ -1400,10 +1400,47 @@ export default function ViewTab() {
               });
             }, 100);
             
+            // Create fallback iframe player
+            function createFallbackPlayer() {
+              console.log('🔄 Creating fallback iframe player');
+              const videoId = '` + youtubeVideoId + `';
+              const container = document.getElementById('youtube-player');
+              container.innerHTML = \`
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src="https://www.youtube.com/embed/\${videoId}?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&showinfo=0&enablejsapi=1"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                  frameborder="0"
+                  style="border: none; pointer-events: none;">
+                </iframe>
+              \`;
+              
+              // Simulate player ready for fallback
+              setTimeout(() => {
+                playerReady = true;
+                playerInitialized = true;
+                notifyReactNative('videoLoaded');
+                if (window.pendingPlayRequest) {
+                  notifyReactNative('videoPlaying');
+                  updatePlayerState(true);
+                  window.pendingPlayRequest = false;
+                }
+              }, 1000);
+            }
+
             // Define YouTube API callback early
             window.onYouTubeIframeAPIReady = function() {
               console.log('🎬 YouTube API Ready callback triggered');
               if (videoUnavailable) return;
+              
+              // Check if YT is actually available
+              if (typeof YT === 'undefined' || !YT.Player) {
+                console.log('❌ YT object not available, using fallback');
+                createFallbackPlayer();
+                return;
+              }
               
               try {
                 const videoId = '` + youtubeVideoId + `';
@@ -1433,9 +1470,17 @@ export default function ViewTab() {
                 console.log('✅ YouTube player created');
               } catch (e) {
                 console.log('❌ Error creating YouTube player:', e);
-                markVideoUnavailable();
+                createFallbackPlayer();
               }
             };
+            
+            // Timeout fallback if API doesn't load
+            setTimeout(() => {
+              if (!playerReady && !playerInitialized) {
+                console.log('⏰ YouTube API timeout, using fallback');
+                createFallbackPlayer();
+              }
+            }, 3000);
             
             function onPlayerReady(event) {
               if (videoUnavailable) return;
