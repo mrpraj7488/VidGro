@@ -1405,7 +1405,36 @@ export default function ViewTab() {
               console.log('🔄 Creating fallback iframe player');
               const videoId = '` + youtubeVideoId + `';
               const container = document.getElementById('youtube-player');
-              container.innerHTML = '<iframe width="100%" height="100%" src="https://www.youtube.com/embed/' + videoId + '?autoplay=0&controls=1&rel=0&modestbranding=1&playsinline=1&fs=0&iv_load_policy=3&cc_load_policy=0&showinfo=0&enablejsapi=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen frameborder="0"></iframe>';
+              
+              // Create iframe that will autoplay muted, then we'll unmute via API
+              const iframe = document.createElement('iframe');
+              iframe.width = '100%';
+              iframe.height = '100%';
+              iframe.src = 'https://www.youtube.com/embed/' + videoId + '?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&playsinline=1&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&showinfo=0&enablejsapi=1';
+              iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+              iframe.allowFullscreen = true;
+              iframe.frameBorder = '0';
+              iframe.style.border = 'none';
+              iframe.style.pointerEvents = 'none';
+              
+              container.innerHTML = '';
+              container.appendChild(iframe);
+              
+              // Try to unmute after video starts playing
+              iframe.onload = function() {
+                setTimeout(() => {
+                  try {
+                    // Attempt to unmute via postMessage
+                    iframe.contentWindow.postMessage(
+                      '{"event":"command","func":"unMute","args":""}',
+                      'https://www.youtube.com'
+                    );
+                    console.log('🔊 Attempted to unmute video');
+                  } catch (e) {
+                    console.log('⚠️ Could not unmute:', e);
+                  }
+                }, 500);
+              };
               
               // Simulate player ready for fallback
               setTimeout(() => {
