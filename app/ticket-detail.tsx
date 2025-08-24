@@ -42,7 +42,7 @@ const isTablet = screenWidth >= 768;
 
 const AnimatedTouchableOpacity = ReanimatedAnimated.createAnimatedComponent(TouchableOpacity);
 
-function TicketDetailScreen() {
+export default function TicketDetailScreen() {
   const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
   const router = useRouter();
