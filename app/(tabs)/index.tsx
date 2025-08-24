@@ -172,13 +172,11 @@ export default function ViewTab() {
           // Always try to play when tab is focused, regardless of current state
           webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
           
-          // Ensure timer can run
-          if (!rewardProcessedRef.current) {
-            setTimerPaused(false);
-            timerPausedRef.current = false;
-            setIsVideoPlaying(true);
-            isVideoPlayingRef.current = true;
-          }
+          // Always ensure timer can run and video state is updated
+          setTimerPaused(false);
+          timerPausedRef.current = false;
+          setIsVideoPlaying(true);
+          isVideoPlayingRef.current = true;
         }
       }, 300);
 
