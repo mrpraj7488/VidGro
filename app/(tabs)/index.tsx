@@ -609,13 +609,6 @@ export default function ViewTab() {
     }
   }, [startTimer, handleSkipToNext, autoSkipEnabledRef]);
 
-  // Memoize HTML content to prevent unnecessary regeneration
-  const htmlContent = useMemo(() => {
-    const videoId = currentVideo?.youtube_url || '';
-    console.log('🎬 Creating HTML content for video ID:', videoId);
-    return createHtmlContent(videoId);
-  }, [currentVideo?.youtube_url]);
-  
   // Create HTML content
   const createHtmlContent = useCallback((youtubeVideoId: string) => {
     // Simple validation - just check if we have a video ID
@@ -1020,6 +1013,13 @@ export default function ViewTab() {
       </html>
     `;
   }, []);
+
+  // Memoize HTML content to prevent unnecessary regeneration
+  const htmlContent = useMemo(() => {
+    const videoId = currentVideo?.youtube_url || '';
+    console.log('🎬 Creating HTML content for video ID:', videoId);
+    return createHtmlContent(videoId);
+  }, [currentVideo?.youtube_url, createHtmlContent]);
 
   // Handle real-time updates
   useEffect(() => {
