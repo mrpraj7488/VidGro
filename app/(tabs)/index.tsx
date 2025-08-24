@@ -145,20 +145,16 @@ export default function ViewTab() {
         });
         
         // App returning to foreground and tab is focused - force auto resume
-        setTimeout(() => {
-          if (webViewRef.current) {
-            console.log('▶️ SENDING playVideo (app foreground)');
-            // Force play regardless of current state
-            webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
-            
-            // Reset timer paused state to ensure timer can run
-            if (videoLoadedRef.current && !rewardProcessedRef.current) {
-              console.log('🔄 UPDATING timer state (foreground)');
-              setTimerPaused(false);
-              timerPausedRef.current = false;
-            }
+        if (webViewRef.current) {
+          console.log('▶️ SENDING playVideo (app foreground)');
+          webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+          
+          if (!isVideoPlayingRef.current) {
+            setIsVideoPlaying(true);
+            setTimerPaused(false);
+            timerPausedRef.current = false;
           }
-        }, 500); // Increased delay for better reliability
+        }
       } else {
         console.log('❌ NOT resuming on foreground:', {
           tabFocused: isTabFocusedRef.current,
@@ -193,75 +189,21 @@ export default function ViewTab() {
         return; // Skip auto-play this time
       }
       
-      // Aggressive auto-play when tab becomes focused
-      const focusTimeout = setTimeout(() => {
-        console.log('⏰ FOCUS TIMEOUT: Attempting to auto-play video');
-        
-        if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
-          console.log('▶️ SENDING playVideo message to WebView');
-          console.log('📱 WebView ref exists:', !!webViewRef.current);
-          
-          // Always try to play when tab is focused, regardless of current state
-          const playMessage = JSON.stringify({ type: 'playVideo' });
-          console.log('📤 Sending message:', playMessage);
-          
-          // Try multiple times with delays to ensure WebView receives the message
-          const sendPlayMessage = () => {
-            if (webViewRef.current) {
-              console.log('📤 Attempting to send playVideo message...');
-              webViewRef.current.postMessage(playMessage);
-            }
-          };
-          
-          // Send immediately
-          sendPlayMessage();
-          
-          // Send again after short delay
-          setTimeout(sendPlayMessage, 100);
-          
-          // Send again after longer delay
-          setTimeout(sendPlayMessage, 500);
-          
-          // Wait for WebView response before updating React state
-          console.log('⏳ Waiting for WebView to respond with videoPlaying...');
-          
-          // Set a timeout to check if WebView responds
-          setTimeout(() => {
-            if (!isVideoPlayingRef.current) {
-              console.log('⚠️ WebView did not respond with videoPlaying, forcing state update');
-              console.log('🔄 FORCE UPDATING state: timer unpaused, video playing');
-              setTimerPaused(false);
-              timerPausedRef.current = false;
-              setIsVideoPlaying(true);
-              isVideoPlayingRef.current = true;
-              
-              // Try sending play message again with multiple attempts
-              console.log('🔄 RETRY: Sending playVideo message again');
-              const retryMessage = JSON.stringify({ type: 'playVideo' });
-              
-              for (let i = 0; i < 3; i++) {
-                setTimeout(() => {
-                  if (webViewRef.current) {
-                    console.log(`🔄 Retry attempt ${i + 1}:`, retryMessage);
-                    webViewRef.current.postMessage(retryMessage);
-                  }
-                }, i * 200); // 0ms, 200ms, 400ms delays
-              }
-            }
-          }, 1000); // Wait 1 second for WebView response
-        } else {
-          console.log('❌ CANNOT auto-play:', {
-            hasCurrentVideo: !!currentVideo,
-            hasWebViewRef: !!webViewRef.current,
-            suppressAutoPlay: suppressAutoPlayRef.current
-          });
-        }
-      }, 300);
+      // Simple auto-play when tab becomes focused
+      if (currentVideo && webViewRef.current && !suppressAutoPlayRef.current) {
+        console.log('▶️ SENDING playVideo message to WebView');
+        webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+      } else {
+        console.log('❌ CANNOT auto-play:', {
+          hasCurrentVideo: !!currentVideo,
+          hasWebViewRef: !!webViewRef.current,
+          suppressAutoPlay: suppressAutoPlayRef.current
+        });
+      }
 
       return () => {
         console.log('🎯 TAB BLUR: Video tab lost focus');
         isTabFocusedRef.current = false;
-        clearTimeout(focusTimeout);
         
         // Pause when tab loses focus
         if (webViewRef.current) {
@@ -360,20 +302,8 @@ export default function ViewTab() {
     setIsTransitioning(true);
     currentVideoRef.current = video.video_id;
 
-    // Set load timeout
-    videoLoadTimeoutRef.current = setTimeout(() => {
-      if (!videoLoadedRef.current) {
-        setVideoError(true);
-        if (autoSkipEnabledRef.current) {
-          handleSkipToNext();
-        }
-      }
-    }, 5000);
-
     // End transition
-    setTimeout(() => {
-      setIsTransitioning(false);
-    }, 100);
+    setIsTransitioning(false);
   }, []);
 
   // Start video playback
@@ -549,11 +479,9 @@ export default function ViewTab() {
           
           if (isTabFocusedRef.current && !rewardProcessedRef.current) {
             console.log('▶️ AUTO-PLAYING video after load');
-            setTimeout(() => {
-              if (webViewRef.current) {
-                webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
-              }
-            }, 100);
+            if (webViewRef.current) {
+              webViewRef.current.postMessage(JSON.stringify({ type: 'playVideo' }));
+            }
           } else {
             console.log('❌ NOT auto-playing on load:', {
               tabFocused: isTabFocusedRef.current,
@@ -561,7 +489,7 @@ export default function ViewTab() {
             });
           }
           
-          setTimeout(() => setIsTransitioning(false), 200);
+          setIsTransitioning(false);
           break;
 
         case 'videoPlaying':
@@ -594,19 +522,24 @@ export default function ViewTab() {
           break;
           
         case 'videoEnded':
-        case 'videoUnavailable':
-        case 'videoError':
           setVideoError(true);
           if (autoSkipEnabledRef.current) {
-            // Add delay to prevent rapid skipping
-            setTimeout(() => handleSkipToNext(), 2000);
+            handleSkipToNext();
           }
+          break;
+          
+        case 'videoUnavailable':
+        case 'videoError':
+          console.log('⚠️ Video unavailable/error - NOT auto-skipping to prevent loop');
+          setVideoError(true);
+          // Temporarily disable auto-skip for unavailable/error videos
+          // if (autoSkipEnabledRef.current) {
+          //   setTimeout(() => handleSkipToNext(), 5000);
+          // }
           break;
       }
     } catch (error) {
-      if (autoSkipEnabledRef.current) {
-        setTimeout(() => handleSkipToNext(), 1000);
-      }
+      console.log('❌ WebView message error:', error);
     }
   }, [startTimer, handleSkipToNext, autoSkipEnabledRef]);
 
@@ -793,11 +726,7 @@ export default function ViewTab() {
               
               iframe.onerror = () => markVideoUnavailable();
               
-              setTimeout(() => {
-                if (!playerReady && !videoUnavailable) {
-                  markVideoUnavailable();
-                }
-              }, 8000);
+              // Remove timeout - let videos load naturally
             }
             
             checkIframeAvailability();
@@ -856,13 +785,9 @@ export default function ViewTab() {
               const firstScriptTag = document.getElementsByTagName('script')[0];
               firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
               
-              setTimeout(() => {
-                if (!window.YT || !window.YT.Player) {
-                  markVideoUnavailable();
-                }
-              }, 6000);
+              // Remove timeout - let YouTube API load naturally
             } else {
-              setTimeout(() => window.onYouTubeIframeAPIReady(), 100);
+              window.onYouTubeIframeAPIReady();
             }
             
             window.onYouTubeIframeAPIReady = function() {
@@ -1043,7 +968,7 @@ export default function ViewTab() {
   // Handle real-time updates
   useEffect(() => {
     if (videoUpdates?.completed && user) {
-      setTimeout(() => refreshQueue(user.id), 1000);
+      refreshQueue(user.id);
     }
   }, [videoUpdates, user, refreshQueue]);
 
