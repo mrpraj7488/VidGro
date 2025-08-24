@@ -822,7 +822,9 @@ export default function ViewTab() {
                   if (playerReady && player && !timerCompleted) {
                     console.log('✅ All conditions met, calling player.playVideo()');
                     player.playVideo();
-                    // Immediately notify that we're playing
+                    // Immediately update overlay state
+                    updatePlayerState(true);
+                    // Notify React Native
                     notifyReactNative('videoPlaying');
                   } else {
                     console.log('❌ Cannot play video - player not ready yet');
@@ -833,6 +835,8 @@ export default function ViewTab() {
                 
                 if (data.type === 'pauseVideo' && playerReady && player) {
                   player.pauseVideo();
+                  // Immediately update overlay state
+                  updatePlayerState(false);
                 }
               } catch (e) {
                 // Silent error handling
@@ -895,6 +899,8 @@ export default function ViewTab() {
                   console.log('🎯 Executing pending play request');
                   event.target.playVideo();
                   window.pendingPlayRequest = false;
+                  // Update overlay state immediately
+                  updatePlayerState(true);
                   notifyReactNative('videoPlaying');
                 }
                 
