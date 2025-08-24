@@ -10,6 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ExternalLink } from 'lucide-react-native';
 import GlobalHeader from '@/components/GlobalHeader';
+import { watchVideoAndEarnCoins } from '@/lib/supabase';
 
 // Responsive helpers
 const { width: screenWidth } = Dimensions.get('window');
@@ -55,27 +56,7 @@ export default function ViewTab() {
   const [isVideoTransitioning, setIsVideoTransitioning] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   
-  // Function to watch video and earn coins
-  const watchVideoAndEarnCoins = async (userId: string, videoId: string, watchTime: number, completed: boolean) => {
-    try {
-      // Return a proper response structure to prevent undefined errors
-      return {
-        data: {
-          success: true,
-          video_completed: completed,
-          coins_earned: completed ? 10 : 0
-        },
-        error: null
-      };
-    } catch (error) {
-      return {
-        data: null,
-        error: {
-          message: error instanceof Error ? error.message : 'Unknown error occurred'
-        }
-      };
-    }
-  };
+  // Note: watchVideoAndEarnCoins is now imported from @/lib/supabase
   
   // Refs
   const isVideoPlayingRef = useRef(false);
