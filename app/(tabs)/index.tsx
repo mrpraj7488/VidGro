@@ -1005,7 +1005,7 @@ export default function ViewTab() {
       </body>
       </html>
     `;
-  }, []);
+  }, [youtubeVideoId]);
 
   // Memoize HTML content to prevent unnecessary regeneration
   const htmlContent = useMemo(() => {
